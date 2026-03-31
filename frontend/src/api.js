@@ -1,5 +1,14 @@
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:4000";
 
+/** Thrown by apiFetch; includes HTTP status (0 = network / unreachable). */
+export class ApiError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 function getToken() {
   return localStorage.getItem("token");
 }
@@ -9,16 +18,21 @@ async function apiFetch(path, { method = "GET", body, token } = {}) {
   const t = token || getToken();
   if (t) headers.Authorization = `Bearer ${t}`;
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    throw new ApiError("Network error", 0);
+  }
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const msg = data.error || `Request failed (${res.status})`;
-    throw new Error(msg);
+    throw new ApiError(msg, res.status);
   }
   return data;
 }

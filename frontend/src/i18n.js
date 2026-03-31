@@ -11,6 +11,11 @@ export const translations = {
     avatarUrlOptional: "Avatar URL (optional)",
     createAccount: "Create account",
 
+    authInvalidCredentials: "Invalid credentials",
+    authServerUnavailable:
+      "Server is starting or temporarily unavailable. Please try again in a few seconds.",
+    authGenericError: "Something went wrong. Please try again.",
+
     chats: "Chats",
     newChat: "New chat",
     searchUsernamePlaceholder: "Search username...",
@@ -62,6 +67,11 @@ export const translations = {
     password: "Пароль",
     avatarUrlOptional: "URL аватара (необязательно)",
     createAccount: "Создать аккаунт",
+
+    authInvalidCredentials: "Неверный логин или пароль",
+    authServerUnavailable:
+      "Сервер запускается или временно недоступен. Попробуйте снова через несколько секунд.",
+    authGenericError: "Что-то пошло не так. Попробуйте ещё раз.",
 
     chats: "Чаты",
     newChat: "Новый чат",
@@ -117,5 +127,20 @@ export function tf(lang, key, vars) {
     s = s.replaceAll(`{${k}}`, String(v[k]));
   });
   return s;
+}
+
+/** Maps login/register failures to a clear UX message (uses `t` from current language). */
+export function formatAuthError(err, t) {
+  const status = err?.status;
+  if (err?.name === "ApiError" && typeof status === "number") {
+    if (status === 0 || status >= 500) {
+      return t("authServerUnavailable");
+    }
+    if (status === 401) {
+      return t("authInvalidCredentials");
+    }
+    return err.message || t("authGenericError");
+  }
+  return err?.message || t("authGenericError");
 }
 

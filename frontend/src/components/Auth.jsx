@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { formatAuthError } from "../i18n.js";
 
 export default function Auth({ onLogin, onRegister, error, t }) {
   const [mode, setMode] = useState("login"); // "login" | "register"
@@ -21,7 +22,7 @@ export default function Auth({ onLogin, onRegister, error, t }) {
         await onRegister({ username, password, avatar });
       }
     } catch (e2) {
-      setErr(e2.message || "Request failed");
+      setErr(formatAuthError(e2, t));
     }
   }
 
