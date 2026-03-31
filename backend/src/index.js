@@ -297,6 +297,7 @@ app.get("/api/chats/:chatId/messages", authRequired, (req, res) => {
         m.text,
         m.delivered_at,
         m.read_at,
+        m.edited_at,
         m.created_at,
         u.username,
         u.avatar_url
@@ -315,6 +316,7 @@ app.get("/api/chats/:chatId/messages", authRequired, (req, res) => {
       text: m.text,
       deliveredAt: m.delivered_at,
       readAt: m.read_at,
+      editedAt: m.edited_at,
       createdAt: m.created_at,
       sender: { id: m.sender_id, username: m.username, avatar: m.avatar_url },
     }));
@@ -332,6 +334,60 @@ const io = new Server(server, {
 
 // Track sockets by authenticated user so we can emit to both participants.
 const userSockets = new Map(); // userId -> Set(socket.id)
+
+app.put("/api/messages/:messageId", authRequired, (req, res) => {
+  const messageId = Number(req.params.messageId);
+  const bodyText = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+  if (!messageId) return res.status(400).json({ error: "Invalid message id" });
+  if (!bodyText) return res.status(400).json({ error: "text is required" });
+  if (bodyText.length > 4000) return res.status(400).json({ error: "Message too long" });
+
+  const row = db.prepare(`SELECT id, chat_id, sender_id FROM messages WHERE id = ?`).get(messageId);
+  if (!row) return res.status(404).json({ error: "Message not found" });
+  if (row.sender_id !== req.user.id) return res.status(403).json({ error: "Not allowed" });
+
+  const chat = getChatParticipants(row.chat_id);
+  if (!chat) return res.status(404).json({ error: "Chat not found" });
+  const isMember = chat.user1_id === req.user.id || chat.user2_id === req.user.id;
+  if (!isMember) return res.status(403).json({ error: "Not a member of this chat" });
+
+  db.prepare(`UPDATE messages SET text = ?, edited_at = CURRENT_TIMESTAMP WHERE id = ?`).run(bodyText, messageId);
+
+  const messageRow = db
+    .prepare(
+      `
+      SELECT m.id, m.chat_id, m.sender_id, m.text, m.delivered_at, m.read_at, m.edited_at, m.created_at,
+             u.username, u.avatar_url
+      FROM messages m
+      JOIN users u ON u.id = m.sender_id
+      WHERE m.id = ?
+    `
+    )
+    .get(messageId);
+
+  const message = {
+    id: messageRow.id,
+    chatId: messageRow.chat_id,
+    senderId: messageRow.sender_id,
+    text: messageRow.text,
+    deliveredAt: messageRow.delivered_at,
+    readAt: messageRow.read_at,
+    editedAt: messageRow.edited_at,
+    createdAt: messageRow.created_at,
+    sender: { id: messageRow.sender_id, username: messageRow.username, avatar: messageRow.avatar_url },
+  };
+
+  const cid = row.chat_id;
+  const u1 = chat.user1_id;
+  const u2 = chat.user2_id;
+  const recipients = new Set([
+    ...(userSockets.get(u1) ? Array.from(userSockets.get(u1)) : []),
+    ...(userSockets.get(u2) ? Array.from(userSockets.get(u2)) : []),
+  ]);
+  recipients.forEach((sid) => io.to(sid).emit("message:edited", { chatId: cid, message }));
+
+  return res.json({ message });
+});
 
 io.on("connection", (socket) => {
   const token = socket.handshake.auth?.token;
@@ -391,7 +447,7 @@ io.on("connection", (socket) => {
     const messageRow = db
       .prepare(
         `
-        SELECT m.id, m.chat_id, m.sender_id, m.text, m.delivered_at, m.read_at, m.created_at,
+        SELECT m.id, m.chat_id, m.sender_id, m.text, m.delivered_at, m.read_at, m.edited_at, m.created_at,
                u.username, u.avatar_url
         FROM messages m
         JOIN users u ON u.id = m.sender_id
@@ -407,6 +463,7 @@ io.on("connection", (socket) => {
       text: messageRow.text,
       deliveredAt: messageRow.delivered_at,
       readAt: messageRow.read_at,
+      editedAt: messageRow.edited_at,
       createdAt: messageRow.created_at,
       sender: { id: messageRow.sender_id, username: messageRow.username, avatar: messageRow.avatar_url },
     };

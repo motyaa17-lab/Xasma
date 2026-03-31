@@ -11,42 +11,72 @@ export default function Chat({
   meUsername,
   chatTheme,
   onSend,
+  onEditMessage,
   onTyping,
   t,
   lang,
 }) {
   const [text, setText] = useState("");
+  const [editingMessageId, setEditingMessageId] = useState(null);
+  const [menuMessageId, setMenuMessageId] = useState(null);
   const listRef = useRef(null);
   const typingStartTimerRef = useRef(null);
   const typingStopTimerRef = useRef(null);
   const typingActiveRef = useRef(false);
 
   useEffect(() => {
-    // Scroll to bottom when switching chats or new messages.
     const el = listRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
   }, [chatId, messages.length]);
 
   useEffect(() => {
-    // Switching chats: stop typing in previous chat.
+    typingActiveRef.current = false;
+    if (typingStartTimerRef.current) clearTimeout(typingStartTimerRef.current);
+    if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
+    onTyping?.(false);
+    setEditingMessageId(null);
+    setMenuMessageId(null);
+    setText("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId]);
+
+  useEffect(() => {
+    if (!editingMessageId) return;
     typingActiveRef.current = false;
     if (typingStartTimerRef.current) clearTimeout(typingStartTimerRef.current);
     if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
     onTyping?.(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatId]);
+  }, [editingMessageId]);
 
-  function handleSend() {
-    const t = text.trim();
-    if (!t) return;
+  useEffect(() => {
+    if (menuMessageId == null) return;
+    const onDown = () => setMenuMessageId(null);
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [menuMessageId]);
+
+  async function handlePrimary() {
+    const trimmed = text.trim();
+    if (!trimmed) return;
     onTyping?.(false);
-    onSend(t);
+    if (editingMessageId) {
+      try {
+        await onEditMessage(editingMessageId, trimmed);
+      } catch {
+        return;
+      }
+      setEditingMessageId(null);
+      setText("");
+      return;
+    }
+    onSend(trimmed);
     setText("");
   }
 
   function scheduleTyping() {
-    // Start typing (debounced).
+    if (editingMessageId) return;
     if (!typingActiveRef.current) {
       if (typingStartTimerRef.current) clearTimeout(typingStartTimerRef.current);
       typingStartTimerRef.current = setTimeout(() => {
@@ -54,8 +84,6 @@ export default function Chat({
         onTyping?.(true);
       }, 350);
     }
-
-    // Stop typing after inactivity.
     if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
     typingStopTimerRef.current = setTimeout(() => {
       typingActiveRef.current = false;
@@ -103,8 +131,48 @@ export default function Chat({
                     <span>{initials(getDisplayName(m, meId, meUsername))}</span>
                   )}
                 </div>
-                <div className={m.senderId === meId ? "bubble me" : "bubble"}>
-                  <div className="bubbleText">{m.text}</div>
+                <div className={m.senderId === meId ? "bubble me bubbleOwn" : "bubble"}>
+                  {m.senderId === meId ? (
+                    <div className="msgMenu">
+                      <button
+                        type="button"
+                        className="msgMenuBtn"
+                        aria-label={t("menu")}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMenuMessageId((id) => (id === m.id ? null : m.id));
+                        }}
+                      >
+                        ⋯
+                      </button>
+                      {menuMessageId === m.id ? (
+                        <div className="msgMenuDropdown" role="menu">
+                          <button
+                            type="button"
+                            className="msgMenuItem"
+                            role="menuitem"
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingMessageId(m.id);
+                              setText(m.text);
+                              setMenuMessageId(null);
+                              onTyping?.(false);
+                            }}
+                          >
+                            {t("edit")}
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  <div className="bubbleText">
+                    {m.text}
+                    {m.editedAt ? (
+                      <span className="bubbleEdited"> {t("edited")}</span>
+                    ) : null}
+                  </div>
                   <div className="bubbleMeta">
                     <span className="bubbleTime">{formatTime(m.createdAt)}</span>
                     {m.senderId === meId ? (
@@ -129,19 +197,26 @@ export default function Chat({
               rows={1}
               placeholder={t("typeMessagePlaceholder")}
               onKeyDown={(e) => {
+                if (e.key === "Escape" && editingMessageId) {
+                  e.preventDefault();
+                  setEditingMessageId(null);
+                  setText("");
+                  onTyping?.(false);
+                  return;
+                }
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  handleSend();
+                  handlePrimary();
                 }
               }}
             />
             <button
               className="sendBtn"
               type="button"
-              onClick={handleSend}
+              onClick={handlePrimary}
               disabled={!text.trim()}
             >
-              {t("send")}
+              {editingMessageId ? t("save") : t("send")}
             </button>
           </div>
         </>
@@ -212,4 +287,3 @@ function initials(name) {
   const s = String(name || "").trim();
   return (s[0] || "?").toUpperCase();
 }
-

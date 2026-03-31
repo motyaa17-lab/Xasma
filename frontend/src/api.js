@@ -75,6 +75,13 @@ export async function getMessages(chatId, limit = 50) {
   return data.messages;
 }
 
+export async function updateMessage(messageId, text) {
+  return apiFetch(`/api/messages/${messageId}`, {
+    method: "PUT",
+    body: { text },
+  });
+}
+
 export function getSocketEndpoint() {
   return API_BASE;
 }

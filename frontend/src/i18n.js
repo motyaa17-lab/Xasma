@@ -23,6 +23,9 @@ export const translations = {
 
     typeMessagePlaceholder: "Type a message...",
     send: "Send",
+    save: "Save",
+    edit: "Edit",
+    edited: "(edited)",
 
     menu: "Menu",
     myProfile: "My Profile",
@@ -72,6 +75,9 @@ export const translations = {
 
     typeMessagePlaceholder: "Введите сообщение...",
     send: "Отправить",
+    save: "Сохранить",
+    edit: "Изменить",
+    edited: "(изменено)",
 
     menu: "Меню",
     myProfile: "Мой профиль",

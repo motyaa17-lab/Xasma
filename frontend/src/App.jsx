@@ -13,6 +13,7 @@ import {
   getMessages,
   login,
   register,
+  updateMessage,
   updateMyAvatar,
 } from "./api.js";
 import { getSocketEndpoint } from "./api.js";
@@ -223,12 +224,22 @@ export default function App() {
       );
     });
 
+    socket.on("message:edited", ({ chatId, message }) => {
+      if (!message?.id) return;
+      const openChatId = selectedChatIdRef.current;
+      if (!openChatId || Number(chatId) !== openChatId) return;
+      setMessages((prev) =>
+        prev.map((m) => (m.id === message.id ? { ...m, ...message } : m))
+      );
+    });
+
     return () => {
       socket.off("chat:message");
       socket.off("user:avatar");
       socket.off("user:presence");
       socket.off("chat:typing");
       socket.off("chat:message:status");
+      socket.off("message:edited");
       socket.disconnect();
     };
   }, [token, socketEndpoint, me?.id]);
@@ -266,6 +277,14 @@ export default function App() {
     if (!socketRef.current || !socketReady) return;
     if (!selectedChatId) return;
     socketRef.current.emit("chat:typing", { chatId: selectedChatId, isTyping: Boolean(isTyping) });
+  }
+
+  async function handleEditMessage(messageId, text) {
+    const data = await updateMessage(messageId, text);
+    const msg = data.message;
+    setMessages((prev) =>
+      prev.map((m) => (m.id === msg.id ? { ...m, ...msg } : m))
+    );
   }
 
   async function handleLogin(data) {
@@ -336,6 +355,7 @@ export default function App() {
               meUsername={me.username}
               chatTheme={settings.chatTheme}
               onSend={handleSend}
+              onEditMessage={handleEditMessage}
               onTyping={handleTyping}
               t={t}
               lang={settings.lang}

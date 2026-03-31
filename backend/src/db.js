@@ -40,6 +40,7 @@ function initDb() {
       text TEXT NOT NULL,
       delivered_at DATETIME,
       read_at DATETIME,
+      edited_at DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY(chat_id) REFERENCES chats(id),
       FOREIGN KEY(sender_id) REFERENCES users(id)
@@ -61,6 +62,9 @@ function initDb() {
   }
   if (!msgCols.includes("read_at")) {
     db.exec(`ALTER TABLE messages ADD COLUMN read_at DATETIME`);
+  }
+  if (!msgCols.includes("edited_at")) {
+    db.exec(`ALTER TABLE messages ADD COLUMN edited_at DATETIME`);
   }
 }
 
