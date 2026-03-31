@@ -1,0 +1,11 @@
+node_modules
+dist
+build
+.env
+*.sqlite
+db.sqlite
+
+# OS
+.DS_Store
+Thumbs.db
+
