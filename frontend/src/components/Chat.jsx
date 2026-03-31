@@ -58,7 +58,7 @@ export default function Chat({
   }, [menuMessageId]);
 
   async function handlePrimary() {
-    const trimmed = text.trim();
+    const trimmed = String(text).trim();
     if (!trimmed) return;
     onTyping?.(false);
     if (editingMessageId) {
@@ -156,7 +156,7 @@ export default function Chat({
                             onClick={(e) => {
                               e.stopPropagation();
                               setEditingMessageId(m.id);
-                              setText(m.text);
+                              setText(String(m.text ?? ""));
                               setMenuMessageId(null);
                               onTyping?.(false);
                             }}
@@ -213,8 +213,12 @@ export default function Chat({
             <button
               className="sendBtn"
               type="button"
+              onMouseDown={(e) => {
+                // Keep click from being lost when the textarea blurs first (browser focus order).
+                e.preventDefault();
+              }}
               onClick={handlePrimary}
-              disabled={!text.trim()}
+              disabled={!String(text).trim()}
             >
               {editingMessageId ? t("save") : t("send")}
             </button>

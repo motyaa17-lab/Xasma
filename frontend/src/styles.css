@@ -791,6 +791,9 @@ body {
 }
 
 .composer {
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
   padding: 14px 18px 18px;
   display: flex;
   gap: 12px;
