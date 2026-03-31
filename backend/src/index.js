@@ -19,11 +19,10 @@ const app = express();
 app.use(express.json());
 app.use(
   cors({
-    origin: FRONTEND_ORIGIN,
+    origin: true,
     credentials: true,
   })
 );
-
 function signToken(user) {
   return jwt.sign({ sub: user.id, username: user.username }, JWT_SECRET, {
     expiresIn: "7d",
@@ -325,11 +324,10 @@ app.get("/api/chats/:chatId/messages", authRequired, (req, res) => {
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: FRONTEND_ORIGIN,
+    origin: true,
     credentials: true,
   },
 });
-
 // Track sockets by authenticated user so we can emit to both participants.
 const userSockets = new Map(); // userId -> Set(socket.id)
 
