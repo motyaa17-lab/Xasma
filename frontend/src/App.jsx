@@ -46,6 +46,8 @@ export default function App() {
   const socketRef = useRef(null);
   const selectedChatIdRef = useRef(null);
   const chatsRefreshTimer = useRef(null);
+  const lastReadSentRef = useRef({}); // chatId -> messageId
+  const readEmitTimerRef = useRef(null);
 
   const socketEndpoint = useMemo(() => getSocketEndpoint(), []);
 
@@ -124,6 +126,22 @@ export default function App() {
       const openChatId = selectedChatIdRef.current;
       if (openChatId && msg.chatId === openChatId) {
         setMessages((prev) => [...prev, msg]);
+
+        // If I'm currently viewing this chat and the tab is active,
+        // immediately mark the incoming message as read.
+        const isIncoming = me?.id && msg.senderId && Number(msg.senderId) !== me.id;
+        if (isIncoming && socketReady && isWindowActive()) {
+          const cid = Number(openChatId);
+          const mid = Number(msg.id);
+          const lastSent = Number(lastReadSentRef.current[cid] || 0);
+          if (mid > lastSent) {
+            lastReadSentRef.current[cid] = mid;
+            if (readEmitTimerRef.current) clearTimeout(readEmitTimerRef.current);
+            readEmitTimerRef.current = setTimeout(() => {
+              socket.emit("chat:read", { chatId: cid, upToMessageId: mid });
+            }, 120);
+          }
+        }
       }
 
       if (chatsRefreshTimer.current) clearTimeout(chatsRefreshTimer.current);
@@ -327,5 +345,14 @@ export default function App() {
       )}
     </div>
   );
+}
+
+function isWindowActive() {
+  // "Active enough" heuristic: visible + focused (where supported).
+  if (typeof document !== "undefined" && document.visibilityState !== "visible") return false;
+  if (typeof document !== "undefined" && typeof document.hasFocus === "function") {
+    return document.hasFocus();
+  }
+  return true;
 }
 

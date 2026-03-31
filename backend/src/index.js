@@ -19,10 +19,11 @@ const app = express();
 app.use(express.json());
 app.use(
   cors({
-    origin: true,
+    origin: FRONTEND_ORIGIN,
     credentials: true,
   })
 );
+
 function signToken(user) {
   return jwt.sign({ sub: user.id, username: user.username }, JWT_SECRET, {
     expiresIn: "7d",
@@ -324,10 +325,11 @@ app.get("/api/chats/:chatId/messages", authRequired, (req, res) => {
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: true,
+    origin: FRONTEND_ORIGIN,
     credentials: true,
   },
 });
+
 // Track sockets by authenticated user so we can emit to both participants.
 const userSockets = new Map(); // userId -> Set(socket.id)
 
@@ -513,7 +515,7 @@ io.on("connection", (socket) => {
   });
 });
 
-server.listen(PORT, "0.0.0.0", () => {
+server.listen(PORT, () => {
   // eslint-disable-next-line no-console
   console.log(`Backend listening on http://localhost:${PORT}`);
 });
