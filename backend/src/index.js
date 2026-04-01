@@ -395,7 +395,13 @@ app.get("/api/chats", authRequired, (req, res) => {
         lm.text AS last_text,
         lm.created_at AS last_created_at,
         lm.sender_id AS last_sender_id,
-        (SELECT COUNT(*)::int FROM chat_members cmx WHERE cmx.chat_id = c.id) AS member_count
+        (SELECT COUNT(*)::int FROM chat_members cmx WHERE cmx.chat_id = c.id) AS member_count,
+        (
+          SELECT COUNT(*)::int
+          FROM chat_members cm2
+          JOIN users u2 ON u2.id = cm2.user_id
+          WHERE cm2.chat_id = c.id AND u2.is_online = TRUE
+        ) AS online_member_count
       FROM chat_members mym
       JOIN chats c ON c.id = mym.chat_id
       LEFT JOIN users other
@@ -435,6 +441,7 @@ app.get("/api/chats", authRequired, (req, res) => {
           title: isGroup ? c.chat_title : null,
           createdBy: c.chat_created_by != null ? Number(c.chat_created_by) : null,
           memberCount: isGroup ? Number(c.member_count) : undefined,
+          onlineMemberCount: isGroup ? Number(c.online_member_count) : undefined,
           avatar: isGroup ? c.chat_avatar_url || "" : undefined,
           other: isGroup
             ? null
@@ -553,6 +560,7 @@ app.get("/api/groups/:chatId", authRequired, (req, res) => {
         id: Number(u.id),
         username: u.username,
         avatar: u.avatar_url,
+        online: Boolean(u.is_online),
         isOnline: Boolean(u.is_online),
         lastSeenAt: u.last_seen_at,
         isCreator: Number(u.id) === createdBy,

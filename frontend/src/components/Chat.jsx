@@ -139,6 +139,14 @@ export default function Chat({
                         {chat.memberCount === 1
                           ? t("participantCountOne")
                           : t("participantCountMany").replace("{count}", String(chat.memberCount))}
+                        {typeof chat?.onlineMemberCount === "number" ? (
+                          <>
+                            <span className="chatHeaderOnlineSep">{t("groupOnlineSep")}</span>
+                            <span className="chatHeaderOnlineCount">
+                              {t("groupOnlineCount").replace("{count}", String(chat.onlineMemberCount))}
+                            </span>
+                          </>
+                        ) : null}
                       </span>
                     ) : null}
                   </div>

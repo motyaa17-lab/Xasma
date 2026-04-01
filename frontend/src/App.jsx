@@ -51,6 +51,7 @@ export default function App() {
   const socketRef = useRef(null);
   const selectedChatIdRef = useRef(null);
   const chatsRefreshTimer = useRef(null);
+  const chatsPresenceRefreshTimer = useRef(null);
   const lastReadSentRef = useRef({}); // chatId -> messageId
   const readEmitTimerRef = useRef(null);
 
@@ -205,6 +206,16 @@ export default function App() {
             : m
         )
       );
+
+      if (chatsPresenceRefreshTimer.current) clearTimeout(chatsPresenceRefreshTimer.current);
+      chatsPresenceRefreshTimer.current = setTimeout(async () => {
+        try {
+          const list = await getChats();
+          setChats(list);
+        } catch {
+          // ignore
+        }
+      }, 220);
     });
 
     socket.on("chat:typing", ({ chatId, userId, isTyping }) => {

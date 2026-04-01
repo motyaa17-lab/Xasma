@@ -47,6 +47,8 @@ export const translations = {
 
     participantCountOne: "1 participant",
     participantCountMany: "{count} participants",
+    groupOnlineSep: " · ",
+    groupOnlineCount: "{count} online",
 
     systemGroupCreated: "{actor} created the group",
     systemMemberAdded: "{actor} added {target} to the group",
@@ -138,6 +140,8 @@ export const translations = {
 
     participantCountOne: "1 участник",
     participantCountMany: "Участников: {count}",
+    groupOnlineSep: " · ",
+    groupOnlineCount: "в сети: {count}",
 
     systemGroupCreated: "{actor} создал(а) группу",
     systemMemberAdded: "{actor} добавил(а) {target} в группу",
