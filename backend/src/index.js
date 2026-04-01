@@ -23,7 +23,7 @@ app.use(
 );
 
 function signToken(user) {
-  return jwt.sign({ sub: user.id, username: user.username }, JWT_SECRET, {
+  return jwt.sign({ sub: user.id, username: user.username, role: user.role }, JWT_SECRET, {
     expiresIn: "7d",
   });
 }
@@ -39,15 +39,22 @@ async function authRequired(req, res, next) {
     const userId = Number(payload.sub);
     if (!userId) return res.status(401).json({ error: "Invalid token" });
 
-    const r = await query(`SELECT id, username FROM users WHERE id = $1`, [userId]);
+    const r = await query(`SELECT id, username, role, banned FROM users WHERE id = $1`, [userId]);
     const user = r.rows[0];
     if (!user) return res.status(401).json({ error: "Invalid token" });
+    if (user.banned) return res.status(403).json({ error: "Banned" });
 
-    req.user = { id: Number(user.id), username: user.username };
+    req.user = { id: Number(user.id), username: user.username, role: user.role };
     return next();
   } catch (e) {
     return res.status(401).json({ error: "Invalid token" });
   }
+}
+
+function requireAdmin(req, res, next) {
+  if (!req.user) return res.status(401).json({ error: "Missing token" });
+  if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only" });
+  return next();
 }
 
 function normalizeChatUsers(a, b) {
@@ -110,12 +117,21 @@ app.post("/api/register", async (req, res) => {
 
   const password_hash = await bcrypt.hash(password, 10);
   const inserted = await query(
-    `INSERT INTO users (username, password_hash, avatar_url) VALUES ($1, $2, $3) RETURNING id, username, avatar_url`,
+    `INSERT INTO users (username, password_hash, avatar_url) VALUES ($1, $2, $3) RETURNING id, username, avatar_url, role, banned`,
     [username.trim(), password_hash, avatar_url]
   );
   const user = inserted.rows[0];
   const token = signToken(user);
-  return res.json({ token, user: { id: Number(user.id), username: user.username, avatar: user.avatar_url } });
+  return res.json({
+    token,
+    user: {
+      id: Number(user.id),
+      username: user.username,
+      avatar: user.avatar_url,
+      role: user.role,
+      banned: Boolean(user.banned),
+    },
+  });
 });
 
 app.post("/api/login", async (req, res) => {
@@ -123,11 +139,12 @@ app.post("/api/login", async (req, res) => {
   if (!username || !password) return res.status(400).json({ error: "username and password are required" });
 
   const r = await query(
-    `SELECT id, username, password_hash, avatar_url FROM users WHERE username = $1`,
+    `SELECT id, username, password_hash, avatar_url, role, banned FROM users WHERE username = $1`,
     [username.trim()]
   );
   const user = r.rows[0];
   if (!user) return res.status(401).json({ error: "Invalid credentials" });
+  if (user.banned) return res.status(403).json({ error: "Banned" });
 
   const ok = await bcrypt.compare(password, user.password_hash);
   if (!ok) return res.status(401).json({ error: "Invalid credentials" });
@@ -135,14 +152,20 @@ app.post("/api/login", async (req, res) => {
   const token = signToken(user);
   return res.json({
     token,
-    user: { id: Number(user.id), username: user.username, avatar: user.avatar_url },
+    user: {
+      id: Number(user.id),
+      username: user.username,
+      avatar: user.avatar_url,
+      role: user.role,
+      banned: Boolean(user.banned),
+    },
   });
 });
 
 app.get("/api/me", authRequired, (req, res) => {
   const uid = Number(req.user.id);
   return query(
-    `SELECT id, username, avatar_url, is_online, last_seen_at FROM users WHERE id = $1`,
+    `SELECT id, username, avatar_url, role, banned, is_online, last_seen_at FROM users WHERE id = $1`,
     [uid]
   ).then((r) => {
     const user = r.rows[0];
@@ -152,6 +175,8 @@ app.get("/api/me", authRequired, (req, res) => {
       id: Number(user.id),
       username: user.username,
       avatar: user.avatar_url,
+      role: user.role,
+      banned: Boolean(user.banned),
       isOnline: Boolean(user.is_online),
       lastSeenAt: user.last_seen_at,
     },
@@ -558,6 +583,120 @@ app.put("/api/messages/:messageId", authRequired, (req, res) => {
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });
 
+// Admin APIs
+app.get("/api/admin/users", authRequired, requireAdmin, (req, res) => {
+  (async () => {
+    const r = await query(
+      `
+      SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, created_at
+      FROM users
+      ORDER BY created_at DESC, id DESC
+    `
+    );
+    return res.json({
+      users: r.rows.map((u) => ({
+        id: Number(u.id),
+        username: u.username,
+        avatar_url: u.avatar_url,
+        role: u.role,
+        banned: Boolean(u.banned),
+        is_online: Boolean(u.is_online),
+        last_seen_at: u.last_seen_at,
+        created_at: u.created_at,
+      })),
+    });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
+app.patch("/api/admin/users/:userId/role", authRequired, requireAdmin, (req, res) => {
+  const userId = Number(req.params.userId);
+  const role = typeof req.body?.role === "string" ? req.body.role : "";
+  if (!userId) return res.status(400).json({ error: "Invalid user id" });
+  if (role !== "user" && role !== "admin") return res.status(400).json({ error: "Invalid role" });
+
+  (async () => {
+    const r = await query(
+      `UPDATE users SET role = $1 WHERE id = $2 RETURNING id, username, avatar_url, role, banned, is_online, last_seen_at, created_at`,
+      [role, userId]
+    );
+    const u = r.rows[0];
+    if (!u) return res.status(404).json({ error: "User not found" });
+    return res.json({
+      user: {
+        id: Number(u.id),
+        username: u.username,
+        avatar_url: u.avatar_url,
+        role: u.role,
+        banned: Boolean(u.banned),
+        is_online: Boolean(u.is_online),
+        last_seen_at: u.last_seen_at,
+        created_at: u.created_at,
+      },
+    });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
+app.patch("/api/admin/users/:userId/ban", authRequired, requireAdmin, (req, res) => {
+  const userId = Number(req.params.userId);
+  const banned = Boolean(req.body?.banned);
+  if (!userId) return res.status(400).json({ error: "Invalid user id" });
+
+  (async () => {
+    const r = await query(
+      `UPDATE users SET banned = $1 WHERE id = $2 RETURNING id, username, avatar_url, role, banned, is_online, last_seen_at, created_at`,
+      [banned, userId]
+    );
+    const u = r.rows[0];
+    if (!u) return res.status(404).json({ error: "User not found" });
+
+    // If banning, force offline presence update.
+    if (banned) {
+      await query(`UPDATE users SET is_online = FALSE, last_seen_at = now() WHERE id = $1`, [userId]);
+      emitToAll("user:presence", { userId, isOnline: false, lastSeenAt: new Date().toISOString() });
+    }
+
+    return res.json({
+      user: {
+        id: Number(u.id),
+        username: u.username,
+        avatar_url: u.avatar_url,
+        role: u.role,
+        banned: Boolean(u.banned),
+        is_online: Boolean(u.is_online),
+        last_seen_at: u.last_seen_at,
+        created_at: u.created_at,
+      },
+    });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
+app.delete("/api/admin/messages/:messageId", authRequired, requireAdmin, (req, res) => {
+  const messageId = Number(req.params.messageId);
+  if (!messageId) return res.status(400).json({ error: "Invalid message id" });
+
+  (async () => {
+    const r = await query(
+      `SELECT m.id, m.chat_id, c.user1_id, c.user2_id FROM messages m JOIN chats c ON c.id = m.chat_id WHERE m.id = $1`,
+      [messageId]
+    );
+    const row = r.rows[0];
+    if (!row) return res.status(404).json({ error: "Message not found" });
+
+    await query(`DELETE FROM messages WHERE id = $1`, [messageId]);
+
+    const chatId = Number(row.chat_id);
+    const u1 = Number(row.user1_id);
+    const u2 = Number(row.user2_id);
+    const recipients = new Set([
+      ...(userSockets.get(u1) ? Array.from(userSockets.get(u1)) : []),
+      ...(userSockets.get(u2) ? Array.from(userSockets.get(u2)) : []),
+    ]);
+    recipients.forEach((sid) => io.to(sid).emit("message:deleted", { chatId, messageId }));
+
+    return res.json({ ok: true });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
 io.on("connection", (socket) => {
   const token = socket.handshake.auth?.token;
   if (!token) {
@@ -573,15 +712,25 @@ io.on("connection", (socket) => {
     return;
   }
 
-  const userId = payload.sub;
+  const userId = Number(payload.sub);
+  if (!userId) {
+    socket.disconnect(true);
+    return;
+  }
 
   if (!userSockets.has(userId)) userSockets.set(userId, new Set());
   userSockets.get(userId).add(socket.id);
 
   // Mark online (simple presence).
   (async () => {
-    await query(`UPDATE users SET is_online = TRUE WHERE id = $1`, [Number(userId)]);
-    emitToAll("user:presence", { userId: Number(userId), isOnline: true, lastSeenAt: null });
+    const r = await query(`SELECT banned FROM users WHERE id = $1`, [userId]);
+    const u = r.rows[0];
+    if (!u || u.banned) {
+      socket.disconnect(true);
+      return;
+    }
+    await query(`UPDATE users SET is_online = TRUE WHERE id = $1`, [userId]);
+    emitToAll("user:presence", { userId, isOnline: true, lastSeenAt: null });
   })().catch(() => {});
 
   socket.on("disconnect", () => {

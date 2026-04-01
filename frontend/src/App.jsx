@@ -13,6 +13,7 @@ import {
   getMessages,
   login,
   register,
+  adminDeleteMessage,
   toggleReaction,
   updateMessage,
   updateMyAvatar,
@@ -243,6 +244,14 @@ export default function App() {
       setMessages((prev) => prev.map((m) => (Number(m.id) === mid ? { ...m, reactions: nextReactions } : m)));
     });
 
+    socket.on("message:deleted", ({ chatId, messageId }) => {
+      const openChatId = selectedChatIdRef.current;
+      if (!openChatId || Number(chatId) !== openChatId) return;
+      const mid = Number(messageId);
+      if (!mid) return;
+      setMessages((prev) => prev.filter((m) => Number(m.id) !== mid));
+    });
+
     return () => {
       socket.off("chat:message");
       socket.off("user:avatar");
@@ -251,6 +260,7 @@ export default function App() {
       socket.off("chat:message:status");
       socket.off("message:edited");
       socket.off("message:reactionsUpdated");
+      socket.off("message:deleted");
       socket.disconnect();
     };
   }, [token, socketEndpoint, me?.id]);
@@ -303,6 +313,12 @@ export default function App() {
     const data = await toggleReaction(mid, emoji);
     const reactions = data.reactions || [];
     setMessages((prev) => prev.map((m) => (Number(m.id) === mid ? { ...m, reactions } : m)));
+  }
+
+  async function handleAdminDeleteMessage(messageId) {
+    const mid = Number(messageId);
+    await adminDeleteMessage(mid);
+    setMessages((prev) => prev.filter((m) => Number(m.id) !== mid));
   }
 
   async function handleLogin(data) {
@@ -375,6 +391,8 @@ export default function App() {
               onSend={handleSend}
               onEditMessage={handleEditMessage}
               onToggleReaction={handleToggleReaction}
+              isAdmin={me.role === "admin"}
+              onAdminDeleteMessage={handleAdminDeleteMessage}
               onTyping={handleTyping}
               t={t}
               lang={settings.lang}

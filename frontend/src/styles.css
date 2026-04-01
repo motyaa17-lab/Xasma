@@ -327,6 +327,62 @@ body {
   gap: 14px;
 }
 
+.adminPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.adminTopRow {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.adminUserList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.adminUserRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.adminUserMain {
+  min-width: 0;
+}
+
+.adminUserNameRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.adminUserName {
+  font-weight: 900;
+}
+
+.adminActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.adminActions .ghostBtn,
+.adminActions .primaryBtn {
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
 .settingsSection {
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 14px;

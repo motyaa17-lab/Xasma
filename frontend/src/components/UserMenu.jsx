@@ -1,13 +1,17 @@
 import React, { useEffect, useRef, useState } from "react";
+import { adminListUsers, adminSetUserBanned, adminSetUserRole } from "../api.js";
 
 export default function UserMenu({ me, onLogout, onChangeAvatar, settings, onChangeSettings, t }) {
   const [open, setOpen] = useState(false);
-  const [panel, setPanel] = useState(null); // "profile" | "settings" | null
+  const [panel, setPanel] = useState(null); // "profile" | "settings" | "admin" | null
   const rootRef = useRef(null);
   const fileInputRef = useRef(null);
   const [avatarPreview, setAvatarPreview] = useState("");
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [avatarError, setAvatarError] = useState("");
+  const [adminUsers, setAdminUsers] = useState([]);
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [adminError, setAdminError] = useState("");
 
   useEffect(() => {
     function onDocMouseDown(e) {
@@ -38,6 +42,19 @@ export default function UserMenu({ me, onLogout, onChangeAvatar, settings, onCha
     setAvatarPreview(me?.avatar || "");
     setAvatarError("");
   }, [panel, me?.avatar]);
+
+  async function loadAdminUsers() {
+    setAdminLoading(true);
+    setAdminError("");
+    try {
+      const data = await adminListUsers();
+      setAdminUsers(Array.isArray(data.users) ? data.users : []);
+    } catch (e) {
+      setAdminError(e.message || "Request failed");
+    } finally {
+      setAdminLoading(false);
+    }
+  }
 
   async function pickAvatarFile(file) {
     if (!file) return;
@@ -98,6 +115,20 @@ export default function UserMenu({ me, onLogout, onChangeAvatar, settings, onCha
           >
             {t("settings")}
           </button>
+          {me?.role === "admin" ? (
+            <button
+              className="dropdownItem"
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                setPanel("admin");
+                loadAdminUsers();
+              }}
+            >
+              Admin
+            </button>
+          ) : null}
           <div className="dropdownSep" />
           <button
             className="dropdownItem danger"
@@ -116,7 +147,9 @@ export default function UserMenu({ me, onLogout, onChangeAvatar, settings, onCha
 
       {panel ? (
         <Modal
-          title={panel === "profile" ? t("myProfile") : t("settings")}
+          title={
+            panel === "profile" ? t("myProfile") : panel === "settings" ? t("settings") : "Admin"
+          }
           onClose={() => setPanel(null)}
           t={t}
         >
@@ -177,7 +210,7 @@ export default function UserMenu({ me, onLogout, onChangeAvatar, settings, onCha
                 </div>
               </div>
             </div>
-          ) : (
+          ) : panel === "settings" ? (
             <div className="settingsPanel">
               <div className="settingsSection">
                 <div className="settingsTitle">{t("language")}</div>
@@ -222,6 +255,82 @@ export default function UserMenu({ me, onLogout, onChangeAvatar, settings, onCha
                   ))}
                 </div>
               </div>
+            </div>
+          ) : (
+            <div className="adminPanel">
+              {adminError ? <div className="authError">{adminError}</div> : null}
+              <div className="adminTopRow">
+                <button className="ghostBtn" type="button" onClick={loadAdminUsers} disabled={adminLoading}>
+                  Refresh
+                </button>
+              </div>
+
+              {adminLoading ? (
+                <div className="muted">Loading...</div>
+              ) : (
+                <div className="adminUserList">
+                  {adminUsers.map((u) => (
+                    <div key={u.id} className="adminUserRow">
+                      <div className="adminUserMain">
+                        <div className="adminUserNameRow">
+                          <div className="adminUserName">{u.username}</div>
+                          <div className={u.is_online ? "presenceDot online" : "presenceDot"} />
+                        </div>
+                        <div className="adminUserMeta muted small">
+                          role: {u.role} · {u.banned ? "banned" : "active"}
+                        </div>
+                      </div>
+
+                      <div className="adminActions">
+                        <button
+                          type="button"
+                          className="ghostBtn"
+                          onClick={async () => {
+                            const nextRole = u.role === "admin" ? "user" : "admin";
+                            setAdminUsers((prev) =>
+                              prev.map((x) => (x.id === u.id ? { ...x, role: nextRole } : x))
+                            );
+                            try {
+                              const res = await adminSetUserRole(u.id, nextRole);
+                              const updated = res.user;
+                              setAdminUsers((prev) =>
+                                prev.map((x) => (x.id === u.id ? { ...x, ...updated } : x))
+                              );
+                            } catch (e) {
+                              setAdminError(e.message || "Request failed");
+                              loadAdminUsers();
+                            }
+                          }}
+                        >
+                          {u.role === "admin" ? "Remove admin" : "Make admin"}
+                        </button>
+                        <button
+                          type="button"
+                          className={u.banned ? "primaryBtn" : "ghostBtn"}
+                          onClick={async () => {
+                            const next = !u.banned;
+                            setAdminUsers((prev) =>
+                              prev.map((x) => (x.id === u.id ? { ...x, banned: next } : x))
+                            );
+                            try {
+                              const res = await adminSetUserBanned(u.id, next);
+                              const updated = res.user;
+                              setAdminUsers((prev) =>
+                                prev.map((x) => (x.id === u.id ? { ...x, ...updated } : x))
+                              );
+                            } catch (e) {
+                              setAdminError(e.message || "Request failed");
+                              loadAdminUsers();
+                            }
+                          }}
+                        >
+                          {u.banned ? "Unban" : "Ban"}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </Modal>

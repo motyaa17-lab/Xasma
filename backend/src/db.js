@@ -24,6 +24,8 @@ async function initDb() {
       username TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
       avatar_url TEXT,
+      role TEXT NOT NULL DEFAULT 'user',
+      banned BOOLEAN NOT NULL DEFAULT FALSE,
       is_online BOOLEAN NOT NULL DEFAULT FALSE,
       last_seen_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -69,6 +71,13 @@ async function initDb() {
     CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id, id);
     CREATE INDEX IF NOT EXISTS idx_reactions_message ON message_reactions(message_id);
   `);
+
+  // Migrations for existing DBs (safe/idempotent).
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user'`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS banned BOOLEAN NOT NULL DEFAULT FALSE`);
+
+  // Ensure initial admin (safe if user doesn't exist).
+  await query(`UPDATE users SET role = 'admin' WHERE username = 'Xasma'`);
 }
 
 module.exports = { pool, query, initDb };

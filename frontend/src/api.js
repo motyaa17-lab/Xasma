@@ -111,3 +111,28 @@ export function getSocketEndpoint() {
   return API_BASE;
 }
 
+// Admin APIs
+export async function adminListUsers() {
+  return apiFetch("/api/admin/users");
+}
+
+export async function adminSetUserRole(userId, role) {
+  return apiFetch(`/api/admin/users/${userId}/role`, {
+    method: "PATCH",
+    body: { role },
+  });
+}
+
+export async function adminSetUserBanned(userId, banned) {
+  return apiFetch(`/api/admin/users/${userId}/ban`, {
+    method: "PATCH",
+    body: { banned: Boolean(banned) },
+  });
+}
+
+export async function adminDeleteMessage(messageId) {
+  return apiFetch(`/api/admin/messages/${messageId}`, {
+    method: "DELETE",
+  });
+}
+

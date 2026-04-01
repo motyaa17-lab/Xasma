@@ -13,6 +13,8 @@ export default function Chat({
   onSend,
   onEditMessage,
   onToggleReaction,
+  isAdmin,
+  onAdminDeleteMessage,
   onTyping,
   t,
   lang,
@@ -140,11 +142,7 @@ export default function Chat({
                     <span>{initials(getDisplayName(m, meId, meUsername))}</span>
                   )}
                 </div>
-                <div
-                  className={
-                    m.senderId === meId ? "bubble me bubbleOwn bubbleWithActions" : "bubble bubbleWithActions"
-                  }
-                >
+                <div className={m.senderId === meId ? "bubble me bubbleOwn bubbleWithActions" : "bubble bubbleWithActions"}>
                   <div className={m.senderId === meId ? "reactBtnWrap right" : "reactBtnWrap left"}>
                     <button
                       type="button"
@@ -208,6 +206,53 @@ export default function Chat({
                             }}
                           >
                             {t("edit")}
+                          </button>
+                          {isAdmin ? (
+                            <button
+                              type="button"
+                              className="msgMenuItem"
+                              role="menuitem"
+                              onMouseDown={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setMenuMessageId(null);
+                                onAdminDeleteMessage?.(m.id);
+                              }}
+                            >
+                              Delete
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : isAdmin ? (
+                    <div className="msgMenu">
+                      <button
+                        type="button"
+                        className="msgMenuBtn"
+                        aria-label={t("menu")}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMenuMessageId((id) => (id === m.id ? null : m.id));
+                        }}
+                      >
+                        ⋯
+                      </button>
+                      {menuMessageId === m.id ? (
+                        <div className="msgMenuDropdown" role="menu">
+                          <button
+                            type="button"
+                            className="msgMenuItem"
+                            role="menuitem"
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setMenuMessageId(null);
+                              onAdminDeleteMessage?.(m.id);
+                            }}
+                          >
+                            Delete
                           </button>
                         </div>
                       ) : null}
