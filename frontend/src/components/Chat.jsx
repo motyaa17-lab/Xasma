@@ -56,6 +56,8 @@ export default function Chat({
   const voiceStartingRef = useRef(false);
   const abortPendingVoiceRef = useRef(false);
   const voiceRecTimerRef = useRef(null);
+  const voiceHoldCleanupRef = useRef(null);
+  const voiceHoldDoneRef = useRef(null);
   const videoStreamRef = useRef(null);
   const videoMediaRecorderRef = useRef(null);
   const videoRecordChunksRef = useRef([]);
@@ -63,6 +65,8 @@ export default function Chat({
   const videoStartingRef = useRef(false);
   const abortPendingVideoRef = useRef(false);
   const videoTickRef = useRef(null);
+  const videoHoldCleanupRef = useRef(null);
+  const videoHoldDoneRef = useRef(null);
   const inlineVideoRef = useRef(null);
   const typingStartTimerRef = useRef(null);
   const typingStopTimerRef = useRef(null);
@@ -77,6 +81,8 @@ export default function Chat({
   }, [chatId, messages.length]);
 
   useEffect(() => {
+    detachVoiceHoldEnd();
+    detachVideoHoldEnd();
     abortPendingVoiceRef.current = false;
     abortPendingVideoRef.current = false;
     typingActiveRef.current = false;
@@ -109,6 +115,8 @@ export default function Chat({
 
   useEffect(() => {
     return () => {
+      detachVoiceHoldEnd();
+      detachVideoHoldEnd();
       recordCancelledRef.current = true;
       videoRecordCancelledRef.current = true;
       try {
@@ -168,12 +176,10 @@ export default function Chat({
       if (e.key !== "Escape") return;
       if (voiceRecording || voiceArming) {
         e.preventDefault();
-        abortPendingVoiceRef.current = true;
         cancelVoiceRecording();
       }
       if (videoRecording || videoArming) {
         e.preventDefault();
-        abortPendingVideoRef.current = true;
         cancelVideoRecording();
       }
     }
@@ -270,8 +276,45 @@ export default function Chat({
     if (vel) vel.srcObject = null;
   }
 
+  function detachVoiceHoldEnd() {
+    voiceHoldDoneRef.current = null;
+    const fn = voiceHoldCleanupRef.current;
+    voiceHoldCleanupRef.current = null;
+    if (fn) fn();
+  }
+
+  function detachVideoHoldEnd() {
+    videoHoldDoneRef.current = null;
+    const fn = videoHoldCleanupRef.current;
+    videoHoldCleanupRef.current = null;
+    if (fn) fn();
+  }
+
   function cancelVoiceRecording() {
-    abortPendingVoiceRef.current = true;
+    detachVoiceHoldEnd();
+    setVoicePressing(false);
+    const rec = mediaRecorderRef.current;
+    if (!rec || rec.state === "inactive") {
+      abortPendingVoiceRef.current = true;
+      mediaStreamRef.current?.getTracks().forEach((tr) => tr.stop());
+      mediaStreamRef.current = null;
+      mediaRecorderRef.current = null;
+      recordChunksRef.current = [];
+      setVoiceRecording(false);
+      setVoiceArming(false);
+      return;
+    }
+    abortPendingVoiceRef.current = false;
+    recordCancelledRef.current = true;
+    try {
+      rec.stop();
+    } catch {
+      // ignore
+    }
+  }
+
+  function finishVoiceRecording() {
+    abortPendingVoiceRef.current = false;
     if (!mediaRecorderRef.current || mediaRecorderRef.current.state === "inactive") {
       mediaStreamRef.current?.getTracks().forEach((tr) => tr.stop());
       mediaStreamRef.current = null;
@@ -281,25 +324,31 @@ export default function Chat({
       setVoiceArming(false);
       return;
     }
-    recordCancelledRef.current = true;
-    mediaRecorderRef.current.stop();
+    recordCancelledRef.current = false;
+    try {
+      mediaRecorderRef.current.stop();
+    } catch {
+      // ignore
+    }
   }
 
-  function finishVoiceRecording() {
-    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === "inactive") {
-      mediaStreamRef.current?.getTracks().forEach((tr) => tr.stop());
-      mediaStreamRef.current = null;
-      setVoiceRecording(false);
-      setVoiceArming(false);
-      return;
-    }
-    recordCancelledRef.current = false;
-    mediaRecorderRef.current.stop();
+  function onVoiceFallbackSend() {
+    detachVoiceHoldEnd();
+    setVoicePressing(false);
+    abortPendingVoiceRef.current = false;
+    finishVoiceRecording();
+  }
+
+  function onVoiceFallbackCancel() {
+    cancelVoiceRecording();
   }
 
   function cancelVideoRecording() {
-    abortPendingVideoRef.current = true;
-    if (!videoMediaRecorderRef.current || videoMediaRecorderRef.current.state === "inactive") {
+    detachVideoHoldEnd();
+    setVideoPressing(false);
+    const rec = videoMediaRecorderRef.current;
+    if (!rec || rec.state === "inactive") {
+      abortPendingVideoRef.current = true;
       cleanupVideoStream();
       videoMediaRecorderRef.current = null;
       videoRecordChunksRef.current = [];
@@ -308,11 +357,17 @@ export default function Chat({
       setVideoRecSec(0);
       return;
     }
+    abortPendingVideoRef.current = false;
     videoRecordCancelledRef.current = true;
-    videoMediaRecorderRef.current.stop();
+    try {
+      rec.stop();
+    } catch {
+      // ignore
+    }
   }
 
   function finishVideoRecording() {
+    abortPendingVideoRef.current = false;
     if (!videoMediaRecorderRef.current || videoMediaRecorderRef.current.state === "inactive") {
       cleanupVideoStream();
       setVideoRecording(false);
@@ -321,41 +376,121 @@ export default function Chat({
       return;
     }
     videoRecordCancelledRef.current = false;
-    videoMediaRecorderRef.current.stop();
+    try {
+      videoMediaRecorderRef.current.stop();
+    } catch {
+      // ignore
+    }
   }
 
-  function attachVoiceHoldEndListeners(pointerId) {
-    const onEnd = (ev) => {
-      if (ev.pointerId !== pointerId) return;
-      window.removeEventListener("pointerup", onEnd, true);
-      window.removeEventListener("pointercancel", onEnd, true);
+  /**
+   * End-of-hold uses MediaRecorder state (refs), not React state, so we never read a stale
+   * voiceRecording flag from the render when the gesture began.
+   */
+  function attachVoiceHoldEndListeners(activePointerId) {
+    detachVoiceHoldEnd();
+    let handled = false;
+    const runRelease = () => {
+      if (handled) return;
+      handled = true;
+      voiceHoldDoneRef.current = null;
+      const rm = voiceHoldCleanupRef.current;
+      voiceHoldCleanupRef.current = null;
+      if (rm) rm();
       setVoicePressing(false);
       if (abortPendingVoiceRef.current) return;
-      if (!voiceRecording && voiceStartingRef.current) {
+      const rec = mediaRecorderRef.current;
+      if (rec && (rec.state === "recording" || rec.state === "paused")) {
+        abortPendingVoiceRef.current = false;
+        recordCancelledRef.current = false;
+        try {
+          rec.stop();
+        } catch {
+          // ignore
+        }
+        return;
+      }
+      if (voiceStartingRef.current) {
         abortPendingVoiceRef.current = true;
         return;
       }
-      if (voiceRecording) finishVoiceRecording();
+      abortPendingVoiceRef.current = true;
     };
-    window.addEventListener("pointerup", onEnd, true);
-    window.addEventListener("pointercancel", onEnd, true);
+    voiceHoldDoneRef.current = runRelease;
+
+    const onPointerUp = (ev) => {
+      if (activePointerId != null && ev.pointerId !== activePointerId) return;
+      runRelease();
+    };
+    const onTouchEnd = () => runRelease();
+    const onMouseUp = () => runRelease();
+
+    window.addEventListener("pointerup", onPointerUp, true);
+    window.addEventListener("pointercancel", onPointerUp, true);
+    window.addEventListener("touchend", onTouchEnd, { capture: true, passive: true });
+    window.addEventListener("touchcancel", onTouchEnd, { capture: true, passive: true });
+    window.addEventListener("mouseup", onMouseUp, true);
+
+    voiceHoldCleanupRef.current = () => {
+      window.removeEventListener("pointerup", onPointerUp, true);
+      window.removeEventListener("pointercancel", onPointerUp, true);
+      window.removeEventListener("touchend", onTouchEnd, true);
+      window.removeEventListener("touchcancel", onTouchEnd, true);
+      window.removeEventListener("mouseup", onMouseUp, true);
+    };
   }
 
-  function attachVideoHoldEndListeners(pointerId) {
-    const onEnd = (ev) => {
-      if (ev.pointerId !== pointerId) return;
-      window.removeEventListener("pointerup", onEnd, true);
-      window.removeEventListener("pointercancel", onEnd, true);
+  function attachVideoHoldEndListeners(activePointerId) {
+    detachVideoHoldEnd();
+    let handled = false;
+    const runRelease = () => {
+      if (handled) return;
+      handled = true;
+      videoHoldDoneRef.current = null;
+      const rm = videoHoldCleanupRef.current;
+      videoHoldCleanupRef.current = null;
+      if (rm) rm();
       setVideoPressing(false);
       if (abortPendingVideoRef.current) return;
-      if (!videoRecording && videoStartingRef.current) {
+      const rec = videoMediaRecorderRef.current;
+      if (rec && (rec.state === "recording" || rec.state === "paused")) {
+        abortPendingVideoRef.current = false;
+        videoRecordCancelledRef.current = false;
+        try {
+          rec.stop();
+        } catch {
+          // ignore
+        }
+        return;
+      }
+      if (videoStartingRef.current) {
         abortPendingVideoRef.current = true;
         return;
       }
-      if (videoRecording) finishVideoRecording();
+      abortPendingVideoRef.current = true;
     };
-    window.addEventListener("pointerup", onEnd, true);
-    window.addEventListener("pointercancel", onEnd, true);
+    videoHoldDoneRef.current = runRelease;
+
+    const onPointerUp = (ev) => {
+      if (activePointerId != null && ev.pointerId !== activePointerId) return;
+      runRelease();
+    };
+    const onTouchEnd = () => runRelease();
+    const onMouseUp = () => runRelease();
+
+    window.addEventListener("pointerup", onPointerUp, true);
+    window.addEventListener("pointercancel", onPointerUp, true);
+    window.addEventListener("touchend", onTouchEnd, { capture: true, passive: true });
+    window.addEventListener("touchcancel", onTouchEnd, { capture: true, passive: true });
+    window.addEventListener("mouseup", onMouseUp, true);
+
+    videoHoldCleanupRef.current = () => {
+      window.removeEventListener("pointerup", onPointerUp, true);
+      window.removeEventListener("pointercancel", onPointerUp, true);
+      window.removeEventListener("touchend", onTouchEnd, true);
+      window.removeEventListener("touchcancel", onTouchEnd, true);
+      window.removeEventListener("mouseup", onMouseUp, true);
+    };
   }
 
   async function startVoiceHoldRecording() {
@@ -380,6 +515,10 @@ export default function Chat({
       videoArming ||
       videoNoteUploading
     ) {
+      return;
+    }
+    const existing = mediaRecorderRef.current;
+    if (existing && existing.state !== "inactive") {
       return;
     }
     setUploadError("");
@@ -495,6 +634,10 @@ export default function Chat({
     ) {
       return;
     }
+    const existingV = videoMediaRecorderRef.current;
+    if (existingV && existingV.state !== "inactive") {
+      return;
+    }
     setUploadError("");
     abortPendingVideoRef.current = false;
     videoRecordCancelledRef.current = false;
@@ -595,8 +738,17 @@ export default function Chat({
     }
   }
 
-  function onMicPointerDown(e) {
-    if (e.button !== 0) return;
+  function beginMicHoldFromUser(e) {
+    if (e.button != null && e.button !== 0) return;
+    const vrec = mediaRecorderRef.current;
+    if (vrec && (vrec.state === "recording" || vrec.state === "paused")) {
+      e.preventDefault?.();
+      detachVoiceHoldEnd();
+      setVoicePressing(false);
+      abortPendingVoiceRef.current = false;
+      finishVoiceRecording();
+      return;
+    }
     if (
       isBanned ||
       editingMessageId ||
@@ -611,14 +763,41 @@ export default function Chat({
     ) {
       return;
     }
-    e.preventDefault();
+    e.preventDefault?.();
     setVoicePressing(true);
-    attachVoiceHoldEndListeners(e.pointerId);
+    const pid = typeof e.pointerId === "number" ? e.pointerId : null;
+    attachVoiceHoldEndListeners(pid);
     void startVoiceHoldRecording();
   }
 
-  function onVideoCamPointerDown(e) {
-    if (e.button !== 0) return;
+  function onMicPointerDown(e) {
+    beginMicHoldFromUser(e);
+  }
+
+  function onMicMouseDown(e) {
+    if (typeof window !== "undefined" && "PointerEvent" in window) return;
+    beginMicHoldFromUser(e);
+  }
+
+  function onMicMouseUp() {
+    voiceHoldDoneRef.current?.();
+  }
+
+  function onMicTouchEnd() {
+    voiceHoldDoneRef.current?.();
+  }
+
+  function beginVideoHoldFromUser(e) {
+    if (e.button != null && e.button !== 0) return;
+    const vrec = videoMediaRecorderRef.current;
+    if (vrec && (vrec.state === "recording" || vrec.state === "paused")) {
+      e.preventDefault?.();
+      detachVideoHoldEnd();
+      setVideoPressing(false);
+      abortPendingVideoRef.current = false;
+      finishVideoRecording();
+      return;
+    }
     if (
       isBanned ||
       editingMessageId ||
@@ -633,10 +812,28 @@ export default function Chat({
     ) {
       return;
     }
-    e.preventDefault();
+    e.preventDefault?.();
     setVideoPressing(true);
-    attachVideoHoldEndListeners(e.pointerId);
+    const pid = typeof e.pointerId === "number" ? e.pointerId : null;
+    attachVideoHoldEndListeners(pid);
     void startVideoHoldRecording();
+  }
+
+  function onVideoCamPointerDown(e) {
+    beginVideoHoldFromUser(e);
+  }
+
+  function onVideoCamMouseDown(e) {
+    if (typeof window !== "undefined" && "PointerEvent" in window) return;
+    beginVideoHoldFromUser(e);
+  }
+
+  function onVideoCamMouseUp() {
+    videoHoldDoneRef.current?.();
+  }
+
+  function onVideoCamTouchEnd() {
+    videoHoldDoneRef.current?.();
   }
 
   async function handlePrimary() {
@@ -1136,6 +1333,9 @@ export default function Chat({
                 aria-label={t("videoNoteHoldRecord")}
                 title={t("videoNoteHoldRecord")}
                 onPointerDown={onVideoCamPointerDown}
+                onMouseDown={onVideoCamMouseDown}
+                onMouseUp={onVideoCamMouseUp}
+                onTouchEnd={onVideoCamTouchEnd}
               >
                 <svg
                   className="videoCamIcon"
@@ -1153,7 +1353,7 @@ export default function Chat({
               </button>
               <button
                 type="button"
-                className={`voiceMicBtn${voiceRecording ? " voiceMicBtn--recording" : ""}${
+                className={`voiceMicBtn${voiceRecording || voiceArming ? " voiceMicBtn--recording" : ""}${
                   voicePressing ? " voiceMicBtn--pressing" : ""
                 }`}
                 disabled={
@@ -1166,9 +1366,14 @@ export default function Chat({
                   videoArming ||
                   videoNoteUploading
                 }
-                aria-label={t("voiceHoldRecord")}
-                title={t("voiceHoldRecord")}
+                aria-label={
+                  voiceRecording || voiceArming ? t("voiceTapStopSend") : t("voiceHoldRecord")
+                }
+                title={voiceRecording || voiceArming ? t("voiceTapStopSend") : t("voiceHoldRecord")}
                 onPointerDown={onMicPointerDown}
+                onMouseDown={onMicMouseDown}
+                onMouseUp={onMicMouseUp}
+                onTouchEnd={onMicTouchEnd}
               >
                 <svg
                   className="voiceMicIcon"
@@ -1207,6 +1412,16 @@ export default function Chat({
                 {editingMessageId ? t("save") : t("send")}
               </button>
             </div>
+            {voiceArming || voiceRecording ? (
+              <div className="voiceRecFallbackRow" role="group" aria-label={t("voiceRecordingControls")}>
+                <button type="button" className="voiceRecFallbackSend" onClick={onVoiceFallbackSend}>
+                  {t("voiceStopSend")}
+                </button>
+                <button type="button" className="voiceRecFallbackCancel" onClick={onVoiceFallbackCancel}>
+                  {t("voiceCancel")}
+                </button>
+              </div>
+            ) : null}
           </div>
         </>
       )}

@@ -1257,6 +1257,42 @@ body {
   animation: recPulseVideo 1.2s ease-in-out infinite;
 }
 
+.voiceRecFallbackRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px;
+}
+
+.voiceRecFallbackSend,
+.voiceRecFallbackCancel {
+  padding: 6px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(248, 250, 252, 0.92);
+}
+
+.voiceRecFallbackSend {
+  background: rgba(59, 130, 246, 0.35);
+  border-color: rgba(59, 130, 246, 0.4);
+  color: white;
+}
+
+.voiceRecFallbackCancel {
+  background: transparent;
+  color: rgba(203, 213, 225, 0.85);
+}
+
+.voiceRecFallbackSend:hover,
+.voiceRecFallbackCancel:hover {
+  filter: brightness(1.08);
+}
+
 @keyframes recPulse {
   0%,
   100% {
