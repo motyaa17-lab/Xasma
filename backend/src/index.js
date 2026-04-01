@@ -807,8 +807,8 @@ io.on("connection", (socket) => {
     };
 
     // Emit to both users that are connected.
-    const u1 = chat.user1_id;
-    const u2 = chat.user2_id;
+    const u1 = Number(chat.user1_id);
+    const u2 = Number(chat.user2_id);
     const recipients = new Set([
       ...(userSockets.get(u1) ? Array.from(userSockets.get(u1)) : []),
       ...(userSockets.get(u2) ? Array.from(userSockets.get(u2)) : []),
