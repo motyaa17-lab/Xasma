@@ -12,6 +12,7 @@ export default function UserMenu({ me, onLogout, onChangeAvatar, settings, onCha
   const [adminUsers, setAdminUsers] = useState([]);
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminError, setAdminError] = useState("");
+  const [adminNotice, setAdminNotice] = useState("");
 
   useEffect(() => {
     function onDocMouseDown(e) {
@@ -46,6 +47,7 @@ export default function UserMenu({ me, onLogout, onChangeAvatar, settings, onCha
   async function loadAdminUsers() {
     setAdminLoading(true);
     setAdminError("");
+    setAdminNotice("");
     try {
       const data = await adminListUsers();
       setAdminUsers(Array.isArray(data.users) ? data.users : []);
@@ -259,6 +261,7 @@ export default function UserMenu({ me, onLogout, onChangeAvatar, settings, onCha
           ) : (
             <div className="adminPanel">
               {adminError ? <div className="authError">{adminError}</div> : null}
+              {adminNotice ? <div className="muted">{adminNotice}</div> : null}
               <div className="adminTopRow">
                 <button className="ghostBtn" type="button" onClick={loadAdminUsers} disabled={adminLoading}>
                   Refresh
@@ -296,6 +299,11 @@ export default function UserMenu({ me, onLogout, onChangeAvatar, settings, onCha
                               setAdminUsers((prev) =>
                                 prev.map((x) => (x.id === u.id ? { ...x, ...updated } : x))
                               );
+                              setAdminNotice(
+                                u.id === me.id
+                                  ? "Role updated."
+                                  : "Role updated. The user may need to relogin to refresh permissions."
+                              );
                             } catch (e) {
                               setAdminError(e.message || "Request failed");
                               loadAdminUsers();
@@ -318,6 +326,7 @@ export default function UserMenu({ me, onLogout, onChangeAvatar, settings, onCha
                               setAdminUsers((prev) =>
                                 prev.map((x) => (x.id === u.id ? { ...x, ...updated } : x))
                               );
+                              setAdminNotice(next ? "User banned." : "User unbanned.");
                             } catch (e) {
                               setAdminError(e.message || "Request failed");
                               loadAdminUsers();

@@ -196,6 +196,13 @@ function emitToAll(event, payload) {
   });
 }
 
+function disconnectUserSockets(userId) {
+  const sids = userSockets.get(userId);
+  if (!sids) return;
+  sids.forEach((sid) => io.to(sid).disconnectSockets(true));
+  userSockets.delete(userId);
+}
+
 app.put("/api/me/avatar", authRequired, (req, res) => {
   const avatar = typeof req.body?.avatar === "string" ? req.body.avatar.trim() : "";
 
@@ -621,6 +628,9 @@ app.patch("/api/admin/users/:userId/role", authRequired, requireAdmin, (req, res
     );
     const u = r.rows[0];
     if (!u) return res.status(404).json({ error: "User not found" });
+    // Notify the affected user (and any connected clients) to refresh permissions.
+    emitToUser(Number(u.id), "user:roleUpdated", { userId: Number(u.id), role: u.role });
+
     return res.json({
       user: {
         id: Number(u.id),
@@ -649,10 +659,12 @@ app.patch("/api/admin/users/:userId/ban", authRequired, requireAdmin, (req, res)
     const u = r.rows[0];
     if (!u) return res.status(404).json({ error: "User not found" });
 
-    // If banning, force offline presence update.
+    // Notify user of ban/unban and force-disconnect on ban.
+    emitToUser(Number(u.id), "user:banned", { userId: Number(u.id), banned: Boolean(u.banned) });
     if (banned) {
       await query(`UPDATE users SET is_online = FALSE, last_seen_at = now() WHERE id = $1`, [userId]);
       emitToAll("user:presence", { userId, isOnline: false, lastSeenAt: new Date().toISOString() });
+      disconnectUserSockets(userId);
     }
 
     return res.json({

@@ -955,6 +955,17 @@ body {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.banBanner {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(239, 68, 68, 0.30);
+  background: rgba(239, 68, 68, 0.10);
+  color: rgba(239, 68, 68, 0.95);
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+
 .composerInput {
   flex: 1;
   resize: none;

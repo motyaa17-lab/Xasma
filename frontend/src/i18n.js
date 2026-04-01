@@ -15,6 +15,7 @@ export const translations = {
     authServerUnavailable:
       "Server is starting or temporarily unavailable. Please try again in a few seconds.",
     authGenericError: "Something went wrong. Please try again.",
+    authBanned: "Your account has been banned by an administrator.",
 
     chats: "Chats",
     newChat: "New chat",
@@ -72,6 +73,7 @@ export const translations = {
     authServerUnavailable:
       "Сервер запускается или временно недоступен. Попробуйте снова через несколько секунд.",
     authGenericError: "Что-то пошло не так. Попробуйте ещё раз.",
+    authBanned: "Ваш аккаунт заблокирован администратором.",
 
     chats: "Чаты",
     newChat: "Новый чат",
@@ -135,6 +137,9 @@ export function formatAuthError(err, t) {
   if (err?.name === "ApiError" && typeof status === "number") {
     if (status === 0 || status >= 500) {
       return t("authServerUnavailable");
+    }
+    if (status === 403 && String(err.message || "").toLowerCase().includes("banned")) {
+      return t("authBanned");
     }
     if (status === 401) {
       return t("authInvalidCredentials");

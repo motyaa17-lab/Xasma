@@ -15,6 +15,7 @@ export default function Chat({
   onToggleReaction,
   isAdmin,
   onAdminDeleteMessage,
+  isBanned,
   onTyping,
   t,
   lang,
@@ -72,6 +73,7 @@ export default function Chat({
     const trimmed = String(text).trim();
     if (!trimmed) return;
     onTyping?.(false);
+    if (isBanned) return;
     if (editingMessageId) {
       try {
         await onEditMessage(editingMessageId, trimmed);
@@ -192,21 +194,23 @@ export default function Chat({
                       </button>
                       {menuMessageId === m.id ? (
                         <div className="msgMenuDropdown" role="menu">
-                          <button
-                            type="button"
-                            className="msgMenuItem"
-                            role="menuitem"
-                            onMouseDown={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingMessageId(m.id);
-                              setText(String(m.text ?? ""));
-                              setMenuMessageId(null);
-                              onTyping?.(false);
-                            }}
-                          >
-                            {t("edit")}
-                          </button>
+                          {!isBanned ? (
+                            <button
+                              type="button"
+                              className="msgMenuItem"
+                              role="menuitem"
+                              onMouseDown={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingMessageId(m.id);
+                                setText(String(m.text ?? ""));
+                                setMenuMessageId(null);
+                                onTyping?.(false);
+                              }}
+                            >
+                              {t("edit")}
+                            </button>
+                          ) : null}
                           {isAdmin ? (
                             <button
                               type="button"
@@ -280,6 +284,7 @@ export default function Chat({
                           key={r.emoji}
                           type="button"
                           className={r.reactedByMe ? "reactionPill active" : "reactionPill"}
+                          disabled={isBanned}
                           onClick={(e) => {
                             e.stopPropagation();
                             onToggleReaction?.(m.id, r.emoji);
@@ -297,6 +302,7 @@ export default function Chat({
           </div>
 
           <div className="composer">
+            {isBanned ? <div className="banBanner">{t("authBanned")}</div> : null}
             <textarea
               className="composerInput"
               value={text}
@@ -306,6 +312,7 @@ export default function Chat({
               }}
               rows={1}
               placeholder={t("typeMessagePlaceholder")}
+              disabled={isBanned}
               onKeyDown={(e) => {
                 if (e.key === "Escape" && editingMessageId) {
                   e.preventDefault();
@@ -328,7 +335,7 @@ export default function Chat({
                 e.preventDefault();
               }}
               onClick={handlePrimary}
-              disabled={!String(text).trim()}
+              disabled={isBanned || !String(text).trim()}
             >
               {editingMessageId ? t("save") : t("send")}
             </button>

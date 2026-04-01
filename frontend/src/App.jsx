@@ -56,6 +56,10 @@ export default function App() {
 
   const t = useMemo(() => (key) => tr(settings.lang, key), [settings.lang]);
 
+  function markBanned() {
+    setMe((prev) => (prev ? { ...prev, banned: true } : prev));
+  }
+
   useEffect(() => {
     localStorage.setItem("settings", JSON.stringify(settings));
   }, [settings]);
@@ -252,6 +256,20 @@ export default function App() {
       setMessages((prev) => prev.filter((m) => Number(m.id) !== mid));
     });
 
+    socket.on("user:roleUpdated", ({ userId, role }) => {
+      const uid = Number(userId);
+      if (!uid) return;
+      setMe((prev) => (prev && prev.id === uid ? { ...prev, role } : prev));
+    });
+
+    socket.on("user:banned", ({ userId, banned }) => {
+      const uid = Number(userId);
+      if (!uid) return;
+      if (me?.id && uid === me.id) {
+        setMe((prev) => (prev ? { ...prev, banned: Boolean(banned) } : prev));
+      }
+    });
+
     return () => {
       socket.off("chat:message");
       socket.off("user:avatar");
@@ -261,6 +279,8 @@ export default function App() {
       socket.off("message:edited");
       socket.off("message:reactionsUpdated");
       socket.off("message:deleted");
+      socket.off("user:roleUpdated");
+      socket.off("user:banned");
       socket.disconnect();
     };
   }, [token, socketEndpoint, me?.id]);
@@ -289,6 +309,7 @@ export default function App() {
   function handleSend(text) {
     if (!socketRef.current || !socketReady) return;
     if (!selectedChatId) return;
+    if (me?.banned) return;
     // Sending implies typing stopped.
     socketRef.current.emit("chat:typing", { chatId: selectedChatId, isTyping: false });
     socketRef.current.emit("chat:send", { chatId: selectedChatId, text });
@@ -297,10 +318,12 @@ export default function App() {
   function handleTyping(isTyping) {
     if (!socketRef.current || !socketReady) return;
     if (!selectedChatId) return;
+    if (me?.banned) return;
     socketRef.current.emit("chat:typing", { chatId: selectedChatId, isTyping: Boolean(isTyping) });
   }
 
   async function handleEditMessage(messageId, text) {
+    if (me?.banned) return;
     const data = await updateMessage(messageId, text);
     const msg = data.message;
     setMessages((prev) =>
@@ -309,6 +332,7 @@ export default function App() {
   }
 
   async function handleToggleReaction(messageId, emoji) {
+    if (me?.banned) return;
     const mid = Number(messageId);
     const data = await toggleReaction(mid, emoji);
     const reactions = data.reactions || [];
@@ -316,6 +340,7 @@ export default function App() {
   }
 
   async function handleAdminDeleteMessage(messageId) {
+    if (me?.banned) return;
     const mid = Number(messageId);
     await adminDeleteMessage(mid);
     setMessages((prev) => prev.filter((m) => Number(m.id) !== mid));
@@ -393,6 +418,7 @@ export default function App() {
               onToggleReaction={handleToggleReaction}
               isAdmin={me.role === "admin"}
               onAdminDeleteMessage={handleAdminDeleteMessage}
+              isBanned={Boolean(me.banned)}
               onTyping={handleTyping}
               t={t}
               lang={settings.lang}
