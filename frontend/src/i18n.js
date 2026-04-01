@@ -4,6 +4,15 @@ export const translations = {
     realtimeOn: "Real-time: ON",
     realtimeReconnecting: "Real-time: reconnecting...",
 
+    back: "Back",
+    searchChatsPlaceholder: "Search chats…",
+    newActivity: "Last message from contact",
+    navChats: "Chats",
+    navCalls: "Calls",
+    navSettings: "Settings",
+    callsComingSoon: "Calls are not available yet. This space is reserved for a future update.",
+    mobileNavLabel: "Main navigation",
+
     login: "Login",
     register: "Register",
     username: "Username",
@@ -138,6 +147,15 @@ export const translations = {
     appTitle: "Xasma",
     realtimeOn: "Реалтайм: ВКЛ",
     realtimeReconnecting: "Реалтайм: подключение...",
+
+    back: "Назад",
+    searchChatsPlaceholder: "Поиск чатов…",
+    newActivity: "Сообщение от собеседника",
+    navChats: "Чаты",
+    navCalls: "Звонки",
+    navSettings: "Настройки",
+    callsComingSoon: "Звонки пока недоступны — раздел зарезервирован.",
+    mobileNavLabel: "Основная навигация",
 
     login: "Войти",
     register: "Регистрация",

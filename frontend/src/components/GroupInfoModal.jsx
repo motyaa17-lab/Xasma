@@ -179,7 +179,12 @@ export default function GroupInfoModal({
 
   return (
     <div className="modalBackdrop" role="presentation" onClick={onClose}>
-      <div className="modalCard groupInfoModal" role="dialog" aria-labelledby="groupInfoHeading" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="modalCard groupInfoModal modalCard--mobileFriendly"
+        role="dialog"
+        aria-labelledby="groupInfoHeading"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modalHeader">
           <div className="modalTitle" id="groupInfoHeading">
             {t("groupInfoTitle")}

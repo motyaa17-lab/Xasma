@@ -1,7 +1,15 @@
 import React, { useEffect, useRef, useState } from "react";
 import { adminListUsers, adminSetUserBanned, adminSetUserRole } from "../api.js";
 
-export default function UserMenu({ me, onLogout, onChangeAvatar, settings, onChangeSettings, t }) {
+export default function UserMenu({
+  me,
+  onLogout,
+  onChangeAvatar,
+  settings,
+  onChangeSettings,
+  t,
+  variant = "dropdown",
+}) {
   const [open, setOpen] = useState(false);
   const [panel, setPanel] = useState(null); // "profile" | "settings" | "admin" | null
   const rootRef = useRef(null);
@@ -74,6 +82,258 @@ export default function UserMenu({ me, onLogout, onChangeAvatar, settings, onCha
     } finally {
       setAvatarBusy(false);
     }
+  }
+
+  const modalCardClass = variant === "mobilePage" ? "modalCard--mobileFriendly" : "";
+
+  if (variant === "mobilePage") {
+    return (
+      <div className="userMenu userMenu--mobilePage" ref={rootRef}>
+        <div className="userMenuMobileHero">
+          <div className="userMenuMobileAvatar">
+            {me?.avatar ? <img src={me.avatar} alt="" /> : <span>{initials(me?.username)}</span>}
+          </div>
+          <div className="userMenuMobileName">{me?.username}</div>
+          <div className="userMenuMobileMeta muted small">
+            {me?.isOnline ? t("online") : me?.lastSeenAt ? t("lastSeen") : ""}
+          </div>
+        </div>
+        <div className="userMenuMobileList" role="menu">
+          <button
+            type="button"
+            className="userMenuMobileItem"
+            role="menuitem"
+            onClick={() => setPanel("profile")}
+          >
+            {t("myProfile")}
+          </button>
+          <button
+            type="button"
+            className="userMenuMobileItem"
+            role="menuitem"
+            onClick={() => setPanel("settings")}
+          >
+            {t("settings")}
+          </button>
+          {me?.role === "admin" ? (
+            <button
+              type="button"
+              className="userMenuMobileItem"
+              role="menuitem"
+              onClick={() => {
+                setPanel("admin");
+                loadAdminUsers();
+              }}
+            >
+              Admin
+            </button>
+          ) : null}
+          <button type="button" className="userMenuMobileItem userMenuMobileItem--danger" role="menuitem" onClick={onLogout}>
+            {t("logout")}
+          </button>
+        </div>
+
+        {panel ? (
+          <Modal
+            title={
+              panel === "profile" ? t("myProfile") : panel === "settings" ? t("settings") : "Admin"
+            }
+            onClose={() => setPanel(null)}
+            t={t}
+            cardClassName={modalCardClass}
+          >
+            {/* same panel bodies as below — duplicate structure minimal by extracting */}
+            {panel === "profile" ? (
+              <div>
+                {avatarError ? <div className="authError">{avatarError}</div> : null}
+                <div className="profilePanel">
+                  <div className="profileAvatar">
+                    {avatarPreview ? (
+                      <img src={avatarPreview} alt="" />
+                    ) : (
+                      <span>{initials(me.username)}</span>
+                    )}
+                  </div>
+
+                  <div className="profileInfo">
+                    <div className="profileLabel">{t("username")}</div>
+                    <div className="profileValue">{me.username}</div>
+                    <div className="profileHint muted small">
+                      {me?.isOnline
+                        ? t("online")
+                        : me?.lastSeenAt
+                          ? t("lastSeenAt").replace("{time}", formatLastSeen(me.lastSeenAt, settings?.lang))
+                          : t("lastSeen")}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="profileActions">
+                  <input
+                    ref={fileInputRef}
+                    className="fileInput"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => pickAvatarFile(e.target.files?.[0])}
+                  />
+                  <button
+                    className="primaryBtn"
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={avatarBusy}
+                  >
+                    {avatarBusy ? t("saving") : t("changeAvatar")}
+                  </button>
+                  <button
+                    className="ghostBtn"
+                    type="button"
+                    onClick={() => {
+                      setAvatarPreview("");
+                      setAvatarBusy(true);
+                      setAvatarError("");
+                      Promise.resolve(onChangeAvatar?.(""))
+                        .catch((e) => setAvatarError(e.message || "Failed to update avatar"))
+                        .finally(() => setAvatarBusy(false));
+                    }}
+                    disabled={avatarBusy}
+                  >
+                    {t("remove")}
+                  </button>
+                  <div className="muted small profileLimitHint">{t("maxAvatarHint")}</div>
+                </div>
+              </div>
+            ) : panel === "settings" ? (
+              <div className="settingsPanel">
+                <div className="settingsSection">
+                  <div className="settingsTitle">{t("language")}</div>
+                  <div className="pillRow">
+                    <button
+                      type="button"
+                      className={settings?.lang === "en" ? "pillBtn active" : "pillBtn"}
+                      onClick={() => onChangeSettings?.({ lang: "en" })}
+                    >
+                      English
+                    </button>
+                    <button
+                      type="button"
+                      className={settings?.lang === "ru" ? "pillBtn active" : "pillBtn"}
+                      onClick={() => onChangeSettings?.({ lang: "ru" })}
+                    >
+                      Русский
+                    </button>
+                  </div>
+                </div>
+
+                <div className="settingsSection">
+                  <div className="settingsTitle">{t("chatBackground")}</div>
+                  <div className="themeGrid">
+                    {[
+                      { id: "ocean", label: t("ocean") },
+                      { id: "midnight", label: t("midnight") },
+                      { id: "slate", label: t("slate") },
+                    ].map((theme) => (
+                      <button
+                        key={theme.id}
+                        type="button"
+                        className={settings?.chatTheme === theme.id ? "themeCard active" : "themeCard"}
+                        onClick={() => onChangeSettings?.({ chatTheme: theme.id })}
+                        title={theme.label}
+                      >
+                        <div className={`themePreview theme-${theme.id}`} />
+                        <div className="themeLabel">{theme.label}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="adminPanel">
+                {adminError ? <div className="authError">{adminError}</div> : null}
+                {adminNotice ? <div className="muted">{adminNotice}</div> : null}
+                <div className="adminTopRow">
+                  <button className="ghostBtn" type="button" onClick={loadAdminUsers} disabled={adminLoading}>
+                    Refresh
+                  </button>
+                </div>
+
+                {adminLoading ? (
+                  <div className="muted">Loading...</div>
+                ) : (
+                  <div className="adminUserList">
+                    {adminUsers.map((u) => (
+                      <div key={u.id} className="adminUserRow">
+                        <div className="adminUserMain">
+                          <div className="adminUserNameRow">
+                            <div className="adminUserName">{u.username}</div>
+                            <div className={u.is_online ? "presenceDot online" : "presenceDot"} />
+                          </div>
+                          <div className="adminUserMeta muted small">
+                            role: {u.role} · {u.banned ? "banned" : "active"}
+                          </div>
+                        </div>
+
+                        <div className="adminActions">
+                          <button
+                            type="button"
+                            className="ghostBtn"
+                            onClick={async () => {
+                              const nextRole = u.role === "admin" ? "user" : "admin";
+                              setAdminUsers((prev) =>
+                                prev.map((x) => (x.id === u.id ? { ...x, role: nextRole } : x))
+                              );
+                              try {
+                                const res = await adminSetUserRole(u.id, nextRole);
+                                const updated = res.user;
+                                setAdminUsers((prev) =>
+                                  prev.map((x) => (x.id === u.id ? { ...x, ...updated } : x))
+                                );
+                                setAdminNotice(
+                                  u.id === me.id
+                                    ? "Role updated."
+                                    : "Role updated. The user may need to relogin to refresh permissions."
+                                );
+                              } catch (e) {
+                                setAdminError(e.message || "Request failed");
+                                loadAdminUsers();
+                              }
+                            }}
+                          >
+                            {u.role === "admin" ? "Remove admin" : "Make admin"}
+                          </button>
+                          <button
+                            type="button"
+                            className={u.banned ? "primaryBtn" : "ghostBtn"}
+                            onClick={async () => {
+                              const next = !u.banned;
+                              setAdminUsers((prev) =>
+                                prev.map((x) => (x.id === u.id ? { ...x, banned: next } : x))
+                              );
+                              try {
+                                const res = await adminSetUserBanned(u.id, next);
+                                const updated = res.user;
+                                setAdminUsers((prev) =>
+                                  prev.map((x) => (x.id === u.id ? { ...x, ...updated } : x))
+                                );
+                                setAdminNotice(next ? "User banned." : "User unbanned.");
+                              } catch (e) {
+                                setAdminError(e.message || "Request failed");
+                                loadAdminUsers();
+                              }
+                            }}
+                          >
+                            {u.banned ? "Unban" : "Ban"}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </Modal>
+        ) : null}
+      </div>
+    );
   }
 
   return (
@@ -357,10 +617,10 @@ function readFileAsDataUrl(file) {
   });
 }
 
-function Modal({ title, children, onClose, t }) {
+function Modal({ title, children, onClose, t, cardClassName = "" }) {
   return (
-    <div className="modalBackdrop" role="dialog" aria-modal="true">
-      <div className="modalCard">
+    <div className="modalBackdrop modalBackdrop--app" role="dialog" aria-modal="true">
+      <div className={`modalCard ${cardClassName}`.trim()}>
         <div className="modalHeader">
           <div className="modalTitle">{title}</div>
           <button className="ghostBtn" type="button" onClick={onClose}>

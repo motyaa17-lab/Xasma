@@ -27,6 +27,7 @@ export default function Chat({
   presenceTick,
   t,
   lang,
+  onMobileBack,
 }) {
   const [text, setText] = useState("");
   const [editingMessageId, setEditingMessageId] = useState(null);
@@ -886,55 +887,69 @@ export default function Chat({
       ) : (
         <>
           <div className="chatHeader">
-            {isGroup ? (
-              <button type="button" className="chatHeaderGroupTap" onClick={() => setGroupInfoOpen(true)}>
-                <div className="avatarSm">
-                  {chat?.avatar ? (
-                    <img src={chat.avatar} alt="" />
-                  ) : (
-                    <span>{initials(chat?.title || "")}</span>
-                  )}
-                </div>
-                <div className="chatHeaderInfo">
-                  <div className="chatHeaderName">
-                    <span className="chatHeaderTitleText">{chat?.title || t("groupChat")}</span>
-                    {typeof chat?.memberCount === "number" ? (
-                      <span className="chatHeaderMembersMeta">
-                        {" · "}
-                        {chat.memberCount === 1
-                          ? t("participantCountOne")
-                          : t("participantCountMany").replace("{count}", String(chat.memberCount))}
-                        {typeof chat?.onlineMemberCount === "number" ? (
-                          <>
-                            <span className="chatHeaderOnlineSep">{t("groupOnlineSep")}</span>
-                            <span className="chatHeaderOnlineCount">
-                              {t("groupOnlineCount").replace("{count}", String(chat.onlineMemberCount))}
-                            </span>
-                          </>
-                        ) : null}
-                      </span>
-                    ) : null}
+            <div className="chatHeaderLead">
+              {onMobileBack ? (
+                <button
+                  type="button"
+                  className="mobileChatBackBtn"
+                  onClick={onMobileBack}
+                  aria-label={t("back")}
+                >
+                  <span className="mobileChatBackGlyph" aria-hidden>
+                    ←
+                  </span>
+                </button>
+              ) : null}
+              {isGroup ? (
+                <button type="button" className="chatHeaderGroupTap" onClick={() => setGroupInfoOpen(true)}>
+                  <div className="avatarSm">
+                    {chat?.avatar ? (
+                      <img src={chat.avatar} alt="" />
+                    ) : (
+                      <span>{initials(chat?.title || "")}</span>
+                    )}
                   </div>
-                  <div className="chatHeaderStatus">{otherTyping ? t("typing") : t("groupChat")}</div>
-                </div>
-              </button>
-            ) : (
-              <div className="chatHeaderLeft">
-                <div className="avatarSm">
-                  {chat?.other?.avatar ? (
-                    <img src={chat.other.avatar} alt="" />
-                  ) : (
-                    <span>{initials(chat?.other?.username || "")}</span>
-                  )}
-                </div>
-                <div className="chatHeaderInfo">
-                  <div className="chatHeaderName">{chat?.other?.username || ""}</div>
-                  <div className="chatHeaderStatus">
-                    {otherTyping ? t("typing") : renderPresence(chat?.other, lang)}
+                  <div className="chatHeaderInfo">
+                    <div className="chatHeaderName">
+                      <span className="chatHeaderTitleText">{chat?.title || t("groupChat")}</span>
+                      {typeof chat?.memberCount === "number" ? (
+                        <span className="chatHeaderMembersMeta">
+                          {" · "}
+                          {chat.memberCount === 1
+                            ? t("participantCountOne")
+                            : t("participantCountMany").replace("{count}", String(chat.memberCount))}
+                          {typeof chat?.onlineMemberCount === "number" ? (
+                            <>
+                              <span className="chatHeaderOnlineSep">{t("groupOnlineSep")}</span>
+                              <span className="chatHeaderOnlineCount">
+                                {t("groupOnlineCount").replace("{count}", String(chat.onlineMemberCount))}
+                              </span>
+                            </>
+                          ) : null}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="chatHeaderStatus">{otherTyping ? t("typing") : t("groupChat")}</div>
+                  </div>
+                </button>
+              ) : (
+                <div className="chatHeaderLeft">
+                  <div className="avatarSm">
+                    {chat?.other?.avatar ? (
+                      <img src={chat.other.avatar} alt="" />
+                    ) : (
+                      <span>{initials(chat?.other?.username || "")}</span>
+                    )}
+                  </div>
+                  <div className="chatHeaderInfo">
+                    <div className="chatHeaderName">{chat?.other?.username || ""}</div>
+                    <div className="chatHeaderStatus">
+                      {otherTyping ? t("typing") : renderPresence(chat?.other, lang)}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
             {isGroup ? (
               <button
                 type="button"

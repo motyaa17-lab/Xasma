@@ -5,6 +5,7 @@ import Auth from "./components/Auth.jsx";
 import Sidebar from "./components/Sidebar.jsx";
 import Chat from "./components/Chat.jsx";
 import UserMenu from "./components/UserMenu.jsx";
+import { useIsMobile } from "./hooks/useIsMobile.js";
 import { t as tr } from "./i18n.js";
 import {
   createChat,
@@ -56,6 +57,8 @@ export default function App() {
   const readEmitTimerRef = useRef(null);
 
   const socketEndpoint = useMemo(() => getSocketEndpoint(), []);
+  const isMobile = useIsMobile(900);
+  const [mobileTab, setMobileTab] = useState("chats");
 
   const t = useMemo(() => (key) => tr(settings.lang, key), [settings.lang]);
 
@@ -429,12 +432,147 @@ export default function App() {
     setMe(updated);
   }
 
+  function goMobileTab(tab) {
+    setMobileTab(tab);
+    setSelectedChatId(null);
+    setMessages([]);
+  }
+
+  function handleMobileBackFromChat() {
+    setSelectedChatId(null);
+    setMessages([]);
+  }
+
+  const userMenuProps = {
+    me,
+    onLogout: logout,
+    onChangeAvatar: changeMyAvatar,
+    settings,
+    onChangeSettings: (next) => setSettings((prev) => ({ ...prev, ...next })),
+    t,
+  };
+
+  const sidebarProps = {
+    chats,
+    me,
+    onSelectChat: selectChat,
+    onStartChat: startChat,
+    onCreateGroup: handleCreateGroup,
+    t,
+    lang: settings.lang,
+  };
+
+  const chatProps = {
+    chatId: selectedChatId,
+    chat: chats.find((c) => c.id === selectedChatId) || null,
+    otherTyping: Boolean(selectedChatId && typingUntil[selectedChatId] > Date.now()),
+    messages,
+    meId: me.id,
+    meAvatar: me.avatar,
+    meUsername: me.username,
+    chatTheme: settings.chatTheme,
+    onSend: handleSend,
+    onEditMessage: handleEditMessage,
+    onToggleReaction: handleToggleReaction,
+    isAdmin: me.role === "admin",
+    onAdminDeleteMessage: handleAdminDeleteMessage,
+    isBanned: Boolean(me.banned),
+    onTyping: handleTyping,
+    onGroupMetaChanged: refreshChatsList,
+    presenceTick,
+    t,
+    lang: settings.lang,
+    onMobileBack: isMobile ? handleMobileBackFromChat : undefined,
+  };
+
   return (
     <div className="appRoot">
       {!me ? (
         <Auth onLogin={handleLogin} onRegister={handleRegister} error={authError} t={t} />
+      ) : isMobile ? (
+        <div className="appShell appShell--mobile">
+          <div className="mobileStage">
+            {mobileTab === "chats" && !selectedChatId ? (
+              <div className="mobilePane mobilePane--inbox">
+                <header className="mobileMainHeader">
+                  <div className="mobileMainHeaderText">
+                    <div className="mobileBrandTitle">{t("appTitle")}</div>
+                    <div
+                      className={`mobileSocketPill${socketReady ? " mobileSocketPill--on" : ""}`}
+                    >
+                      {socketReady ? t("realtimeOn") : t("realtimeReconnecting")}
+                    </div>
+                  </div>
+                  <UserMenu {...userMenuProps} variant="dropdown" />
+                </header>
+                <Sidebar {...sidebarProps} mobileLayout />
+              </div>
+            ) : null}
+
+            {mobileTab === "chats" && selectedChatId ? (
+              <div className="mobilePane mobilePane--conversation">
+                <Chat {...chatProps} />
+              </div>
+            ) : null}
+
+            {mobileTab === "calls" ? (
+              <div className="mobilePane mobilePane--placeholder">
+                <header className="mobileSubHeader">
+                  <h1 className="mobileSubHeaderTitle">{t("navCalls")}</h1>
+                </header>
+                <div className="mobilePlaceholderBody">
+                  <p className="muted">{t("callsComingSoon")}</p>
+                </div>
+              </div>
+            ) : null}
+
+            {mobileTab === "settings" ? (
+              <div className="mobilePane mobilePane--settings">
+                <header className="mobileSubHeader">
+                  <h1 className="mobileSubHeaderTitle">{t("navSettings")}</h1>
+                </header>
+                <div className="mobileSettingsScroll">
+                  <UserMenu {...userMenuProps} variant="mobilePage" />
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <nav className="mobileBottomNav" aria-label={t("mobileNavLabel")}>
+            <button
+              type="button"
+              className={`mobileNavItem${mobileTab === "chats" ? " mobileNavItem--active" : ""}`}
+              onClick={() => goMobileTab("chats")}
+            >
+              <span className="mobileNavIcon" aria-hidden>
+                💬
+              </span>
+              <span className="mobileNavLabel">{t("navChats")}</span>
+            </button>
+            <button
+              type="button"
+              className={`mobileNavItem${mobileTab === "calls" ? " mobileNavItem--active" : ""}`}
+              onClick={() => goMobileTab("calls")}
+            >
+              <span className="mobileNavIcon" aria-hidden>
+                📞
+              </span>
+              <span className="mobileNavLabel">{t("navCalls")}</span>
+            </button>
+            <button
+              type="button"
+              className={`mobileNavItem${mobileTab === "settings" ? " mobileNavItem--active" : ""}`}
+              onClick={() => goMobileTab("settings")}
+            >
+              <span className="mobileNavIcon" aria-hidden>
+                ⚙
+              </span>
+              <span className="mobileNavLabel">{t("navSettings")}</span>
+            </button>
+          </nav>
+        </div>
       ) : (
-        <div className="appShell">
+        <div className="appShell appShell--desktop">
           <div className="topBar">
             <div className="topBarLeft">
               <div className="appTitle">{t("appTitle")}</div>
@@ -442,47 +580,12 @@ export default function App() {
                 {socketReady ? t("realtimeOn") : t("realtimeReconnecting")}
               </div>
             </div>
-            <UserMenu
-              me={me}
-              onLogout={logout}
-              onChangeAvatar={changeMyAvatar}
-              settings={settings}
-              onChangeSettings={(next) => setSettings((prev) => ({ ...prev, ...next }))}
-              t={t}
-            />
+            <UserMenu {...userMenuProps} variant="dropdown" />
           </div>
 
           <div className="appBody">
-            <Sidebar
-              chats={chats}
-              me={me}
-              onSelectChat={selectChat}
-              onStartChat={startChat}
-              onCreateGroup={handleCreateGroup}
-              t={t}
-              lang={settings.lang}
-            />
-            <Chat
-              chatId={selectedChatId}
-              chat={chats.find((c) => c.id === selectedChatId) || null}
-              otherTyping={Boolean(selectedChatId && typingUntil[selectedChatId] > Date.now())}
-              messages={messages}
-              meId={me.id}
-              meAvatar={me.avatar}
-              meUsername={me.username}
-              chatTheme={settings.chatTheme}
-              onSend={handleSend}
-              onEditMessage={handleEditMessage}
-              onToggleReaction={handleToggleReaction}
-              isAdmin={me.role === "admin"}
-              onAdminDeleteMessage={handleAdminDeleteMessage}
-              isBanned={Boolean(me.banned)}
-              onTyping={handleTyping}
-              onGroupMetaChanged={refreshChatsList}
-              presenceTick={presenceTick}
-              t={t}
-              lang={settings.lang}
-            />
+            <Sidebar {...sidebarProps} />
+            <Chat {...chatProps} />
           </div>
         </div>
       )}
