@@ -418,6 +418,14 @@ export default function Chat({
                   <div className="systemMessageTime">{formatTime(m.createdAt)}</div>
                 </div>
               ) : (
+                (() => {
+                  const textTrim = String(m.text ?? "").trim();
+                  const isCircleVideoOnly =
+                    Boolean(m.videoUrl) && !m.imageUrl && !m.audioUrl && !textTrim && !m.editedAt;
+                  const isVoiceOnly =
+                    Boolean(m.audioUrl) && !m.imageUrl && !m.videoUrl && !textTrim && !m.editedAt;
+                  const bubbleMediaBare = isCircleVideoOnly || isVoiceOnly ? " bubbleMediaBare" : "";
+                  return (
                 <div
                   key={m.id}
                   className={m.senderId === meId ? "bubbleRow me" : "bubbleRow"}
@@ -429,7 +437,13 @@ export default function Chat({
                       <span>{initials(getDisplayName(m, meId, meUsername))}</span>
                     )}
                   </div>
-                  <div className={m.senderId === meId ? "bubble me bubbleOwn bubbleWithActions" : "bubble bubbleWithActions"}>
+                  <div
+                    className={
+                      m.senderId === meId
+                        ? `bubble me bubbleOwn bubbleWithActions${bubbleMediaBare}`
+                        : `bubble bubbleWithActions${bubbleMediaBare}`
+                    }
+                  >
                     <div className={m.senderId === meId ? "reactBtnWrap right" : "reactBtnWrap left"}>
                       <button
                         type="button"
@@ -624,6 +638,8 @@ export default function Chat({
                     ) : null}
                   </div>
                 </div>
+                  );
+                })()
               )
             )}
           </div>

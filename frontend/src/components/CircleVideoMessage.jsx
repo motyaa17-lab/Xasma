@@ -26,18 +26,16 @@ export default function CircleVideoMessage({ src, tapSoundLabel, soundOnLabel })
 
   return (
     <div className="circleVideoMsg">
-      <div className="circleVideoClip">
-        <video
-          ref={videoRef}
-          className="circleVideoEl"
-          src={src}
-          muted={muted}
-          loop
-          playsInline
-          autoPlay
-          preload="metadata"
-        />
-      </div>
+      <video
+        ref={videoRef}
+        className="circleVideoEl"
+        src={src}
+        muted={muted}
+        loop
+        playsInline
+        autoPlay
+        preload="metadata"
+      />
       <button
         type="button"
         className="circleVideoSoundBtn"

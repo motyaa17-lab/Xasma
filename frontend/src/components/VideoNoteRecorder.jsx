@@ -206,10 +206,7 @@ export default function VideoNoteRecorder({ onSend, onClose, t }) {
   const maxSs = String(MAX_SEC % 60).padStart(2, "0");
 
   return (
-    <div className="videoNotePanel" role="dialog" aria-labelledby="videoNoteHeading">
-      <div id="videoNoteHeading" className="videoNoteTitle">
-        {t("videoNoteTitle")}
-      </div>
+    <div className="videoNoteRoot" role="dialog" aria-label={t("videoNoteTitle")}>
       <div className="videoNotePreviewWrap">
         <video
           ref={videoRef}

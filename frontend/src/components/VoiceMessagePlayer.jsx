@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
-/** Sparse bars (~Telegram density): amplitude shape without equalizer clutter */
-const BAR_COUNT = 18;
+/** Sparse, soft bars — calm waveform, not dense */
+const BAR_COUNT = 14;
 
 function smoothPeaks(arr) {
   if (arr.length < 3) return arr;
@@ -190,7 +190,7 @@ export default function VoiceMessagePlayer({ src, messageId, isOwn, playLabel, p
           </svg>
         )}
       </button>
-      <div className="voiceMsgBody">
+      <div className="voiceMsgContent">
         <div
           ref={trackRef}
           className="voiceMsgWaveTrack"
@@ -219,27 +219,27 @@ export default function VoiceMessagePlayer({ src, messageId, isOwn, playLabel, p
             }
           }}
         >
-          <div className="voiceMsgWaveBars" aria-hidden="true">
-            {waveform.map((h, i) => {
-              const reveal = (i + 0.5) / BAR_COUNT <= progress;
-              return (
-                <span
-                  // eslint-disable-next-line react/no-array-index-key
-                  key={i}
-                  className={`voiceMsgWaveBar ${reveal ? "voiceMsgWaveBarPlayed" : ""}`}
-                  style={{ transform: `scaleY(${0.2 + h * 0.8})` }}
-                />
-              );
-            })}
+            <div className="voiceMsgWaveBars" aria-hidden="true">
+              {waveform.map((h, i) => {
+                const reveal = (i + 0.5) / BAR_COUNT <= progress;
+                return (
+                  <span
+                    // eslint-disable-next-line react/no-array-index-key
+                    key={i}
+                    className={`voiceMsgWaveBar ${reveal ? "voiceMsgWaveBarPlayed" : ""}`}
+                    style={{ transform: `scaleY(${0.25 + h * 0.75})` }}
+                  />
+                );
+              })}
+            </div>
+            <div className="voiceMsgProgressRail" aria-hidden="true">
+              <div className="voiceMsgProgressFill" style={{ width: `${progress * 100}%` }} />
+            </div>
           </div>
-          <div className="voiceMsgProgressRail" aria-hidden="true">
-            <div className="voiceMsgProgressFill" style={{ width: `${progress * 100}%` }} />
-          </div>
-        </div>
-        <div className="voiceMsgTimes">
-          <span>{formatAudioTime(current)}</span>
+        <div className="voiceMsgTimes" aria-live="polite">
+          <span className="voiceMsgTimeCurrent">{formatAudioTime(current)}</span>
           <span className="voiceMsgTimesSep">/</span>
-          <span>{formatAudioTime(duration)}</span>
+          <span className="voiceMsgTimeTotal">{formatAudioTime(duration)}</span>
         </div>
       </div>
     </div>

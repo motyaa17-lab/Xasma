@@ -966,6 +966,25 @@ body {
   border-color: rgba(37, 99, 235, 0.35);
 }
 
+/* Voice-only / circle-video-only: no second frame around the media chrome */
+.bubble.bubbleMediaBare {
+  padding: 2px 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.bubble.me.bubbleMediaBare {
+  background: transparent;
+  border: none;
+}
+
+.bubble.bubbleMediaBare .bubbleMeta {
+  margin-top: 2px;
+  padding-left: 2px;
+  padding-right: 2px;
+}
+
 .bubbleOwn {
   position: relative;
   padding-right: 34px;
@@ -1206,10 +1225,10 @@ body {
 
 /* ----- Voice recording (composer) — minimal ----- */
 .voiceRecorderPanel {
-  padding: 14px 16px;
-  border-radius: 18px;
-  background: rgba(15, 23, 42, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 10px 0 0;
+  border-radius: 0;
+  background: transparent;
+  border: none;
 }
 
 .voiceRecorderTitle {
@@ -1275,24 +1294,24 @@ body {
   flex-wrap: wrap;
 }
 
-/* ----- Voice message playback (bubble) — minimal pill ----- */
+/* ----- Voice message playback — soft Telegram-like bubble (single surface, no inner frame) ----- */
 .voiceMsgPill {
   position: relative;
   display: flex;
-  align-items: stretch;
-  gap: 8px;
-  max-width: min(300px, 100%);
-  padding: 6px 10px 6px 6px;
-  margin-bottom: 6px;
-  border-radius: 20px;
-  background: rgba(30, 41, 59, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  align-items: center;
+  gap: 6px;
+  max-width: min(280px, 100%);
+  padding: 8px 12px 8px 8px;
+  margin-bottom: 4px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.06);
+  border: none;
+  box-shadow: none;
   align-self: flex-start;
 }
 
 .voiceMsgPillOwn {
-  background: rgba(51, 65, 85, 0.55);
-  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(77, 171, 247, 0.22);
   align-self: flex-end;
   margin-left: auto;
 }
@@ -1308,13 +1327,12 @@ body {
 
 .voiceMsgPlayBtn {
   flex-shrink: 0;
-  align-self: center;
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(248, 250, 252, 0.95);
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(248, 250, 252, 0.88);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1323,29 +1341,29 @@ body {
 }
 
 .voiceMsgPlayBtn:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .voiceMsgPillOwn .voiceMsgPlayBtn {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .voiceMsgPillOwn .voiceMsgPlayBtn:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.24);
 }
 
 .voiceMsgPlayGlyph {
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
   margin-left: 2px;
-  opacity: 0.95;
+  opacity: 0.92;
 }
 
 .voiceMsgPauseIcon {
   display: inline-block;
-  width: 11px;
-  height: 13px;
+  width: 10px;
+  height: 12px;
   position: relative;
 }
 
@@ -1354,11 +1372,11 @@ body {
   content: "";
   position: absolute;
   top: 0;
-  width: 2.5px;
+  width: 2px;
   height: 100%;
   background: currentColor;
-  border-radius: 1px;
-  opacity: 0.95;
+  border-radius: 99px;
+  opacity: 0.9;
 }
 
 .voiceMsgPauseIcon::before {
@@ -1369,83 +1387,76 @@ body {
   right: 1px;
 }
 
-.voiceMsgBody {
+.voiceMsgContent {
   flex: 1;
   min-width: 0;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  justify-content: center;
-  padding: 2px 0;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
 }
 
 .voiceMsgWaveTrack {
   position: relative;
-  height: 30px;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.18);
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  border-radius: 0;
+  background: transparent;
   cursor: pointer;
   touch-action: none;
-  overflow: hidden;
+  overflow: visible;
   outline: none;
 }
 
 .voiceMsgWaveTrack:focus-visible {
-  box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.35);
+  outline: none;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
 }
 
 .voiceMsgWaveBars {
   display: flex;
   align-items: flex-end;
-  justify-content: space-evenly;
-  height: calc(100% - 5px);
-  padding: 4px 10px 0;
-  gap: 5px;
+  justify-content: space-between;
+  height: calc(100% - 4px);
+  padding: 2px 0 0;
+  gap: 7px;
   pointer-events: none;
-  animation: voiceMsgWaveSoft 3.5s ease-in-out infinite;
-}
-
-@keyframes voiceMsgWaveSoft {
-  0%,
-  100% {
-    opacity: 0.88;
-  }
-  50% {
-    opacity: 1;
-  }
 }
 
 .voiceMsgWaveBar {
-  width: 2px;
-  flex: 0 0 2px;
-  height: 18px;
+  width: 1.5px;
+  flex: 0 0 1.5px;
+  max-width: 1.5px;
+  height: 16px;
   align-self: flex-end;
   border-radius: 99px;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.14);
   transform-origin: center bottom;
-  transition: transform 0.12s ease-out, background 0.15s ease;
+  transition: transform 0.14s ease-out, background 0.2s ease;
 }
 
 .voiceMsgWaveBarPlayed {
-  background: rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.28);
 }
 
 .voiceMsgPillOwn .voiceMsgWaveBar {
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .voiceMsgPillOwn .voiceMsgWaveBarPlayed {
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.38);
 }
 
 .voiceMsgProgressRail {
   position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: 4px;
-  height: 3px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
   border-radius: 99px;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
   pointer-events: none;
   overflow: hidden;
 }
@@ -1453,25 +1464,50 @@ body {
 .voiceMsgProgressFill {
   height: 100%;
   border-radius: 99px;
-  background: rgba(255, 255, 255, 0.38);
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.voiceMsgPillOwn .voiceMsgProgressRail {
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .voiceMsgPillOwn .voiceMsgProgressFill {
-  background: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.32);
 }
 
 .voiceMsgTimes {
-  font-size: 11px;
+  flex-shrink: 0;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
-  color: rgba(203, 213, 225, 0.65);
+  font-weight: 500;
+  color: rgba(203, 213, 225, 0.5);
   display: flex;
-  align-items: center;
-  gap: 5px;
-  padding-left: 2px;
+  align-items: baseline;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.voiceMsgPillOwn .voiceMsgTimes {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.voiceMsgTimeCurrent {
+  color: rgba(226, 232, 240, 0.65);
+  min-width: 2.25em;
+  text-align: right;
+}
+
+.voiceMsgPillOwn .voiceMsgTimeCurrent {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.voiceMsgTimeTotal {
+  opacity: 0.85;
 }
 
 .voiceMsgTimesSep {
-  opacity: 0.35;
+  opacity: 0.25;
+  font-weight: 400;
 }
 
 .bubbleTextMetaOnly {
@@ -1607,30 +1643,23 @@ body {
   height: 21px;
 }
 
-.videoNotePanel {
-  padding: 14px 16px;
-  border-radius: 18px;
-  background: rgba(15, 23, 42, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+.videoNoteRoot {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border: none;
   text-align: center;
-}
-
-.videoNoteTitle {
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(226, 232, 240, 0.9);
-  margin-bottom: 12px;
 }
 
 .videoNotePreviewWrap {
   width: 220px;
   max-width: 72vw;
   aspect-ratio: 1;
-  margin: 0 auto 12px;
+  margin: 0 auto 8px;
   border-radius: 50%;
   overflow: hidden;
-  background: #0f172a;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  border: none;
 }
 
 .videoNotePreview {
@@ -1702,23 +1731,18 @@ body {
 .circleVideoMsg {
   position: relative;
   align-self: flex-start;
-  margin-bottom: 6px;
-  width: fit-content;
-}
-
-.bubble.me .circleVideoMsg {
-  align-self: flex-end;
-  margin-left: auto;
-}
-
-.circleVideoClip {
+  margin-bottom: 4px;
   width: 200px;
   max-width: min(200px, 72vw);
   aspect-ratio: 1;
   border-radius: 50%;
   overflow: hidden;
-  background: #0f172a;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+}
+
+.bubble.me .circleVideoMsg {
+  align-self: flex-end;
+  margin-left: auto;
 }
 
 .circleVideoEl {
@@ -1730,22 +1754,23 @@ body {
 
 .circleVideoSoundBtn {
   position: absolute;
-  right: 8px;
-  bottom: 8px;
-  width: 34px;
-  height: 34px;
+  right: 6px;
+  bottom: 6px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   border: none;
-  background: rgba(0, 0, 0, 0.42);
+  background: rgba(15, 23, 42, 0.45);
   color: rgba(248, 250, 252, 0.95);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: none;
 }
 
 .circleVideoSoundBtn:hover {
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(15, 23, 42, 0.58);
 }
 
 .circleVideoSoundIcon {
