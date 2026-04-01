@@ -56,8 +56,18 @@ async function initDb() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
+    CREATE TABLE IF NOT EXISTS message_reactions (
+      id BIGSERIAL PRIMARY KEY,
+      message_id BIGINT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      emoji TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      CONSTRAINT message_reactions_unique UNIQUE (message_id, user_id, emoji)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_messages_chat_created ON messages(chat_id, created_at, id);
     CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id, id);
+    CREATE INDEX IF NOT EXISTS idx_reactions_message ON message_reactions(message_id);
   `);
 }
 

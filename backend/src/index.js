@@ -341,6 +341,9 @@ app.get("/api/chats/:chatId/messages", authRequired, (req, res) => {
     [chatId, limit]
   );
 
+  const messageIds = messages.rows.map((m) => Number(m.id));
+  const reactionsByMessageId = await getGroupedReactionsForMessages(messageIds, uid);
+
   return res.json({
     messages: messages.rows.map((m) => ({
       id: Number(m.id),
@@ -352,8 +355,138 @@ app.get("/api/chats/:chatId/messages", authRequired, (req, res) => {
       editedAt: m.edited_at,
       createdAt: m.created_at,
       sender: { id: Number(m.sender_id), username: m.username, avatar: m.avatar_url },
+      reactions: reactionsByMessageId.get(Number(m.id)) || [],
     })),
   });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
+async function getMessageWithChat(messageId) {
+  const r = await query(
+    `
+    SELECT m.id, m.chat_id, m.sender_id, c.user1_id, c.user2_id
+    FROM messages m
+    JOIN chats c ON c.id = m.chat_id
+    WHERE m.id = $1
+  `,
+    [messageId]
+  );
+  return r.rows[0] || null;
+}
+
+async function getGroupedReactions(messageId, meId) {
+  const r = await query(
+    `
+    SELECT
+      emoji,
+      COUNT(*)::int AS count,
+      BOOL_OR(user_id = $2) AS reacted_by_me
+    FROM message_reactions
+    WHERE message_id = $1
+    GROUP BY emoji
+    ORDER BY COUNT(*) DESC, emoji ASC
+  `,
+    [messageId, meId]
+  );
+  return r.rows.map((row) => ({
+    emoji: row.emoji,
+    count: Number(row.count),
+    reactedByMe: Boolean(row.reacted_by_me),
+  }));
+}
+
+async function getGroupedReactionsForMessages(messageIds, meId) {
+  const map = new Map();
+  if (!messageIds.length) return map;
+
+  const r = await query(
+    `
+    SELECT
+      message_id,
+      emoji,
+      COUNT(*)::int AS count,
+      BOOL_OR(user_id = $2) AS reacted_by_me
+    FROM message_reactions
+    WHERE message_id = ANY($1::bigint[])
+    GROUP BY message_id, emoji
+    ORDER BY message_id ASC, COUNT(*) DESC, emoji ASC
+  `,
+    [messageIds, meId]
+  );
+
+  for (const row of r.rows) {
+    const mid = Number(row.message_id);
+    if (!map.has(mid)) map.set(mid, []);
+    map.get(mid).push({
+      emoji: row.emoji,
+      count: Number(row.count),
+      reactedByMe: Boolean(row.reacted_by_me),
+    });
+  }
+  return map;
+}
+
+app.get("/api/messages/:messageId/reactions", authRequired, (req, res) => {
+  const messageId = Number(req.params.messageId);
+  if (!messageId) return res.status(400).json({ error: "Invalid message id" });
+
+  (async () => {
+    const uid = Number(req.user.id);
+    const msg = await getMessageWithChat(messageId);
+    if (!msg) return res.status(404).json({ error: "Message not found" });
+
+    const isMember = Number(msg.user1_id) === uid || Number(msg.user2_id) === uid;
+    if (!isMember) return res.status(403).json({ error: "Not a member of this chat" });
+
+    const reactions = await getGroupedReactions(messageId, uid);
+    return res.json({ reactions });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
+app.post("/api/messages/:messageId/reactions", authRequired, (req, res) => {
+  const messageId = Number(req.params.messageId);
+  const emoji = typeof req.body?.emoji === "string" ? req.body.emoji.trim() : "";
+  if (!messageId) return res.status(400).json({ error: "Invalid message id" });
+  if (!emoji) return res.status(400).json({ error: "emoji is required" });
+  if (emoji.length > 16) return res.status(400).json({ error: "Invalid emoji" });
+
+  (async () => {
+    const uid = Number(req.user.id);
+    const msg = await getMessageWithChat(messageId);
+    if (!msg) return res.status(404).json({ error: "Message not found" });
+
+    const isMember = Number(msg.user1_id) === uid || Number(msg.user2_id) === uid;
+    if (!isMember) return res.status(403).json({ error: "Not a member of this chat" });
+
+    const del = await query(
+      `DELETE FROM message_reactions WHERE message_id = $1 AND user_id = $2 AND emoji = $3`,
+      [messageId, uid, emoji]
+    );
+    if (del.rowCount === 0) {
+      await query(
+        `INSERT INTO message_reactions (message_id, user_id, emoji) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+        [messageId, uid, emoji]
+      );
+    }
+
+    const reactions = await getGroupedReactions(messageId, uid);
+
+    const chatIdNum = Number(msg.chat_id);
+    const u1 = Number(msg.user1_id);
+    const u2 = Number(msg.user2_id);
+    const recipients = new Set([
+      ...(userSockets.get(u1) ? Array.from(userSockets.get(u1)) : []),
+      ...(userSockets.get(u2) ? Array.from(userSockets.get(u2)) : []),
+    ]);
+    recipients.forEach((sid) =>
+      io.to(sid).emit("message:reactionsUpdated", {
+        chatId: chatIdNum,
+        messageId,
+        reactions,
+      })
+    );
+
+    return res.json({ reactions });
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });
 
