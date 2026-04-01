@@ -121,9 +121,10 @@ export async function removeGroupMember(chatId, userId) {
   });
 }
 
-export async function postChatMessage(chatId, text, imageUrl) {
+export async function postChatMessage(chatId, text, imageUrl, audioUrl) {
   const body = { text: text || "" };
   if (imageUrl) body.imageUrl = imageUrl;
+  if (audioUrl) body.audioUrl = audioUrl;
   const data = await apiFetch(`/api/chats/${chatId}/messages`, {
     method: "POST",
     body,
@@ -138,6 +139,26 @@ export async function uploadChatImage(file) {
   let res;
   try {
     res = await fetch(`${API_BASE}/api/upload`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: fd,
+    });
+  } catch {
+    throw new ApiError("Network error", 0);
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(data.error || "Upload failed", res.status);
+  if (!data.url) throw new ApiError("Upload failed", res.status);
+  return data.url;
+}
+
+export async function uploadChatAudio(file) {
+  const fd = new FormData();
+  fd.append("audio", file);
+  const token = getToken();
+  let res;
+  try {
+    res = await fetch(`${API_BASE}/api/upload/audio`, {
       method: "POST",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: fd,

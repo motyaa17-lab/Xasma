@@ -68,6 +68,18 @@ export const translations = {
     uploadImageError: "Could not upload the image. Please try again.",
     uploadImageTypeError: "Please choose a JPEG, PNG, WebP, or GIF image.",
     removeAttachedPhoto: "Remove attached photo",
+
+    voiceRecord: "Record voice message",
+    voiceRecording: "Recording…",
+    voiceStopSend: "Stop & send",
+    voiceCancel: "Cancel",
+    voiceSending: "Sending voice…",
+    voiceMicDenied:
+      "Microphone access was denied or is unavailable. Check browser permissions and try again.",
+    voiceNotSupported: "Voice recording is not supported in this browser. Try Chrome, Firefox, or Safari (HTTPS).",
+    voiceTooShort: "Recording was too short.",
+    uploadVoiceError: "Could not upload the voice message. Please try again.",
+
     send: "Send",
     save: "Save",
     edit: "Edit",
@@ -166,6 +178,19 @@ export const translations = {
     uploadImageError: "Не удалось загрузить изображение. Попробуйте ещё раз.",
     uploadImageTypeError: "Выберите изображение JPEG, PNG, WebP или GIF.",
     removeAttachedPhoto: "Убрать фото",
+
+    voiceRecord: "Голосовое сообщение",
+    voiceRecording: "Идёт запись…",
+    voiceStopSend: "Стоп и отправить",
+    voiceCancel: "Отмена",
+    voiceSending: "Отправка голоса…",
+    voiceMicDenied:
+      "Нет доступа к микрофону или он недоступен. Разрешите доступ в настройках браузера.",
+    voiceNotSupported:
+      "Запись голоса не поддерживается в этом браузере. Попробуйте Chrome, Firefox или Safari (HTTPS).",
+    voiceTooShort: "Запись слишком короткая.",
+    uploadVoiceError: "Не удалось загрузить голосовое сообщение. Попробуйте ещё раз.",
+
     send: "Отправить",
     save: "Сохранить",
     edit: "Изменить",

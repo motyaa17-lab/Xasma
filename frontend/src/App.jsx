@@ -355,7 +355,8 @@ export default function App() {
     const isObj = payload && typeof payload === "object" && !Array.isArray(payload);
     const text = isObj ? String(payload.text ?? "").trim() : String(payload ?? "").trim();
     const imageUrl = isObj && payload.imageUrl ? String(payload.imageUrl).trim() : "";
-    if (!text && !imageUrl) return;
+    const audioUrl = isObj && payload.audioUrl ? String(payload.audioUrl).trim() : "";
+    if (!text && !imageUrl && !audioUrl) return;
     if (!socketRef.current || !socketReady) return;
     if (!selectedChatId) return;
     if (me?.banned) return;
@@ -365,6 +366,7 @@ export default function App() {
       chatId: selectedChatId,
       text,
       ...(imageUrl ? { imageUrl } : {}),
+      ...(audioUrl ? { audioUrl } : {}),
     });
   }
 

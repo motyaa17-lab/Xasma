@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { tf } from "../i18n.js";
-import { uploadChatImage, getApiBase } from "../api.js";
+import { uploadChatImage, uploadChatAudio, getApiBase } from "../api.js";
 import GroupInfoModal from "./GroupInfoModal.jsx";
 
 export default function Chat({
@@ -32,9 +32,16 @@ export default function Chat({
   const [pendingImageUrl, setPendingImageUrl] = useState(null);
   const [pendingPreviewObjectUrl, setPendingPreviewObjectUrl] = useState(null);
   const [imageUploading, setImageUploading] = useState(false);
+  const [voiceRecording, setVoiceRecording] = useState(false);
+  const [voiceUploading, setVoiceUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const listRef = useRef(null);
   const fileInputRef = useRef(null);
+  const mediaStreamRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const recordChunksRef = useRef([]);
+  const recordCancelledRef = useRef(false);
+  const voiceStartingRef = useRef(false);
   const typingStartTimerRef = useRef(null);
   const typingStopTimerRef = useRef(null);
   const typingActiveRef = useRef(false);
@@ -58,12 +65,31 @@ export default function Chat({
     setGroupInfoOpen(false);
     setPendingImageUrl(null);
     setImageUploading(false);
+    setVoiceRecording(false);
+    setVoiceUploading(false);
     setUploadError("");
     setPendingPreviewObjectUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return null;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId]);
+
+  useEffect(() => {
+    return () => {
+      recordCancelledRef.current = true;
+      try {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+          mediaRecorderRef.current.stop();
+        }
+      } catch {
+        // ignore
+      }
+      mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
+      mediaStreamRef.current = null;
+      mediaRecorderRef.current = null;
+      recordChunksRef.current = [];
+    };
   }, [chatId]);
 
   useEffect(() => {
@@ -125,10 +151,114 @@ export default function Chat({
     }
   }
 
+  function startVoiceRecording() {
+    if (typeof MediaRecorder === "undefined") {
+      setUploadError(t("voiceNotSupported"));
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setUploadError(t("voiceNotSupported"));
+      return;
+    }
+    if (
+      isBanned ||
+      editingMessageId ||
+      imageUploading ||
+      voiceUploading ||
+      voiceRecording ||
+      pendingImageUrl ||
+      voiceStartingRef.current
+    ) {
+      return;
+    }
+    setUploadError("");
+    recordCancelledRef.current = false;
+    recordChunksRef.current = [];
+    voiceStartingRef.current = true;
+    navigator.mediaDevices
+      .getUserMedia({ audio: true })
+      .then((stream) => {
+        mediaStreamRef.current = stream;
+        const mime = pickRecorderMime();
+        let rec;
+        try {
+          rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+        } catch {
+          try {
+            rec = new MediaRecorder(stream);
+          } catch {
+            stream.getTracks().forEach((tr) => tr.stop());
+            mediaStreamRef.current = null;
+            setUploadError(t("voiceNotSupported"));
+            return;
+          }
+        }
+        mediaRecorderRef.current = rec;
+        rec.ondataavailable = (e) => {
+          if (e.data.size > 0) recordChunksRef.current.push(e.data);
+        };
+        rec.onstop = () => {
+          mediaStreamRef.current?.getTracks().forEach((tr) => tr.stop());
+          mediaStreamRef.current = null;
+          const cancelled = recordCancelledRef.current;
+          recordCancelledRef.current = false;
+          mediaRecorderRef.current = null;
+          setVoiceRecording(false);
+          const chunks = [...recordChunksRef.current];
+          recordChunksRef.current = [];
+          if (cancelled) return;
+          const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
+          if (blob.size < 256) {
+            setUploadError(t("voiceTooShort"));
+            return;
+          }
+          const ext = extForRecorderMime(rec.mimeType || blob.type);
+          const file = new File([blob], `voice-${Date.now()}${ext}`, {
+            type: blob.type || rec.mimeType || "application/octet-stream",
+          });
+          setVoiceUploading(true);
+          onTyping?.(false);
+          (async () => {
+            try {
+              const url = await uploadChatAudio(file);
+              onSend({ text: "", audioUrl: url });
+            } catch (err) {
+              const msg =
+                err?.name === "ApiError" ? err.message : String(err?.message || t("uploadVoiceError"));
+              setUploadError(msg);
+            } finally {
+              setVoiceUploading(false);
+            }
+          })();
+        };
+        rec.start(200);
+        setVoiceRecording(true);
+      })
+      .catch(() => {
+        setUploadError(t("voiceMicDenied"));
+      })
+      .finally(() => {
+        voiceStartingRef.current = false;
+      });
+  }
+
+  function cancelVoiceRecording() {
+    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === "inactive") return;
+    recordCancelledRef.current = true;
+    mediaRecorderRef.current.stop();
+  }
+
+  function finishVoiceRecording() {
+    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === "inactive") return;
+    recordCancelledRef.current = false;
+    mediaRecorderRef.current.stop();
+  }
+
   async function handlePrimary() {
     const trimmed = String(text).trim();
     onTyping?.(false);
     if (isBanned) return;
+    if (voiceRecording) return;
     if (editingMessageId) {
       if (!trimmed) return;
       try {
@@ -141,7 +271,7 @@ export default function Chat({
       return;
     }
     if (!pendingImageUrl && !trimmed) return;
-    if (imageUploading) return;
+    if (imageUploading || voiceRecording) return;
     onSend({ text: trimmed, imageUrl: pendingImageUrl || undefined });
     setText("");
     clearPendingImage();
@@ -391,19 +521,28 @@ export default function Chat({
                     ) : null}
                     {m.imageUrl ? (
                       <a
-                        href={messageImageAbsUrl(m.imageUrl)}
+                        href={messageMediaAbsUrl(m.imageUrl)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="msgImageLink"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <img
-                          src={messageImageAbsUrl(m.imageUrl)}
+                          src={messageMediaAbsUrl(m.imageUrl)}
                           alt=""
                           className="msgImage"
                           loading="lazy"
                         />
                       </a>
+                    ) : null}
+                    {m.audioUrl ? (
+                      <audio
+                        className="msgAudio"
+                        controls
+                        src={messageMediaAbsUrl(m.audioUrl)}
+                        preload="metadata"
+                        onClick={(e) => e.stopPropagation()}
+                      />
                     ) : null}
                     {String(m.text ?? "").trim() ? (
                       <div className="bubbleText">
@@ -454,7 +593,20 @@ export default function Chat({
           <div className="composer">
             {isBanned ? <div className="banBanner">{t("authBanned")}</div> : null}
             {uploadError ? <div className="uploadErrBanner">{uploadError}</div> : null}
+            {voiceRecording ? (
+              <div className="voiceRecordBar" role="status">
+                <span className="voiceRecordDot" aria-hidden />
+                <span className="voiceRecordLabel">{t("voiceRecording")}</span>
+                <button type="button" className="voiceBarBtn voiceBarBtnPrimary" onClick={finishVoiceRecording}>
+                  {t("voiceStopSend")}
+                </button>
+                <button type="button" className="voiceBarBtn" onClick={cancelVoiceRecording}>
+                  {t("voiceCancel")}
+                </button>
+              </div>
+            ) : null}
             {imageUploading ? <div className="uploadProgressHint">{t("uploadImageProgress")}</div> : null}
+            {voiceUploading ? <div className="uploadProgressHint">{t("voiceSending")}</div> : null}
             {pendingPreviewObjectUrl && !editingMessageId ? (
               <div className="pendingImageStrip">
                 <img src={pendingPreviewObjectUrl} alt="" className="pendingImageThumb" />
@@ -462,7 +614,7 @@ export default function Chat({
                   type="button"
                   className="pendingImageRemove"
                   onClick={clearPendingImage}
-                  disabled={imageUploading}
+                  disabled={imageUploading || voiceRecording}
                   aria-label={t("removeAttachedPhoto")}
                 >
                   ×
@@ -482,7 +634,13 @@ export default function Chat({
               <button
                 type="button"
                 className="attachPhotoBtn"
-                disabled={isBanned || Boolean(editingMessageId) || imageUploading}
+                disabled={
+                  isBanned ||
+                  Boolean(editingMessageId) ||
+                  imageUploading ||
+                  voiceUploading ||
+                  voiceRecording
+                }
                 aria-label={t("attachPhoto")}
                 title={t("attachPhoto")}
                 onClick={() => fileInputRef.current?.click()}
@@ -498,7 +656,7 @@ export default function Chat({
                 }}
                 rows={1}
                 placeholder={t("typeMessagePlaceholder")}
-                disabled={isBanned || imageUploading}
+                disabled={isBanned || imageUploading || voiceRecording}
                 onKeyDown={(e) => {
                   if (e.key === "Escape" && editingMessageId) {
                     e.preventDefault();
@@ -514,6 +672,23 @@ export default function Chat({
                 }}
               />
               <button
+                type="button"
+                className="voiceMicBtn"
+                disabled={
+                  isBanned ||
+                  Boolean(editingMessageId) ||
+                  Boolean(pendingImageUrl) ||
+                  voiceRecording ||
+                  imageUploading ||
+                  voiceUploading
+                }
+                aria-label={t("voiceRecord")}
+                title={t("voiceRecord")}
+                onClick={startVoiceRecording}
+              >
+                🎤
+              </button>
+              <button
                 className="sendBtn"
                 type="button"
                 onMouseDown={(e) => {
@@ -524,6 +699,7 @@ export default function Chat({
                 disabled={
                   isBanned ||
                   imageUploading ||
+                  voiceRecording ||
                   (editingMessageId ? !String(text).trim() : !String(text).trim() && !pendingImageUrl)
                 }
               >
@@ -537,12 +713,42 @@ export default function Chat({
   );
 }
 
-function messageImageAbsUrl(pathOrUrl) {
+function messageMediaAbsUrl(pathOrUrl) {
   if (!pathOrUrl) return "";
   if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
   const base = getApiBase().replace(/\/$/, "");
   const p = pathOrUrl.startsWith("/") ? pathOrUrl : `/${pathOrUrl}`;
   return `${base}${p}`;
+}
+
+function pickRecorderMime() {
+  if (typeof MediaRecorder === "undefined") return "";
+  const types = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "video/webm;codecs=opus",
+    "video/webm",
+    "audio/ogg;codecs=opus",
+    "audio/ogg",
+    "audio/mp4",
+  ];
+  for (const t of types) {
+    try {
+      if (MediaRecorder.isTypeSupported(t)) return t;
+    } catch {
+      // ignore
+    }
+  }
+  return "";
+}
+
+function extForRecorderMime(mime) {
+  const m = String(mime || "").toLowerCase();
+  if (m.includes("ogg")) return ".ogg";
+  if (m.includes("mp4") || m.includes("m4a")) return ".m4a";
+  if (m.includes("mpeg") || m.includes("mp3")) return ".mp3";
+  if (m.includes("wav")) return ".wav";
+  return ".webm";
 }
 
 function formatSystemLine(m, t) {
