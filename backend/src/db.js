@@ -113,6 +113,7 @@ async function initDb() {
 
   await query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS image_url TEXT`);
   await query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS audio_url TEXT`);
+  await query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS video_url TEXT`);
 
   // Ensure initial admin (safe if user doesn't exist).
   await query(`UPDATE users SET role = 'admin' WHERE username = 'Xasma'`);

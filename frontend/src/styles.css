@@ -1571,6 +1571,188 @@ body {
   cursor: not-allowed;
 }
 
+.videoCamBtn {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(226, 232, 240, 0.75);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.videoCamBtn:hover:not(:disabled) {
+  color: rgba(248, 250, 252, 0.95);
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.videoCamBtn--active {
+  color: rgba(191, 219, 254, 0.95);
+  border-color: rgba(96, 165, 250, 0.35);
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.videoCamBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.videoCamIcon {
+  width: 21px;
+  height: 21px;
+}
+
+.videoNotePanel {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: center;
+}
+
+.videoNoteTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(226, 232, 240, 0.9);
+  margin-bottom: 12px;
+}
+
+.videoNotePreviewWrap {
+  width: 220px;
+  max-width: 72vw;
+  aspect-ratio: 1;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.videoNotePreview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.videoNoteHint {
+  font-size: 12px;
+  color: rgba(148, 163, 184, 0.85);
+  margin-bottom: 10px;
+}
+
+.videoNoteErr {
+  font-size: 13px;
+  color: rgba(252, 165, 165, 0.95);
+  margin-bottom: 10px;
+}
+
+.videoNoteActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+}
+
+.videoNoteBtn {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(248, 250, 252, 0.9);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.videoNoteBtnPrimary {
+  background: rgba(59, 130, 246, 0.45);
+  border-color: rgba(59, 130, 246, 0.35);
+  color: white;
+}
+
+.videoNoteBtnStop {
+  background: rgba(248, 113, 113, 0.14);
+  border-color: rgba(248, 113, 113, 0.32);
+  color: #fecaca;
+}
+
+.videoNoteRecordingRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.videoNoteTimer {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 14px;
+  color: rgba(248, 250, 252, 0.92);
+}
+
+.circleVideoMsg {
+  position: relative;
+  align-self: flex-start;
+  margin-bottom: 6px;
+  width: fit-content;
+}
+
+.bubble.me .circleVideoMsg {
+  align-self: flex-end;
+  margin-left: auto;
+}
+
+.circleVideoClip {
+  width: 200px;
+  max-width: min(200px, 72vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.circleVideoEl {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.circleVideoSoundBtn {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.42);
+  color: rgba(248, 250, 252, 0.95);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.circleVideoSoundBtn:hover {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.circleVideoSoundIcon {
+  width: 18px;
+  height: 18px;
+}
+
 .voiceBarBtn {
   padding: 8px 14px;
   border-radius: 10px;

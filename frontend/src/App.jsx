@@ -356,7 +356,8 @@ export default function App() {
     const text = isObj ? String(payload.text ?? "").trim() : String(payload ?? "").trim();
     const imageUrl = isObj && payload.imageUrl ? String(payload.imageUrl).trim() : "";
     const audioUrl = isObj && payload.audioUrl ? String(payload.audioUrl).trim() : "";
-    if (!text && !imageUrl && !audioUrl) return;
+    const videoUrl = isObj && payload.videoUrl ? String(payload.videoUrl).trim() : "";
+    if (!text && !imageUrl && !audioUrl && !videoUrl) return;
     if (!socketRef.current || !socketReady) return;
     if (!selectedChatId) return;
     if (me?.banned) return;
@@ -367,6 +368,7 @@ export default function App() {
       text,
       ...(imageUrl ? { imageUrl } : {}),
       ...(audioUrl ? { audioUrl } : {}),
+      ...(videoUrl ? { videoUrl } : {}),
     });
   }
 

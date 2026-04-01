@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { tf } from "../i18n.js";
-import { uploadChatImage, uploadChatAudio, getApiBase } from "../api.js";
+import { uploadChatImage, uploadChatAudio, uploadChatVideo, getApiBase } from "../api.js";
 import GroupInfoModal from "./GroupInfoModal.jsx";
 import VoiceRecorderPanel from "./VoiceRecorderPanel.jsx";
 import VoiceMessagePlayer from "./VoiceMessagePlayer.jsx";
+import VideoNoteRecorder from "./VideoNoteRecorder.jsx";
+import CircleVideoMessage from "./CircleVideoMessage.jsx";
 
 export default function Chat({
   chatId,
@@ -37,6 +39,8 @@ export default function Chat({
   const [voiceRecording, setVoiceRecording] = useState(false);
   const [recordingStream, setRecordingStream] = useState(null);
   const [voiceUploading, setVoiceUploading] = useState(false);
+  const [videoNoteOpen, setVideoNoteOpen] = useState(false);
+  const [videoNoteUploading, setVideoNoteUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const listRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -71,6 +75,8 @@ export default function Chat({
     setVoiceRecording(false);
     setRecordingStream(null);
     setVoiceUploading(false);
+    setVideoNoteOpen(false);
+    setVideoNoteUploading(false);
     setUploadError("");
     setPendingPreviewObjectUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
@@ -155,6 +161,22 @@ export default function Chat({
     }
   }
 
+  async function handleVideoNoteSend(file) {
+    setUploadError("");
+    setVideoNoteUploading(true);
+    try {
+      const url = await uploadChatVideo(file);
+      onSend({ text: "", videoUrl: url });
+      setVideoNoteOpen(false);
+    } catch (err) {
+      const msg =
+        err?.name === "ApiError" ? err.message : String(err?.message || t("videoNoteUploadError"));
+      setUploadError(msg);
+    } finally {
+      setVideoNoteUploading(false);
+    }
+  }
+
   function startVoiceRecording() {
     if (typeof MediaRecorder === "undefined") {
       setUploadError(t("voiceNotSupported"));
@@ -171,7 +193,9 @@ export default function Chat({
       voiceUploading ||
       voiceRecording ||
       pendingImageUrl ||
-      voiceStartingRef.current
+      voiceStartingRef.current ||
+      videoNoteOpen ||
+      videoNoteUploading
     ) {
       return;
     }
@@ -265,6 +289,7 @@ export default function Chat({
     onTyping?.(false);
     if (isBanned) return;
     if (voiceRecording) return;
+    if (videoNoteOpen) return;
     if (editingMessageId) {
       if (!trimmed) return;
       try {
@@ -541,6 +566,13 @@ export default function Chat({
                         />
                       </a>
                     ) : null}
+                    {m.videoUrl ? (
+                      <CircleVideoMessage
+                        src={messageMediaAbsUrl(m.videoUrl)}
+                        tapSoundLabel={t("videoTapSound")}
+                        soundOnLabel={t("videoSoundOn")}
+                      />
+                    ) : null}
                     {m.audioUrl ? (
                       <VoiceMessagePlayer
                         src={messageMediaAbsUrl(m.audioUrl)}
@@ -599,6 +631,13 @@ export default function Chat({
           <div className="composer">
             {isBanned ? <div className="banBanner">{t("authBanned")}</div> : null}
             {uploadError ? <div className="uploadErrBanner">{uploadError}</div> : null}
+            {videoNoteOpen ? (
+              <VideoNoteRecorder
+                onSend={handleVideoNoteSend}
+                onClose={() => setVideoNoteOpen(false)}
+                t={t}
+              />
+            ) : null}
             {voiceRecording && recordingStream ? (
               <VoiceRecorderPanel
                 audioStream={recordingStream}
@@ -609,6 +648,7 @@ export default function Chat({
             ) : null}
             {imageUploading ? <div className="uploadProgressHint">{t("uploadImageProgress")}</div> : null}
             {voiceUploading ? <div className="uploadProgressHint">{t("voiceSending")}</div> : null}
+            {videoNoteUploading ? <div className="uploadProgressHint">{t("videoNoteUploading")}</div> : null}
             {pendingPreviewObjectUrl && !editingMessageId ? (
               <div className="pendingImageStrip">
                 <img src={pendingPreviewObjectUrl} alt="" className="pendingImageThumb" />
@@ -616,7 +656,7 @@ export default function Chat({
                   type="button"
                   className="pendingImageRemove"
                   onClick={clearPendingImage}
-                  disabled={imageUploading || voiceRecording}
+                  disabled={imageUploading || voiceRecording || videoNoteOpen || videoNoteUploading}
                   aria-label={t("removeAttachedPhoto")}
                 >
                   ×
@@ -641,7 +681,9 @@ export default function Chat({
                   Boolean(editingMessageId) ||
                   imageUploading ||
                   voiceUploading ||
-                  voiceRecording
+                  voiceRecording ||
+                  videoNoteOpen ||
+                  videoNoteUploading
                 }
                 aria-label={t("attachPhoto")}
                 title={t("attachPhoto")}
@@ -658,7 +700,7 @@ export default function Chat({
                 }}
                 rows={1}
                 placeholder={t("typeMessagePlaceholder")}
-                disabled={isBanned || imageUploading || voiceRecording}
+                disabled={isBanned || imageUploading || voiceRecording || videoNoteOpen || videoNoteUploading}
                 onKeyDown={(e) => {
                   if (e.key === "Escape" && editingMessageId) {
                     e.preventDefault();
@@ -675,6 +717,37 @@ export default function Chat({
               />
               <button
                 type="button"
+                className={`videoCamBtn${videoNoteOpen ? " videoCamBtn--active" : ""}`}
+                disabled={
+                  isBanned ||
+                  Boolean(editingMessageId) ||
+                  Boolean(pendingImageUrl) ||
+                  voiceRecording ||
+                  imageUploading ||
+                  voiceUploading ||
+                  videoNoteOpen ||
+                  videoNoteUploading
+                }
+                aria-label={t("videoNoteOpenCamera")}
+                title={t("videoNoteOpenCamera")}
+                onClick={() => setVideoNoteOpen(true)}
+              >
+                <svg
+                  className="videoCamIcon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.65"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect x="3" y="7" width="13" height="11" rx="2" />
+                  <path d="M16 10l5-3v11l-5-3" />
+                </svg>
+              </button>
+              <button
+                type="button"
                 className={`voiceMicBtn${voiceRecording ? " voiceMicBtn--recording" : ""}`}
                 disabled={
                   isBanned ||
@@ -682,7 +755,9 @@ export default function Chat({
                   Boolean(pendingImageUrl) ||
                   voiceRecording ||
                   imageUploading ||
-                  voiceUploading
+                  voiceUploading ||
+                  videoNoteOpen ||
+                  videoNoteUploading
                 }
                 aria-label={t("voiceRecord")}
                 title={t("voiceRecord")}
@@ -715,6 +790,8 @@ export default function Chat({
                   isBanned ||
                   imageUploading ||
                   voiceRecording ||
+                  videoNoteOpen ||
+                  videoNoteUploading ||
                   (editingMessageId ? !String(text).trim() : !String(text).trim() && !pendingImageUrl)
                 }
               >

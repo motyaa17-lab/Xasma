@@ -56,6 +56,26 @@ const audioUpload = multer({
     else cb(new Error("Unsupported audio format (use WebM, OGG, MP3, M4A, WAV, etc.)"));
   },
 });
+
+const videoMimeOk = (mime) =>
+  /^video\/(webm|mp4|quicktime|x-msvideo|3gpp)$/i.test(String(mime || ""));
+
+const videoUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadsDir),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname || "").toLowerCase();
+      const allowed = [".webm", ".mp4", ".mov", ".3gp"];
+      const safeExt = allowed.includes(ext) ? ext : ".webm";
+      cb(null, `${Date.now()}-${crypto.randomBytes(8).toString("hex")}${safeExt}`);
+    },
+  }),
+  limits: { fileSize: 32 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (videoMimeOk(file.mimetype)) cb(null, true);
+    else cb(new Error("Unsupported video format (use WebM or MP4)"));
+  },
+});
 const JWT_SECRET = process.env.JWT_SECRET || "change_me";
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
 
@@ -211,6 +231,7 @@ function messageRowToApi(mr, reactions = []) {
     systemPayload: payload && typeof payload === "object" ? payload : null,
     imageUrl: mr.image_url || null,
     audioUrl: mr.audio_url || null,
+    videoUrl: mr.video_url || null,
     reactions,
   };
 }
@@ -219,7 +240,7 @@ async function fetchMessageById(messageId) {
   const messageRow = await query(
     `
       SELECT m.id, m.chat_id, m.sender_id, m.text, m.delivered_at, m.read_at, m.edited_at, m.created_at,
-             m.message_type, m.system_kind, m.system_payload, m.image_url, m.audio_url,
+             m.message_type, m.system_kind, m.system_payload, m.image_url, m.audio_url, m.video_url,
              u.username, u.avatar_url
       FROM messages m
       JOIN users u ON u.id = m.sender_id
@@ -245,15 +266,16 @@ async function insertSystemMessageAndBroadcast(chatId, actorUserId, systemKind, 
   return message;
 }
 
-async function insertChatMessageAndBroadcast(chatId, senderId, bodyText, imageUrl, audioUrl) {
+async function insertChatMessageAndBroadcast(chatId, senderId, bodyText, imageUrl, audioUrl, videoUrl) {
   const text = String(bodyText || "").trim();
   const img = validateMessageMediaUrl(imageUrl);
   const aud = validateMessageMediaUrl(audioUrl);
-  if (!text && !img && !aud) return null;
+  const vid = validateMessageMediaUrl(videoUrl);
+  if (!text && !img && !aud && !vid) return null;
 
   const inserted = await query(
-    `INSERT INTO messages (chat_id, sender_id, text, message_type, image_url, audio_url) VALUES ($1, $2, $3, 'text', $4, $5) RETURNING id`,
-    [chatId, senderId, text, img, aud]
+    `INSERT INTO messages (chat_id, sender_id, text, message_type, image_url, audio_url, video_url) VALUES ($1, $2, $3, 'text', $4, $5, $6) RETURNING id`,
+    [chatId, senderId, text, img, aud, vid]
   );
   const insertedId = Number(inserted.rows[0].id);
   const message = await fetchMessageById(insertedId);
@@ -479,6 +501,7 @@ app.get("/api/chats", authRequired, (req, res) => {
                 WHEN 'member_removed' THEN '[Member removed]'
                 ELSE '[Event]'
               END
+            WHEN m.video_url IS NOT NULL AND TRIM(COALESCE(m.text, '')) = '' THEN '[Video message]'
             WHEN m.audio_url IS NOT NULL AND TRIM(COALESCE(m.text, '')) = '' THEN '[Voice message]'
             WHEN m.image_url IS NOT NULL AND TRIM(COALESCE(m.text, '')) = '' THEN '[Photo]'
             ELSE TRIM(COALESCE(m.text, ''))
@@ -761,17 +784,35 @@ app.post(
   }
 );
 
+app.post(
+  "/api/upload/video",
+  authRequired,
+  (req, res, next) => {
+    videoUpload.single("video")(req, res, (err) => {
+      if (err) return res.status(400).json({ error: err.message || "Upload failed" });
+      next();
+    });
+  },
+  (req, res) => {
+    if (!req.file) return res.status(400).json({ error: "No video file" });
+    return res.json({ url: `/uploads/${req.file.filename}` });
+  }
+);
+
 app.post("/api/chats/:chatId/messages", authRequired, (req, res) => {
   const chatId = Number(req.params.chatId);
   const bodyText = typeof req.body?.text === "string" ? req.body.text.trim() : "";
   const rawImg = typeof req.body?.imageUrl === "string" ? req.body.imageUrl.trim() : "";
   const rawAud = typeof req.body?.audioUrl === "string" ? req.body.audioUrl.trim() : "";
+  const rawVid = typeof req.body?.videoUrl === "string" ? req.body.videoUrl.trim() : "";
   const img = validateMessageMediaUrl(rawImg);
   const aud = validateMessageMediaUrl(rawAud);
+  const vid = validateMessageMediaUrl(rawVid);
   if (rawImg && !img) return res.status(400).json({ error: "Invalid imageUrl" });
   if (rawAud && !aud) return res.status(400).json({ error: "Invalid audioUrl" });
-  if (!chatId || (!bodyText && !img && !aud)) {
-    return res.status(400).json({ error: "text, imageUrl, or audioUrl is required" });
+  if (rawVid && !vid) return res.status(400).json({ error: "Invalid videoUrl" });
+  if (!chatId || (!bodyText && !img && !aud && !vid)) {
+    return res.status(400).json({ error: "text, imageUrl, audioUrl, or videoUrl is required" });
   }
   if (bodyText.length > 4000) return res.status(400).json({ error: "Message too long" });
 
@@ -781,7 +822,7 @@ app.post("/api/chats/:chatId/messages", authRequired, (req, res) => {
     if (!chat) return res.status(404).json({ error: "Chat not found" });
     if (!(await isUserChatMember(chatId, uid))) return res.status(403).json({ error: "Not a member of this chat" });
 
-    const message = await insertChatMessageAndBroadcast(chatId, uid, bodyText, img, aud);
+    const message = await insertChatMessageAndBroadcast(chatId, uid, bodyText, img, aud, vid);
     if (!message) return res.status(400).json({ error: "Invalid message" });
     return res.json({ message });
   })().catch(() => res.status(500).json({ error: "Server error" }));
@@ -817,6 +858,7 @@ app.get("/api/chats/:chatId/messages", authRequired, (req, res) => {
       m.system_payload,
       m.image_url,
       m.audio_url,
+      m.video_url,
       u.username,
       u.avatar_url
     FROM messages m
@@ -978,7 +1020,7 @@ app.put("/api/messages/:messageId", authRequired, (req, res) => {
     const messageRow = await query(
       `
       SELECT m.id, m.chat_id, m.sender_id, m.text, m.delivered_at, m.read_at, m.edited_at, m.created_at,
-             m.message_type, m.system_kind, m.system_payload, m.image_url, m.audio_url,
+             m.message_type, m.system_kind, m.system_payload, m.image_url, m.audio_url, m.video_url,
              u.username, u.avatar_url
       FROM messages m
       JOIN users u ON u.id = m.sender_id
@@ -1161,24 +1203,27 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("chat:send", async ({ chatId, text, imageUrl, audioUrl } = {}) => {
+  socket.on("chat:send", async ({ chatId, text, imageUrl, audioUrl, videoUrl } = {}) => {
     const cid = Number(chatId);
     const bodyText = String(text || "").trim();
     const rawImg = typeof imageUrl === "string" ? imageUrl.trim() : "";
     const rawAud = typeof audioUrl === "string" ? audioUrl.trim() : "";
+    const rawVid = typeof videoUrl === "string" ? videoUrl.trim() : "";
     const img = validateMessageMediaUrl(rawImg);
     const aud = validateMessageMediaUrl(rawAud);
+    const vid = validateMessageMediaUrl(rawVid);
     if (rawImg && !img) return;
     if (rawAud && !aud) return;
+    if (rawVid && !vid) return;
 
-    if (!cid || (!bodyText && !img && !aud)) return;
+    if (!cid || (!bodyText && !img && !aud && !vid)) return;
     if (bodyText.length > 4000) return;
 
     const chat = await getChatById(cid);
     if (!chat) return;
     if (!(await isUserChatMember(cid, Number(userId)))) return;
 
-    await insertChatMessageAndBroadcast(cid, Number(userId), bodyText, img, aud);
+    await insertChatMessageAndBroadcast(cid, Number(userId), bodyText, img, aud, vid);
   });
 
   socket.on("chat:read", async ({ chatId, upToMessageId } = {}) => {
