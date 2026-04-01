@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 
-const BAR_COUNT = 28;
+const BAR_COUNT = 14;
 
 /**
  * Live recording UI: AnalyserNode-driven level bars + elapsed time + stop/cancel.
@@ -33,7 +33,7 @@ export default function VoiceRecorderPanel({ audioStream, onStopSend, onCancel, 
     const source = ctx.createMediaStreamSource(audioStream);
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 256;
-    analyser.smoothingTimeConstant = 0.65;
+    analyser.smoothingTimeConstant = 0.82;
     source.connect(analyser);
     analyserRef.current = analyser;
     freqDataRef.current = new Uint8Array(analyser.frequencyBinCount);
@@ -54,13 +54,13 @@ export default function VoiceRecorderPanel({ audioStream, onStopSend, onCancel, 
       const out = [];
       for (let i = 0; i < BAR_COUNT; i++) {
         const idx = startBin + Math.floor((i / BAR_COUNT) * usable);
-        out.push(Math.min(1, (freq[idx] / 255) * 1.35));
+        out.push(Math.min(1, (freq[idx] / 255) * 1.2));
       }
       return out;
     };
 
     const loop = (now) => {
-      if (now - lastEmitRef.current >= 48) {
+      if (now - lastEmitRef.current >= 56) {
         lastEmitRef.current = now;
         setLevels(sampleLevels());
       }
@@ -91,14 +91,17 @@ export default function VoiceRecorderPanel({ audioStream, onStopSend, onCancel, 
 
   return (
     <div className="voiceRecorderPanel" role="status">
-      <div className="voiceRecorderTitle">{t("voiceRecording")}</div>
+      <div className="voiceRecorderTitle">
+        <span className="voiceRecorderDot" aria-hidden />
+        <span>{t("voiceRecording")}</span>
+      </div>
       <div className="voiceRecorderMeter" aria-hidden="true">
         {levels.map((h, i) => (
           <span
             // eslint-disable-next-line react/no-array-index-key
             key={i}
             className="voiceRecorderMeterBar"
-            style={{ transform: `scaleY(${0.12 + h * 0.88})` }}
+            style={{ transform: `scaleY(${0.18 + h * 0.82})` }}
           />
         ))}
       </div>

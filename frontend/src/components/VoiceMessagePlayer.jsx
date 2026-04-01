@@ -1,6 +1,20 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
-const BAR_COUNT = 36;
+/** Sparse bars (~Telegram density): amplitude shape without equalizer clutter */
+const BAR_COUNT = 18;
+
+function smoothPeaks(arr) {
+  if (arr.length < 3) return arr;
+  let a = [...arr];
+  for (let pass = 0; pass < 2; pass++) {
+    a = a.map((v, i) => {
+      const p = a[Math.max(0, i - 1)];
+      const n = a[Math.min(a.length - 1, i + 1)];
+      return (p + v * 2 + n) / 4;
+    });
+  }
+  return a;
+}
 
 function seededBars(seed, n) {
   let s = Number(seed) || 1;
@@ -109,7 +123,8 @@ export default function VoiceMessagePlayer({ src, messageId, isOwn, playLabel, p
           peaks.push(Math.sqrt(sum / (end - start)));
         }
         const max = Math.max(...peaks, 1e-8);
-        setWaveform(peaks.map((p) => Math.min(1, (p / max) * 1.15)));
+        const norm = smoothPeaks(peaks.map((p) => Math.min(1, (p / max) * 1.05)));
+        setWaveform(norm);
       } catch {
         if (!cancelled) setWaveform(seededBars(messageId, BAR_COUNT));
       }
@@ -167,7 +182,13 @@ export default function VoiceMessagePlayer({ src, messageId, isOwn, playLabel, p
         }}
         aria-label={playing ? pauseLabel : playLabel}
       >
-        {playing ? <span className="voiceMsgPauseIcon" aria-hidden /> : <span className="voiceMsgPlayIcon">▶</span>}
+        {playing ? (
+          <span className="voiceMsgPauseIcon" aria-hidden />
+        ) : (
+          <svg className="voiceMsgPlayGlyph" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M9 7.5v9l7.5-4.5L9 7.5z" fill="currentColor" />
+          </svg>
+        )}
       </button>
       <div className="voiceMsgBody">
         <div
@@ -206,12 +227,14 @@ export default function VoiceMessagePlayer({ src, messageId, isOwn, playLabel, p
                   // eslint-disable-next-line react/no-array-index-key
                   key={i}
                   className={`voiceMsgWaveBar ${reveal ? "voiceMsgWaveBarPlayed" : ""}`}
-                  style={{ transform: `scaleY(${0.15 + h * 0.85})` }}
+                  style={{ transform: `scaleY(${0.2 + h * 0.8})` }}
                 />
               );
             })}
           </div>
-          <div className="voiceMsgWaveProgressLine" style={{ width: `${progress * 100}%` }} />
+          <div className="voiceMsgProgressRail" aria-hidden="true">
+            <div className="voiceMsgProgressFill" style={{ width: `${progress * 100}%` }} />
+          </div>
         </div>
         <div className="voiceMsgTimes">
           <span>{formatAudioTime(current)}</span>
