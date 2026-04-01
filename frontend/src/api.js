@@ -92,6 +92,10 @@ export async function createGroup({ title, memberUserIds }) {
   return data.chatId;
 }
 
+export async function getGroup(chatId) {
+  return apiFetch(`/api/groups/${chatId}`);
+}
+
 export async function addGroupMember(chatId, userId) {
   return apiFetch(`/api/groups/${chatId}/members`, {
     method: "POST",

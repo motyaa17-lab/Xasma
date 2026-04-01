@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { tf } from "../i18n.js";
+import GroupInfoModal from "./GroupInfoModal.jsx";
 
 export default function Chat({
   chatId,
@@ -17,6 +18,8 @@ export default function Chat({
   onAdminDeleteMessage,
   isBanned,
   onTyping,
+  onGroupMetaChanged,
+  presenceTick,
   t,
   lang,
 }) {
@@ -24,6 +27,7 @@ export default function Chat({
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [menuMessageId, setMenuMessageId] = useState(null);
   const [reactionPickerForId, setReactionPickerForId] = useState(null);
+  const [groupInfoOpen, setGroupInfoOpen] = useState(false);
   const listRef = useRef(null);
   const typingStartTimerRef = useRef(null);
   const typingStopTimerRef = useRef(null);
@@ -45,6 +49,7 @@ export default function Chat({
     setEditingMessageId(null);
     setMenuMessageId(null);
     setText("");
+    setGroupInfoOpen(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatId]);
 
@@ -116,26 +121,58 @@ export default function Chat({
       ) : (
         <>
           <div className="chatHeader">
-            <div className="chatHeaderLeft">
-              <div className="avatarSm">
-                {isGroup ? (
+            {isGroup ? (
+              <button type="button" className="chatHeaderGroupTap" onClick={() => setGroupInfoOpen(true)}>
+                <div className="avatarSm">
                   <span>{initials(chat?.title || "")}</span>
-                ) : chat?.other?.avatar ? (
-                  <img src={chat.other.avatar} alt="" />
-                ) : (
-                  <span>{initials(chat?.other?.username || "")}</span>
-                )}
-              </div>
-              <div className="chatHeaderInfo">
-                <div className="chatHeaderName">
-                  {isGroup ? chat?.title || t("groupChat") : chat?.other?.username || ""}
                 </div>
-                <div className="chatHeaderStatus">
-                  {otherTyping ? t("typing") : isGroup ? t("groupChat") : renderPresence(chat?.other, lang)}
+                <div className="chatHeaderInfo">
+                  <div className="chatHeaderName">{chat?.title || t("groupChat")}</div>
+                  <div className="chatHeaderStatus">{otherTyping ? t("typing") : t("groupChat")}</div>
+                </div>
+              </button>
+            ) : (
+              <div className="chatHeaderLeft">
+                <div className="avatarSm">
+                  {chat?.other?.avatar ? (
+                    <img src={chat.other.avatar} alt="" />
+                  ) : (
+                    <span>{initials(chat?.other?.username || "")}</span>
+                  )}
+                </div>
+                <div className="chatHeaderInfo">
+                  <div className="chatHeaderName">{chat?.other?.username || ""}</div>
+                  <div className="chatHeaderStatus">
+                    {otherTyping ? t("typing") : renderPresence(chat?.other, lang)}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+            {isGroup ? (
+              <button
+                type="button"
+                className="chatHeaderInfoBtn"
+                title={t("groupInfo")}
+                aria-label={t("groupInfo")}
+                onClick={() => setGroupInfoOpen(true)}
+              >
+                ⓘ
+              </button>
+            ) : null}
           </div>
+
+          {isGroup && chatId ? (
+            <GroupInfoModal
+              open={groupInfoOpen}
+              onClose={() => setGroupInfoOpen(false)}
+              chatId={chatId}
+              chatTitle={chat?.title}
+              onMetaChanged={onGroupMetaChanged}
+              presenceTick={presenceTick}
+              t={t}
+              lang={lang}
+            />
+          ) : null}
 
           <div className="messages" ref={listRef}>
             {messages.map((m) => (

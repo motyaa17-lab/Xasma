@@ -46,6 +46,7 @@ export default function App() {
   const [messages, setMessages] = useState([]);
   const [socketReady, setSocketReady] = useState(false);
   const [typingUntil, setTypingUntil] = useState({}); // chatId -> ms timestamp
+  const [presenceTick, setPresenceTick] = useState(0);
 
   const socketRef = useRef(null);
   const selectedChatIdRef = useRef(null);
@@ -181,6 +182,8 @@ export default function App() {
       const online = Boolean(isOnline);
       const seen = lastSeenAt || null;
 
+      setPresenceTick((n) => n + 1);
+
       setMe((prev) =>
         prev && prev.id === uid ? { ...prev, isOnline: online, lastSeenAt: seen } : prev
       );
@@ -314,6 +317,15 @@ export default function App() {
     await selectChat(chatId);
   }
 
+  async function refreshChatsList() {
+    try {
+      const list = await getChats();
+      setChats(list);
+    } catch {
+      // ignore
+    }
+  }
+
   function handleSend(text) {
     if (!socketRef.current || !socketReady) return;
     if (!selectedChatId) return;
@@ -429,6 +441,8 @@ export default function App() {
               onAdminDeleteMessage={handleAdminDeleteMessage}
               isBanned={Boolean(me.banned)}
               onTyping={handleTyping}
+              onGroupMetaChanged={refreshChatsList}
+              presenceTick={presenceTick}
               t={t}
               lang={settings.lang}
             />

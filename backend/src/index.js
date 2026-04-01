@@ -57,6 +57,12 @@ function requireAdmin(req, res, next) {
   return next();
 }
 
+/** Group creator or app admin may add/remove members (admin cannot remove the group creator). */
+function canManageGroupMembers(req, chat) {
+  if (!chat || chat.type !== "group") return false;
+  return Number(chat.created_by) === Number(req.user.id) || req.user.role === "admin";
+}
+
 function normalizeChatUsers(a, b) {
   // Ensure we store each one-to-one chat in a single canonical order.
   return a < b ? [a, b] : [b, a];
@@ -463,6 +469,50 @@ app.post("/api/groups", authRequired, (req, res) => {
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });
 
+app.get("/api/groups/:chatId", authRequired, (req, res) => {
+  const chatId = Number(req.params.chatId);
+  if (!chatId) return res.status(400).json({ error: "Invalid chat id" });
+
+  (async () => {
+    const uid = Number(req.user.id);
+    const chat = await getChatById(chatId);
+    if (!chat || chat.type !== "group") return res.status(404).json({ error: "Group not found" });
+    if (!(await isUserChatMember(chatId, uid))) return res.status(403).json({ error: "Not a member of this group" });
+
+    const members = await query(
+      `
+      SELECT u.id, u.username, u.avatar_url, u.is_online, u.last_seen_at
+      FROM chat_members cm
+      JOIN users u ON u.id = cm.user_id
+      WHERE cm.chat_id = $1
+      ORDER BY u.username ASC
+    `,
+      [chatId]
+    );
+
+    const createdBy = Number(chat.created_by);
+    const canManage = canManageGroupMembers(req, chat);
+
+    return res.json({
+      group: {
+        id: chatId,
+        title: chat.title,
+        createdBy,
+        memberCount: members.rows.length,
+        canManage,
+      },
+      members: members.rows.map((u) => ({
+        id: Number(u.id),
+        username: u.username,
+        avatar: u.avatar_url,
+        isOnline: Boolean(u.is_online),
+        lastSeenAt: u.last_seen_at,
+        isCreator: Number(u.id) === createdBy,
+      })),
+    });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
 app.post("/api/groups/:chatId/members", authRequired, (req, res) => {
   const chatId = Number(req.params.chatId);
   const addUserId = Number(req.body?.userId);
@@ -471,13 +521,15 @@ app.post("/api/groups/:chatId/members", authRequired, (req, res) => {
   (async () => {
     const chat = await getChatById(chatId);
     if (!chat || chat.type !== "group") return res.status(404).json({ error: "Group not found" });
-    if (Number(chat.created_by) !== Number(req.user.id)) return res.status(403).json({ error: "Only the creator can add members" });
+    if (!canManageGroupMembers(req, chat)) return res.status(403).json({ error: "Only the creator or an admin can add members" });
 
     const u = await query(`SELECT id FROM users WHERE id = $1`, [addUserId]);
     if (!u.rows[0]) return res.status(404).json({ error: "User not found" });
-    if (addUserId === Number(req.user.id)) return res.status(400).json({ error: "Already in group" });
 
-    await query(`INSERT INTO chat_members (chat_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [chatId, addUserId]);
+    const already = await query(`SELECT 1 FROM chat_members WHERE chat_id = $1 AND user_id = $2`, [chatId, addUserId]);
+    if (already.rows[0]) return res.status(400).json({ error: "User already in group" });
+
+    await query(`INSERT INTO chat_members (chat_id, user_id) VALUES ($1, $2)`, [chatId, addUserId]);
 
     return res.json({ ok: true });
   })().catch(() => res.status(500).json({ error: "Server error" }));
@@ -491,7 +543,7 @@ app.delete("/api/groups/:chatId/members/:userId", authRequired, (req, res) => {
   (async () => {
     const chat = await getChatById(chatId);
     if (!chat || chat.type !== "group") return res.status(404).json({ error: "Group not found" });
-    if (Number(chat.created_by) !== Number(req.user.id)) return res.status(403).json({ error: "Only the creator can remove members" });
+    if (!canManageGroupMembers(req, chat)) return res.status(403).json({ error: "Only the creator or an admin can remove members" });
     if (targetUserId === Number(chat.created_by)) return res.status(400).json({ error: "Cannot remove the creator" });
 
     const del = await query(`DELETE FROM chat_members WHERE chat_id = $1 AND user_id = $2`, [chatId, targetUserId]);
