@@ -96,6 +96,17 @@ export async function updateMessage(messageId, text) {
   });
 }
 
+export async function toggleReaction(messageId, emoji) {
+  return apiFetch(`/api/messages/${messageId}/reactions`, {
+    method: "POST",
+    body: { emoji },
+  });
+}
+
+export async function getReactions(messageId) {
+  return apiFetch(`/api/messages/${messageId}/reactions`);
+}
+
 export function getSocketEndpoint() {
   return API_BASE;
 }

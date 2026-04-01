@@ -13,6 +13,7 @@ import {
   getMessages,
   login,
   register,
+  toggleReaction,
   updateMessage,
   updateMyAvatar,
 } from "./api.js";
@@ -233,6 +234,14 @@ export default function App() {
       );
     });
 
+    socket.on("message:reactionsUpdated", ({ chatId, messageId, reactions }) => {
+      const openChatId = selectedChatIdRef.current;
+      if (!openChatId || Number(chatId) !== openChatId) return;
+      const mid = Number(messageId);
+      if (!mid) return;
+      setMessages((prev) => prev.map((m) => (m.id === mid ? { ...m, reactions: reactions || [] } : m)));
+    });
+
     return () => {
       socket.off("chat:message");
       socket.off("user:avatar");
@@ -240,6 +249,7 @@ export default function App() {
       socket.off("chat:typing");
       socket.off("chat:message:status");
       socket.off("message:edited");
+      socket.off("message:reactionsUpdated");
       socket.disconnect();
     };
   }, [token, socketEndpoint, me?.id]);
@@ -285,6 +295,12 @@ export default function App() {
     setMessages((prev) =>
       prev.map((m) => (m.id === msg.id ? { ...m, ...msg } : m))
     );
+  }
+
+  async function handleToggleReaction(messageId, emoji) {
+    const data = await toggleReaction(messageId, emoji);
+    const reactions = data.reactions || [];
+    setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, reactions } : m)));
   }
 
   async function handleLogin(data) {
@@ -356,6 +372,7 @@ export default function App() {
               chatTheme={settings.chatTheme}
               onSend={handleSend}
               onEditMessage={handleEditMessage}
+              onToggleReaction={handleToggleReaction}
               onTyping={handleTyping}
               t={t}
               lang={settings.lang}

@@ -12,6 +12,7 @@ export default function Chat({
   chatTheme,
   onSend,
   onEditMessage,
+  onToggleReaction,
   onTyping,
   t,
   lang,
@@ -19,6 +20,7 @@ export default function Chat({
   const [text, setText] = useState("");
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [menuMessageId, setMenuMessageId] = useState(null);
+  const [reactionPickerForId, setReactionPickerForId] = useState(null);
   const listRef = useRef(null);
   const typingStartTimerRef = useRef(null);
   const typingStopTimerRef = useRef(null);
@@ -56,6 +58,13 @@ export default function Chat({
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, [menuMessageId]);
+
+  useEffect(() => {
+    if (reactionPickerForId == null) return;
+    const onDown = () => setReactionPickerForId(null);
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [reactionPickerForId]);
 
   async function handlePrimary() {
     const trimmed = String(text).trim();
@@ -132,6 +141,38 @@ export default function Chat({
                   )}
                 </div>
                 <div className={m.senderId === meId ? "bubble me bubbleOwn" : "bubble"}>
+                  <div className="reactBtnWrap">
+                    <button
+                      type="button"
+                      className="reactBtn"
+                      aria-label="React"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setReactionPickerForId((id) => (id === m.id ? null : m.id));
+                      }}
+                    >
+                      +
+                    </button>
+                    {reactionPickerForId === m.id ? (
+                      <div className="reactPicker" role="menu" onMouseDown={(e) => e.stopPropagation()}>
+                        {["👍", "❤️", "😂", "😮", "😢", "🔥"].map((emo) => (
+                          <button
+                            key={emo}
+                            type="button"
+                            className="reactPick"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setReactionPickerForId(null);
+                              onToggleReaction?.(m.id, emo);
+                            }}
+                          >
+                            {emo}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                   {m.senderId === meId ? (
                     <div className="msgMenu">
                       <button
@@ -181,6 +222,25 @@ export default function Chat({
                       </span>
                     ) : null}
                   </div>
+
+                  {Array.isArray(m.reactions) && m.reactions.length ? (
+                    <div className="reactionsRow">
+                      {m.reactions.map((r) => (
+                        <button
+                          key={r.emoji}
+                          type="button"
+                          className={r.reactedByMe ? "reactionPill active" : "reactionPill"}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleReaction?.(m.id, r.emoji);
+                          }}
+                        >
+                          <span className="reactionEmoji">{r.emoji}</span>
+                          <span className="reactionCount">{r.count}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               </div>
             ))}
