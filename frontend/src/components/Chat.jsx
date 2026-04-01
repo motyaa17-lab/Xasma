@@ -76,6 +76,12 @@ export default function Chat({
   const isGroup = chat?.type === "group";
 
   useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    // eslint-disable-next-line no-console
+    console.log("[Xasma] Chat", { chatId, hasChat: Boolean(chat), mobileBack: Boolean(onMobileBack) });
+  }, [chatId, chat?.id, onMobileBack]);
+
+  useEffect(() => {
     const el = listRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;

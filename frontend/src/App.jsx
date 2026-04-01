@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { Component, useEffect, useMemo, useRef, useState } from "react";
 import { io } from "socket.io-client";
 
 import Auth from "./components/Auth.jsx";
@@ -443,6 +443,14 @@ export default function App() {
     setMessages([]);
   }
 
+  if (!me) {
+    return (
+      <div className="appRoot appRoot--auth">
+        <Auth onLogin={handleLogin} onRegister={handleRegister} error={authError} t={t} />
+      </div>
+    );
+  }
+
   const userMenuProps = {
     me,
     onLogout: logout,
@@ -462,7 +470,7 @@ export default function App() {
     lang: settings.lang,
   };
 
-  const chatProps = {
+  const chatPropsBase = {
     chatId: selectedChatId,
     chat: chats.find((c) => c.id === selectedChatId) || null,
     otherTyping: Boolean(selectedChatId && typingUntil[selectedChatId] > Date.now()),
@@ -482,115 +490,158 @@ export default function App() {
     presenceTick,
     t,
     lang: settings.lang,
-    onMobileBack: isMobile ? handleMobileBackFromChat : undefined,
   };
+
+  const chatPropsDesktop = { ...chatPropsBase, onMobileBack: undefined };
+  const chatPropsMobile = { ...chatPropsBase, onMobileBack: handleMobileBackFromChat };
+
+  if (import.meta.env.DEV) {
+    // eslint-disable-next-line no-console
+    console.log("[Xasma] shell", {
+      isMobile,
+      mobileTab,
+      selectedChatId,
+    });
+  }
+
+  const desktopShell = (
+    <div className="appShell appShell--desktop">
+      <div className="topBar">
+        <div className="topBarLeft">
+          <div className="appTitle">{t("appTitle")}</div>
+          <div className="statusTag">
+            {socketReady ? t("realtimeOn") : t("realtimeReconnecting")}
+          </div>
+        </div>
+        <UserMenu {...userMenuProps} variant="dropdown" />
+      </div>
+
+      <div className="appBody">
+        <Sidebar {...sidebarProps} />
+        <Chat {...chatPropsDesktop} />
+      </div>
+    </div>
+  );
+
+  const mobileShell = (
+    <div className="appShell appShell--mobile">
+      <div className="mobileStage">
+        {mobileTab === "chats" && !selectedChatId ? (
+          <div className="mobilePane mobilePane--inbox">
+            <header className="mobileMainHeader">
+              <div className="mobileMainHeaderText">
+                <div className="mobileBrandTitle">{t("appTitle")}</div>
+                <div className={`mobileSocketPill${socketReady ? " mobileSocketPill--on" : ""}`}>
+                  {socketReady ? t("realtimeOn") : t("realtimeReconnecting")}
+                </div>
+              </div>
+              <UserMenu {...userMenuProps} variant="dropdown" />
+            </header>
+            <Sidebar {...sidebarProps} mobileLayout />
+          </div>
+        ) : null}
+
+        {mobileTab === "chats" && selectedChatId ? (
+          <div className="mobilePane mobilePane--conversation">
+            <Chat {...chatPropsMobile} />
+          </div>
+        ) : null}
+
+        {mobileTab === "calls" ? (
+          <div className="mobilePane mobilePane--placeholder">
+            <header className="mobileSubHeader">
+              <h1 className="mobileSubHeaderTitle">{t("navCalls")}</h1>
+            </header>
+            <div className="mobilePlaceholderBody">
+              <p className="muted">{t("callsComingSoon")}</p>
+            </div>
+          </div>
+        ) : null}
+
+        {mobileTab === "settings" ? (
+          <div className="mobilePane mobilePane--settings">
+            <header className="mobileSubHeader">
+              <h1 className="mobileSubHeaderTitle">{t("navSettings")}</h1>
+            </header>
+            <div className="mobileSettingsScroll">
+              <UserMenu {...userMenuProps} variant="mobilePage" />
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <nav className="mobileBottomNav" aria-label={t("mobileNavLabel")}>
+        <button
+          type="button"
+          className={`mobileNavItem${mobileTab === "chats" ? " mobileNavItem--active" : ""}`}
+          onClick={() => goMobileTab("chats")}
+        >
+          <span className="mobileNavIcon" aria-hidden>
+            💬
+          </span>
+          <span className="mobileNavLabel">{t("navChats")}</span>
+        </button>
+        <button
+          type="button"
+          className={`mobileNavItem${mobileTab === "calls" ? " mobileNavItem--active" : ""}`}
+          onClick={() => goMobileTab("calls")}
+        >
+          <span className="mobileNavIcon" aria-hidden>
+            📞
+          </span>
+          <span className="mobileNavLabel">{t("navCalls")}</span>
+        </button>
+        <button
+          type="button"
+          className={`mobileNavItem${mobileTab === "settings" ? " mobileNavItem--active" : ""}`}
+          onClick={() => goMobileTab("settings")}
+        >
+          <span className="mobileNavIcon" aria-hidden>
+            ⚙
+          </span>
+          <span className="mobileNavLabel">{t("navSettings")}</span>
+        </button>
+      </nav>
+    </div>
+  );
 
   return (
     <div className="appRoot">
-      {!me ? (
-        <Auth onLogin={handleLogin} onRegister={handleRegister} error={authError} t={t} />
-      ) : isMobile ? (
-        <div className="appShell appShell--mobile">
-          <div className="mobileStage">
-            {mobileTab === "chats" && !selectedChatId ? (
-              <div className="mobilePane mobilePane--inbox">
-                <header className="mobileMainHeader">
-                  <div className="mobileMainHeaderText">
-                    <div className="mobileBrandTitle">{t("appTitle")}</div>
-                    <div
-                      className={`mobileSocketPill${socketReady ? " mobileSocketPill--on" : ""}`}
-                    >
-                      {socketReady ? t("realtimeOn") : t("realtimeReconnecting")}
-                    </div>
-                  </div>
-                  <UserMenu {...userMenuProps} variant="dropdown" />
-                </header>
-                <Sidebar {...sidebarProps} mobileLayout />
-              </div>
-            ) : null}
-
-            {mobileTab === "chats" && selectedChatId ? (
-              <div className="mobilePane mobilePane--conversation">
-                <Chat {...chatProps} />
-              </div>
-            ) : null}
-
-            {mobileTab === "calls" ? (
-              <div className="mobilePane mobilePane--placeholder">
-                <header className="mobileSubHeader">
-                  <h1 className="mobileSubHeaderTitle">{t("navCalls")}</h1>
-                </header>
-                <div className="mobilePlaceholderBody">
-                  <p className="muted">{t("callsComingSoon")}</p>
-                </div>
-              </div>
-            ) : null}
-
-            {mobileTab === "settings" ? (
-              <div className="mobilePane mobilePane--settings">
-                <header className="mobileSubHeader">
-                  <h1 className="mobileSubHeaderTitle">{t("navSettings")}</h1>
-                </header>
-                <div className="mobileSettingsScroll">
-                  <UserMenu {...userMenuProps} variant="mobilePage" />
-                </div>
-              </div>
-            ) : null}
-          </div>
-
-          <nav className="mobileBottomNav" aria-label={t("mobileNavLabel")}>
-            <button
-              type="button"
-              className={`mobileNavItem${mobileTab === "chats" ? " mobileNavItem--active" : ""}`}
-              onClick={() => goMobileTab("chats")}
-            >
-              <span className="mobileNavIcon" aria-hidden>
-                💬
-              </span>
-              <span className="mobileNavLabel">{t("navChats")}</span>
-            </button>
-            <button
-              type="button"
-              className={`mobileNavItem${mobileTab === "calls" ? " mobileNavItem--active" : ""}`}
-              onClick={() => goMobileTab("calls")}
-            >
-              <span className="mobileNavIcon" aria-hidden>
-                📞
-              </span>
-              <span className="mobileNavLabel">{t("navCalls")}</span>
-            </button>
-            <button
-              type="button"
-              className={`mobileNavItem${mobileTab === "settings" ? " mobileNavItem--active" : ""}`}
-              onClick={() => goMobileTab("settings")}
-            >
-              <span className="mobileNavIcon" aria-hidden>
-                ⚙
-              </span>
-              <span className="mobileNavLabel">{t("navSettings")}</span>
-            </button>
-          </nav>
-        </div>
+      {isMobile ? (
+        <MobileLayoutErrorBoundary fallback={desktopShell}>{mobileShell}</MobileLayoutErrorBoundary>
       ) : (
-        <div className="appShell appShell--desktop">
-          <div className="topBar">
-            <div className="topBarLeft">
-              <div className="appTitle">{t("appTitle")}</div>
-              <div className="statusTag">
-                {socketReady ? t("realtimeOn") : t("realtimeReconnecting")}
-              </div>
-            </div>
-            <UserMenu {...userMenuProps} variant="dropdown" />
-          </div>
-
-          <div className="appBody">
-            <Sidebar {...sidebarProps} />
-            <Chat {...chatProps} />
-          </div>
-        </div>
+        desktopShell
       )}
     </div>
   );
+}
+
+/** Catches render errors in the mobile tree and shows desktop layout (no blank frame). */
+class MobileLayoutErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error, info) {
+    // eslint-disable-next-line no-console
+    console.error("[Xasma] MobileLayoutErrorBoundary", error, info?.componentStack);
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.warn("[Xasma] showing desktop shell fallback after mobile layout error");
+    }
+  }
+
+  render() {
+    if (this.state.error && this.props.fallback != null) {
+      return this.props.fallback;
+    }
+    return this.props.children;
+  }
 }
 
 function isWindowActive() {

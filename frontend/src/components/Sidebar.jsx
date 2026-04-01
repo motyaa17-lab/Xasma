@@ -40,6 +40,12 @@ export default function Sidebar({
   }, [chats, mobileListQuery, mobileLayout]);
 
   useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    // eslint-disable-next-line no-console
+    console.log("[Xasma] Sidebar", { mobileLayout, chatCount: chats?.length ?? 0 });
+  }, [mobileLayout, chats?.length]);
+
+  useEffect(() => {
     let timer = null;
     async function run() {
       if (!canSearch) {
