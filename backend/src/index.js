@@ -7,13 +7,11 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const { Server } = require("socket.io");
 
-const { db, initDb } = require("./db");
+const { query, initDb } = require("./db");
 
 const PORT = process.env.PORT || 4000;
 const JWT_SECRET = process.env.JWT_SECRET || "change_me";
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
-
-initDb();
 
 const app = express();
 app.use(express.json());
@@ -30,14 +28,22 @@ function signToken(user) {
   });
 }
 
-function authRequired(req, res, next) {
+async function authRequired(req, res, next) {
   const header = req.headers.authorization || "";
   const token = header.startsWith("Bearer ") ? header.slice("Bearer ".length) : null;
   if (!token) return res.status(401).json({ error: "Missing token" });
 
   try {
     const payload = jwt.verify(token, JWT_SECRET);
-    req.user = { id: payload.sub, username: payload.username };
+
+    const userId = Number(payload.sub);
+    if (!userId) return res.status(401).json({ error: "Invalid token" });
+
+    const r = await query(`SELECT id, username FROM users WHERE id = $1`, [userId]);
+    const user = r.rows[0];
+    if (!user) return res.status(401).json({ error: "Invalid token" });
+
+    req.user = { id: Number(user.id), username: user.username };
     return next();
   } catch (e) {
     return res.status(401).json({ error: "Invalid token" });
@@ -49,33 +55,48 @@ function normalizeChatUsers(a, b) {
   return a < b ? [a, b] : [b, a];
 }
 
-function getChatParticipants(chatId) {
-  return db
-    .prepare(
-      `
-      SELECT user1_id, user2_id
-      FROM chats
-      WHERE id = ?
+async function getChatParticipants(chatId) {
+  const r = await query(
     `
-    )
-    .get(chatId);
+    SELECT user1_id, user2_id
+    FROM chats
+    WHERE id = $1
+  `,
+    [chatId]
+  );
+  return r.rows[0] || null;
 }
 
-function getOrCreateChat(userA, userB) {
+async function getOrCreateChat(userA, userB) {
   const [user1_id, user2_id] = normalizeChatUsers(userA, userB);
-  const existing = db
-    .prepare(`SELECT id FROM chats WHERE user1_id = ? AND user2_id = ?`)
-    .get(user1_id, user2_id);
-  if (existing) return existing.id;
-  const inserted = db
-    .prepare(`INSERT INTO chats (user1_id, user2_id) VALUES (?, ?)`)
-    .run(user1_id, user2_id);
-  return inserted.lastInsertRowid;
+  const existing = await query(
+    `SELECT id FROM chats WHERE user1_id = $1 AND user2_id = $2`,
+    [user1_id, user2_id]
+  );
+  if (existing.rows[0]) return Number(existing.rows[0].id);
+
+  const inserted = await query(
+    `INSERT INTO chats (user1_id, user2_id) VALUES ($1, $2) RETURNING id`,
+    [user1_id, user2_id]
+  );
+  const chatId = Number(inserted.rows[0].id);
+
+  // Keep chat_members in sync.
+  await query(
+    `INSERT INTO chat_members (chat_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+    [chatId, user1_id]
+  );
+  await query(
+    `INSERT INTO chat_members (chat_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+    [chatId, user2_id]
+  );
+
+  return chatId;
 }
 
 function getOtherUser(chatRow, meId) {
   const otherId = chatRow.user1_id === meId ? chatRow.user2_id : chatRow.user1_id;
-  return db.prepare(`SELECT id, username, avatar_url FROM users WHERE id = ?`).get(otherId);
+  return otherId;
 }
 
 app.post("/api/register", async (req, res) => {
@@ -84,24 +105,28 @@ app.post("/api/register", async (req, res) => {
 
   const avatar_url = typeof avatar === "string" && avatar.trim() ? avatar.trim() : null;
 
-  const existing = db.prepare(`SELECT id FROM users WHERE username = ?`).get(username.trim());
-  if (existing) return res.status(409).json({ error: "Username already exists" });
+  const existing = await query(`SELECT id FROM users WHERE username = $1`, [username.trim()]);
+  if (existing.rows[0]) return res.status(409).json({ error: "Username already exists" });
 
   const password_hash = await bcrypt.hash(password, 10);
-  const inserted = db
-    .prepare(`INSERT INTO users (username, password_hash, avatar_url) VALUES (?, ?, ?)`)
-    .run(username.trim(), password_hash, avatar_url);
-
-  const user = db.prepare(`SELECT id, username, avatar_url FROM users WHERE id = ?`).get(inserted.lastInsertRowid);
+  const inserted = await query(
+    `INSERT INTO users (username, password_hash, avatar_url) VALUES ($1, $2, $3) RETURNING id, username, avatar_url`,
+    [username.trim(), password_hash, avatar_url]
+  );
+  const user = inserted.rows[0];
   const token = signToken(user);
-  return res.json({ token, user: { id: user.id, username: user.username, avatar: user.avatar_url } });
+  return res.json({ token, user: { id: Number(user.id), username: user.username, avatar: user.avatar_url } });
 });
 
 app.post("/api/login", async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: "username and password are required" });
 
-  const user = db.prepare(`SELECT id, username, password_hash, avatar_url FROM users WHERE username = ?`).get(username.trim());
+  const r = await query(
+    `SELECT id, username, password_hash, avatar_url FROM users WHERE username = $1`,
+    [username.trim()]
+  );
+  const user = r.rows[0];
   if (!user) return res.status(401).json({ error: "Invalid credentials" });
 
   const ok = await bcrypt.compare(password, user.password_hash);
@@ -110,22 +135,27 @@ app.post("/api/login", async (req, res) => {
   const token = signToken(user);
   return res.json({
     token,
-    user: { id: user.id, username: user.username, avatar: user.avatar_url },
+    user: { id: Number(user.id), username: user.username, avatar: user.avatar_url },
   });
 });
 
 app.get("/api/me", authRequired, (req, res) => {
-  const user = db
-    .prepare(`SELECT id, username, avatar_url, is_online, last_seen_at FROM users WHERE id = ?`)
-    .get(req.user.id);
+  const uid = Number(req.user.id);
+  return query(
+    `SELECT id, username, avatar_url, is_online, last_seen_at FROM users WHERE id = $1`,
+    [uid]
+  ).then((r) => {
+    const user = r.rows[0];
+    if (!user) return res.status(404).json({ error: "User not found" });
   return res.json({
     user: {
-      id: user.id,
+      id: Number(user.id),
       username: user.username,
       avatar: user.avatar_url,
       isOnline: Boolean(user.is_online),
       lastSeenAt: user.last_seen_at,
     },
+  });
   });
 });
 
@@ -152,23 +182,28 @@ app.put("/api/me/avatar", authRequired, (req, res) => {
     if (avatar.length > 400_000) return res.status(400).json({ error: "Avatar too large" });
   }
 
-  db.prepare(`UPDATE users SET avatar_url = ? WHERE id = ?`).run(avatar || null, req.user.id);
-  const user = db
-    .prepare(`SELECT id, username, avatar_url, is_online, last_seen_at FROM users WHERE id = ?`)
-    .get(req.user.id);
+  (async () => {
+    const uid = Number(req.user.id);
+    await query(`UPDATE users SET avatar_url = $1 WHERE id = $2`, [avatar || null, uid]);
+    const r = await query(
+      `SELECT id, username, avatar_url, is_online, last_seen_at FROM users WHERE id = $1`,
+      [uid]
+    );
+    const user = r.rows[0];
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-  // Broadcast so other users update UI immediately.
-  emitToAll("user:avatar", { userId: user.id, avatar: user.avatar_url || "" });
+    emitToAll("user:avatar", { userId: Number(user.id), avatar: user.avatar_url || "" });
 
-  return res.json({
-    user: {
-      id: user.id,
-      username: user.username,
-      avatar: user.avatar_url,
-      isOnline: Boolean(user.is_online),
-      lastSeenAt: user.last_seen_at,
-    },
-  });
+    return res.json({
+      user: {
+        id: Number(user.id),
+        username: user.username,
+        avatar: user.avatar_url,
+        isOnline: Boolean(user.is_online),
+        lastSeenAt: user.last_seen_at,
+      },
+    });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
 });
 
 app.get("/api/users", authRequired, (req, res) => {
@@ -177,35 +212,37 @@ app.get("/api/users", authRequired, (req, res) => {
 
   if (!q) return res.json({ users: [] });
 
-  const users = db
-    .prepare(
+  (async () => {
+    const uid = Number(req.user.id);
+    const users = await query(
       `
       SELECT id, username, avatar_url, is_online, last_seen_at
       FROM users
-      WHERE id != ?
-        AND username LIKE ?
+      WHERE id != $1
+        AND username ILIKE $2
       ORDER BY username ASC
-      LIMIT ?
-    `
-    )
-    .all(req.user.id, `%${q}%`, limit);
-
-  return res.json({
-    users: users.map((u) => ({
-      id: u.id,
-      username: u.username,
-      avatar: u.avatar_url,
-      isOnline: Boolean(u.is_online),
-      lastSeenAt: u.last_seen_at,
-    })),
-  });
+      LIMIT $3
+    `,
+      [uid, `%${q}%`, limit]
+    );
+    return res.json({
+      users: users.rows.map((u) => ({
+        id: Number(u.id),
+        username: u.username,
+        avatar: u.avatar_url,
+        isOnline: Boolean(u.is_online),
+        lastSeenAt: u.last_seen_at,
+      })),
+    });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
 });
 
 app.get("/api/chats", authRequired, (req, res) => {
   const meId = req.user.id;
 
-  const chats = db
-    .prepare(
+  (async () => {
+    const uid = Number(meId);
+    const chats = await query(
       `
       SELECT
         c.id AS chat_id,
@@ -216,51 +253,41 @@ app.get("/api/chats", authRequired, (req, res) => {
         other.avatar_url AS other_avatar_url,
         other.is_online AS other_is_online,
         other.last_seen_at AS other_last_seen_at,
-        (
-          SELECT m.text
-          FROM messages m
-          WHERE m.chat_id = c.id
-          ORDER BY m.created_at DESC, m.id DESC
-          LIMIT 1
-        ) AS last_text,
-        (
-          SELECT m.created_at
-          FROM messages m
-          WHERE m.chat_id = c.id
-          ORDER BY m.created_at DESC, m.id DESC
-          LIMIT 1
-        ) AS last_created_at,
-        (
-          SELECT m.sender_id
-          FROM messages m
-          WHERE m.chat_id = c.id
-          ORDER BY m.created_at DESC, m.id DESC
-          LIMIT 1
-        ) AS last_sender_id
+        lm.text AS last_text,
+        lm.created_at AS last_created_at,
+        lm.sender_id AS last_sender_id
       FROM chats c
       JOIN users other
-        ON other.id = CASE WHEN c.user1_id = ? THEN c.user2_id ELSE c.user1_id END
-      WHERE c.user1_id = ? OR c.user2_id = ?
-      ORDER BY last_created_at DESC, c.id DESC
-    `
-    )
-    .all(meId, meId, meId);
+        ON other.id = CASE WHEN c.user1_id = $1 THEN c.user2_id ELSE c.user1_id END
+      LEFT JOIN LATERAL (
+        SELECT m.text, m.created_at, m.sender_id
+        FROM messages m
+        WHERE m.chat_id = c.id
+        ORDER BY m.created_at DESC, m.id DESC
+        LIMIT 1
+      ) lm ON true
+      WHERE c.user1_id = $1 OR c.user2_id = $1
+      ORDER BY lm.created_at DESC NULLS LAST, c.id DESC
+    `,
+      [uid]
+    );
 
-  return res.json({
-    chats: chats.map((c) => ({
-      id: c.chat_id,
-      other: {
-        id: c.other_id,
-        username: c.other_username,
-        avatar: c.other_avatar_url,
-        isOnline: Boolean(c.other_is_online),
-        lastSeenAt: c.other_last_seen_at,
-      },
-      last: c.last_text
-        ? { text: c.last_text, createdAt: c.last_created_at, senderId: c.last_sender_id }
-        : null,
-    })),
-  });
+    return res.json({
+      chats: chats.rows.map((c) => ({
+        id: Number(c.chat_id),
+        other: {
+          id: Number(c.other_id),
+          username: c.other_username,
+          avatar: c.other_avatar_url,
+          isOnline: Boolean(c.other_is_online),
+          lastSeenAt: c.other_last_seen_at,
+        },
+        last: c.last_text
+          ? { text: c.last_text, createdAt: c.last_created_at, senderId: Number(c.last_sender_id) }
+          : null,
+      })),
+    });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
 });
 
 app.post("/api/chats", authRequired, (req, res) => {
@@ -269,59 +296,65 @@ app.post("/api/chats", authRequired, (req, res) => {
   if (!otherId) return res.status(400).json({ error: "withUserId is required" });
   if (otherId === req.user.id) return res.status(400).json({ error: "Cannot chat with yourself" });
 
-  const other = db.prepare(`SELECT id FROM users WHERE id = ?`).get(otherId);
-  if (!other) return res.status(404).json({ error: "User not found" });
-
-  const chatId = getOrCreateChat(req.user.id, otherId);
-
-  return res.json({ chatId });
+  (async () => {
+    const other = await query(`SELECT id FROM users WHERE id = $1`, [otherId]);
+    if (!other.rows[0]) return res.status(404).json({ error: "User not found" });
+    const chatId = await getOrCreateChat(Number(req.user.id), otherId);
+    return res.json({ chatId });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
 });
 
 app.get("/api/chats/:chatId/messages", authRequired, (req, res) => {
   const chatId = Number(req.params.chatId);
   const limit = Math.min(parseInt(String(req.query.limit || "50"), 10), 200);
 
-  const chat = getChatParticipants(chatId);
+  // ensure chat exists + membership
+  // (also used by socket events)
+  // async wrapper below
+  (async () => {
+    const chat = await getChatParticipants(chatId);
   if (!chat) return res.status(404).json({ error: "Chat not found" });
 
-  const isMember = chat.user1_id === req.user.id || chat.user2_id === req.user.id;
+  const uid = Number(req.user.id);
+  const isMember = Number(chat.user1_id) === uid || Number(chat.user2_id) === uid;
   if (!isMember) return res.status(403).json({ error: "Not a member of this chat" });
 
-  const messages = db
-    .prepare(
-      `
-      SELECT
-        m.id,
-        m.chat_id,
-        m.sender_id,
-        m.text,
-        m.delivered_at,
-        m.read_at,
-        m.edited_at,
-        m.created_at,
-        u.username,
-        u.avatar_url
-      FROM messages m
-      JOIN users u ON u.id = m.sender_id
-      WHERE m.chat_id = ?
-      ORDER BY m.created_at ASC, m.id ASC
-      LIMIT ?
+  const messages = await query(
     `
-    )
-    .all(chatId, limit)
-    .map((m) => ({
-      id: m.id,
-      chatId: m.chat_id,
-      senderId: m.sender_id,
+    SELECT
+      m.id,
+      m.chat_id,
+      m.sender_id,
+      m.text,
+      m.delivered_at,
+      m.read_at,
+      m.edited_at,
+      m.created_at,
+      u.username,
+      u.avatar_url
+    FROM messages m
+    JOIN users u ON u.id = m.sender_id
+    WHERE m.chat_id = $1
+    ORDER BY m.created_at ASC, m.id ASC
+    LIMIT $2
+  `,
+    [chatId, limit]
+  );
+
+  return res.json({
+    messages: messages.rows.map((m) => ({
+      id: Number(m.id),
+      chatId: Number(m.chat_id),
+      senderId: Number(m.sender_id),
       text: m.text,
       deliveredAt: m.delivered_at,
       readAt: m.read_at,
       editedAt: m.edited_at,
       createdAt: m.created_at,
-      sender: { id: m.sender_id, username: m.username, avatar: m.avatar_url },
-    }));
-
-  return res.json({ messages });
+      sender: { id: Number(m.sender_id), username: m.username, avatar: m.avatar_url },
+    })),
+  });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
 });
 
 const server = http.createServer(app);
@@ -342,51 +375,54 @@ app.put("/api/messages/:messageId", authRequired, (req, res) => {
   if (!bodyText) return res.status(400).json({ error: "text is required" });
   if (bodyText.length > 4000) return res.status(400).json({ error: "Message too long" });
 
-  const row = db.prepare(`SELECT id, chat_id, sender_id FROM messages WHERE id = ?`).get(messageId);
-  if (!row) return res.status(404).json({ error: "Message not found" });
-  if (row.sender_id !== req.user.id) return res.status(403).json({ error: "Not allowed" });
+  (async () => {
+    const uid = Number(req.user.id);
+    const row = await query(`SELECT id, chat_id, sender_id FROM messages WHERE id = $1`, [messageId]);
+    const msgRow = row.rows[0];
+    if (!msgRow) return res.status(404).json({ error: "Message not found" });
+    if (Number(msgRow.sender_id) !== uid) return res.status(403).json({ error: "Not allowed" });
 
-  const chat = getChatParticipants(row.chat_id);
-  if (!chat) return res.status(404).json({ error: "Chat not found" });
-  const isMember = chat.user1_id === req.user.id || chat.user2_id === req.user.id;
-  if (!isMember) return res.status(403).json({ error: "Not a member of this chat" });
+    const chat = await getChatParticipants(Number(msgRow.chat_id));
+    if (!chat) return res.status(404).json({ error: "Chat not found" });
+    const isMember = Number(chat.user1_id) === uid || Number(chat.user2_id) === uid;
+    if (!isMember) return res.status(403).json({ error: "Not a member of this chat" });
 
-  db.prepare(`UPDATE messages SET text = ?, edited_at = CURRENT_TIMESTAMP WHERE id = ?`).run(bodyText, messageId);
+    await query(`UPDATE messages SET text = $1, edited_at = now() WHERE id = $2`, [bodyText, messageId]);
 
-  const messageRow = db
-    .prepare(
+    const messageRow = await query(
       `
       SELECT m.id, m.chat_id, m.sender_id, m.text, m.delivered_at, m.read_at, m.edited_at, m.created_at,
              u.username, u.avatar_url
       FROM messages m
       JOIN users u ON u.id = m.sender_id
-      WHERE m.id = ?
-    `
-    )
-    .get(messageId);
+      WHERE m.id = $1
+    `,
+      [messageId]
+    );
+    const m = messageRow.rows[0];
+    const message = {
+      id: Number(m.id),
+      chatId: Number(m.chat_id),
+      senderId: Number(m.sender_id),
+      text: m.text,
+      deliveredAt: m.delivered_at,
+      readAt: m.read_at,
+      editedAt: m.edited_at,
+      createdAt: m.created_at,
+      sender: { id: Number(m.sender_id), username: m.username, avatar: m.avatar_url },
+    };
 
-  const message = {
-    id: messageRow.id,
-    chatId: messageRow.chat_id,
-    senderId: messageRow.sender_id,
-    text: messageRow.text,
-    deliveredAt: messageRow.delivered_at,
-    readAt: messageRow.read_at,
-    editedAt: messageRow.edited_at,
-    createdAt: messageRow.created_at,
-    sender: { id: messageRow.sender_id, username: messageRow.username, avatar: messageRow.avatar_url },
-  };
+    const cid = Number(msgRow.chat_id);
+    const u1 = Number(chat.user1_id);
+    const u2 = Number(chat.user2_id);
+    const recipients = new Set([
+      ...(userSockets.get(u1) ? Array.from(userSockets.get(u1)) : []),
+      ...(userSockets.get(u2) ? Array.from(userSockets.get(u2)) : []),
+    ]);
+    recipients.forEach((sid) => io.to(sid).emit("message:edited", { chatId: cid, message }));
 
-  const cid = row.chat_id;
-  const u1 = chat.user1_id;
-  const u2 = chat.user2_id;
-  const recipients = new Set([
-    ...(userSockets.get(u1) ? Array.from(userSockets.get(u1)) : []),
-    ...(userSockets.get(u2) ? Array.from(userSockets.get(u2)) : []),
-  ]);
-  recipients.forEach((sid) => io.to(sid).emit("message:edited", { chatId: cid, message }));
-
-  return res.json({ message });
+    return res.json({ message });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
 });
 
 io.on("connection", (socket) => {
@@ -410,8 +446,10 @@ io.on("connection", (socket) => {
   userSockets.get(userId).add(socket.id);
 
   // Mark online (simple presence).
-  db.prepare(`UPDATE users SET is_online = 1 WHERE id = ?`).run(userId);
-  emitToAll("user:presence", { userId, isOnline: true, lastSeenAt: null });
+  (async () => {
+    await query(`UPDATE users SET is_online = TRUE WHERE id = $1`, [Number(userId)]);
+    emitToAll("user:presence", { userId: Number(userId), isOnline: true, lastSeenAt: null });
+  })().catch(() => {});
 
   socket.on("disconnect", () => {
     const set = userSockets.get(userId);
@@ -419,53 +457,59 @@ io.on("connection", (socket) => {
     set.delete(socket.id);
     if (set.size === 0) {
       userSockets.delete(userId);
-      // Mark offline + save last seen time.
-      db.prepare(`UPDATE users SET is_online = 0, last_seen_at = CURRENT_TIMESTAMP WHERE id = ?`).run(userId);
-      const row = db.prepare(`SELECT last_seen_at FROM users WHERE id = ?`).get(userId);
-      emitToAll("user:presence", { userId, isOnline: false, lastSeenAt: row?.last_seen_at || null });
+      (async () => {
+        await query(`UPDATE users SET is_online = FALSE, last_seen_at = now() WHERE id = $1`, [Number(userId)]);
+        const row = await query(`SELECT last_seen_at FROM users WHERE id = $1`, [Number(userId)]);
+        emitToAll("user:presence", {
+          userId: Number(userId),
+          isOnline: false,
+          lastSeenAt: row.rows[0]?.last_seen_at || null,
+        });
+      })().catch(() => {});
     }
   });
 
   // Receive a new message and broadcast it to both chat participants.
-  socket.on("chat:send", ({ chatId, text } = {}) => {
+  socket.on("chat:send", async ({ chatId, text } = {}) => {
     const cid = Number(chatId);
     const bodyText = String(text || "").trim();
 
     if (!cid || !bodyText) return;
     if (bodyText.length > 4000) return;
 
-    const chat = getChatParticipants(cid);
+    const chat = await getChatParticipants(cid);
     if (!chat) return;
 
-    const isMember = chat.user1_id === userId || chat.user2_id === userId;
+    const isMember = Number(chat.user1_id) === Number(userId) || Number(chat.user2_id) === Number(userId);
     if (!isMember) return;
 
-    const inserted = db
-      .prepare(`INSERT INTO messages (chat_id, sender_id, text) VALUES (?, ?, ?)`)
-      .run(cid, userId, bodyText);
-
-    const messageRow = db
-      .prepare(
-        `
-        SELECT m.id, m.chat_id, m.sender_id, m.text, m.delivered_at, m.read_at, m.edited_at, m.created_at,
-               u.username, u.avatar_url
-        FROM messages m
-        JOIN users u ON u.id = m.sender_id
-        WHERE m.id = ?
+    const inserted = await query(
+      `INSERT INTO messages (chat_id, sender_id, text) VALUES ($1, $2, $3) RETURNING id`,
+      [cid, Number(userId), bodyText]
+    );
+    const insertedId = Number(inserted.rows[0].id);
+    const messageRow = await query(
       `
-      )
-      .get(inserted.lastInsertRowid);
+      SELECT m.id, m.chat_id, m.sender_id, m.text, m.delivered_at, m.read_at, m.edited_at, m.created_at,
+             u.username, u.avatar_url
+      FROM messages m
+      JOIN users u ON u.id = m.sender_id
+      WHERE m.id = $1
+    `,
+      [insertedId]
+    );
+    const mr = messageRow.rows[0];
 
     const message = {
-      id: messageRow.id,
-      chatId: messageRow.chat_id,
-      senderId: messageRow.sender_id,
-      text: messageRow.text,
-      deliveredAt: messageRow.delivered_at,
-      readAt: messageRow.read_at,
-      editedAt: messageRow.edited_at,
-      createdAt: messageRow.created_at,
-      sender: { id: messageRow.sender_id, username: messageRow.username, avatar: messageRow.avatar_url },
+      id: Number(mr.id),
+      chatId: Number(mr.chat_id),
+      senderId: Number(mr.sender_id),
+      text: mr.text,
+      deliveredAt: mr.delivered_at,
+      readAt: mr.read_at,
+      editedAt: mr.edited_at,
+      createdAt: mr.created_at,
+      sender: { id: Number(mr.sender_id), username: mr.username, avatar: mr.avatar_url },
     };
 
     // Emit to both users that are connected.
@@ -479,11 +523,11 @@ io.on("connection", (socket) => {
     recipients.forEach((sid) => io.to(sid).emit("chat:message", message));
 
     // Mark delivered if recipient is currently connected.
-    const otherId = chat.user1_id === userId ? chat.user2_id : chat.user1_id;
+    const otherId = Number(chat.user1_id) === Number(userId) ? Number(chat.user2_id) : Number(chat.user1_id);
     if (userSockets.get(otherId)?.size) {
-      db.prepare(`UPDATE messages SET delivered_at = CURRENT_TIMESTAMP WHERE id = ? AND delivered_at IS NULL`).run(message.id);
-      const row = db.prepare(`SELECT delivered_at FROM messages WHERE id = ?`).get(message.id);
-      const deliveredAt = row?.delivered_at || null;
+      await query(`UPDATE messages SET delivered_at = now() WHERE id = $1 AND delivered_at IS NULL`, [message.id]);
+      const row = await query(`SELECT delivered_at FROM messages WHERE id = $1`, [message.id]);
+      const deliveredAt = row.rows[0]?.delivered_at || null;
       const payload = { chatId: cid, updates: [{ id: message.id, deliveredAt, readAt: null }] };
       const both = new Set([
         ...(userSockets.get(userId) ? Array.from(userSockets.get(userId)) : []),
@@ -494,58 +538,65 @@ io.on("connection", (socket) => {
   });
 
   // Mark messages as read up to messageId for this chat (1:1).
-  socket.on("chat:read", ({ chatId, upToMessageId } = {}) => {
+  socket.on("chat:read", async ({ chatId, upToMessageId } = {}) => {
     const cid = Number(chatId);
     const upTo = Number(upToMessageId);
     if (!cid || !upTo) return;
 
-    const chat = getChatParticipants(cid);
+    const chat = await getChatParticipants(cid);
     if (!chat) return;
-    const isMember = chat.user1_id === userId || chat.user2_id === userId;
+    const isMember = Number(chat.user1_id) === Number(userId) || Number(chat.user2_id) === Number(userId);
     if (!isMember) return;
 
     // Mark delivered for any messages from the other user that were never delivered.
-    db.prepare(
+    await query(
       `
       UPDATE messages
-      SET delivered_at = COALESCE(delivered_at, CURRENT_TIMESTAMP)
-      WHERE chat_id = ?
-        AND sender_id != ?
-        AND id <= ?
+      SET delivered_at = COALESCE(delivered_at, now())
+      WHERE chat_id = $1
+        AND sender_id != $2
+        AND id <= $3
         AND delivered_at IS NULL
-    `
-    ).run(cid, userId, upTo);
+    `,
+      [cid, Number(userId), upTo]
+    );
 
     // Mark read for any messages from the other user.
-    db.prepare(
+    await query(
       `
       UPDATE messages
-      SET read_at = COALESCE(read_at, CURRENT_TIMESTAMP)
-      WHERE chat_id = ?
-        AND sender_id != ?
-        AND id <= ?
+      SET read_at = COALESCE(read_at, now())
+      WHERE chat_id = $1
+        AND sender_id != $2
+        AND id <= $3
         AND read_at IS NULL
-    `
-    ).run(cid, userId, upTo);
+    `,
+      [cid, Number(userId), upTo]
+    );
 
-    const updated = db.prepare(
+    const updated = await query(
       `
       SELECT id, delivered_at, read_at
       FROM messages
-      WHERE chat_id = ?
-        AND sender_id != ?
-        AND id <= ?
+      WHERE chat_id = $1
+        AND sender_id != $2
+        AND id <= $3
         AND (delivered_at IS NOT NULL OR read_at IS NOT NULL)
       ORDER BY id ASC
-    `
-    ).all(cid, userId, upTo);
+    `,
+      [cid, Number(userId), upTo]
+    );
 
-    if (!updated.length) return;
+    if (!updated.rows.length) return;
 
-    const otherId = chat.user1_id === userId ? chat.user2_id : chat.user1_id;
+    const otherId = Number(chat.user1_id) === Number(userId) ? Number(chat.user2_id) : Number(chat.user1_id);
     const payload = {
       chatId: cid,
-      updates: updated.map((r) => ({ id: r.id, deliveredAt: r.delivered_at, readAt: r.read_at })),
+      updates: updated.rows.map((r) => ({
+        id: Number(r.id),
+        deliveredAt: r.delivered_at,
+        readAt: r.read_at,
+      })),
     };
 
     const recipients = new Set([
@@ -561,19 +612,29 @@ io.on("connection", (socket) => {
     const typing = Boolean(isTyping);
     if (!cid) return;
 
-    const chat = getChatParticipants(cid);
-    if (!chat) return;
-
-    const isMember = chat.user1_id === userId || chat.user2_id === userId;
-    if (!isMember) return;
-
-    const otherId = chat.user1_id === userId ? chat.user2_id : chat.user1_id;
-    emitToUser(otherId, "chat:typing", { chatId: cid, userId, isTyping: typing });
+    (async () => {
+      const chat = await getChatParticipants(cid);
+      if (!chat) return;
+      const isMember = Number(chat.user1_id) === Number(userId) || Number(chat.user2_id) === Number(userId);
+      if (!isMember) return;
+      const otherId = Number(chat.user1_id) === Number(userId) ? Number(chat.user2_id) : Number(chat.user1_id);
+      emitToUser(otherId, "chat:typing", { chatId: cid, userId: Number(userId), isTyping: typing });
+    })().catch(() => {});
   });
+
 });
 
-server.listen(PORT, () => {
+async function main() {
+  await initDb();
+  server.listen(PORT, () => {
+    // eslint-disable-next-line no-console
+    console.log(`Backend listening on http://localhost:${PORT}`);
+  });
+}
+
+main().catch((e) => {
   // eslint-disable-next-line no-console
-  console.log(`Backend listening on http://localhost:${PORT}`);
+  console.error("Failed to start backend:", e);
+  process.exit(1);
 });
 
