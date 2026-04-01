@@ -138,7 +138,11 @@ export default function App() {
 
         // If I'm currently viewing this chat and the tab is active,
         // immediately mark the incoming message as read.
-        const isIncoming = me?.id && msg.senderId && Number(msg.senderId) !== me.id;
+        const isIncoming =
+          me?.id &&
+          msg.senderId &&
+          Number(msg.senderId) !== me.id &&
+          msg.type !== "system";
         if (isIncoming && socketReady && isWindowActive()) {
           const cid = Number(openChatId);
           const mid = Number(msg.id);

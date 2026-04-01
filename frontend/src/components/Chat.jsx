@@ -127,7 +127,17 @@ export default function Chat({
                   <span>{initials(chat?.title || "")}</span>
                 </div>
                 <div className="chatHeaderInfo">
-                  <div className="chatHeaderName">{chat?.title || t("groupChat")}</div>
+                  <div className="chatHeaderName">
+                    <span className="chatHeaderTitleText">{chat?.title || t("groupChat")}</span>
+                    {typeof chat?.memberCount === "number" ? (
+                      <span className="chatHeaderMembersMeta">
+                        {" · "}
+                        {chat.memberCount === 1
+                          ? t("participantCountOne")
+                          : t("participantCountMany").replace("{count}", String(chat.memberCount))}
+                      </span>
+                    ) : null}
+                  </div>
                   <div className="chatHeaderStatus">{otherTyping ? t("typing") : t("groupChat")}</div>
                 </div>
               </button>
@@ -175,86 +185,125 @@ export default function Chat({
           ) : null}
 
           <div className="messages" ref={listRef}>
-            {messages.map((m) => (
-              <div
-                key={m.id}
-                className={m.senderId === meId ? "bubbleRow me" : "bubbleRow"}
-              >
-                <div className="msgAvatar" title={m.sender?.username || ""}>
-                  {getAvatarSrc(m, meId, meAvatar) ? (
-                    <img src={getAvatarSrc(m, meId, meAvatar)} alt="" />
-                  ) : (
-                    <span>{initials(getDisplayName(m, meId, meUsername))}</span>
-                  )}
+            {messages.map((m) =>
+              m.type === "system" ? (
+                <div key={m.id} className="systemMessageRow">
+                  <div className="systemMessageInner">{formatSystemLine(m, t)}</div>
+                  <div className="systemMessageTime">{formatTime(m.createdAt)}</div>
                 </div>
-                <div className={m.senderId === meId ? "bubble me bubbleOwn bubbleWithActions" : "bubble bubbleWithActions"}>
-                  <div className={m.senderId === meId ? "reactBtnWrap right" : "reactBtnWrap left"}>
-                    <button
-                      type="button"
-                      className="reactBtn"
-                      aria-label="React"
-                      onMouseDown={(e) => e.stopPropagation()}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setReactionPickerForId((id) => (id === m.id ? null : m.id));
-                      }}
-                    >
-                      +
-                    </button>
-                    {reactionPickerForId === m.id ? (
-                      <div className="reactPicker" role="menu" onMouseDown={(e) => e.stopPropagation()}>
-                        {["👍", "❤️", "😂", "😮", "😢", "🔥"].map((emo) => (
-                          <button
-                            key={emo}
-                            type="button"
-                            className="reactPick"
-                            onMouseDown={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setReactionPickerForId(null);
-                              onToggleReaction?.(m.id, emo);
-                            }}
-                          >
-                            {emo}
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
+              ) : (
+                <div
+                  key={m.id}
+                  className={m.senderId === meId ? "bubbleRow me" : "bubbleRow"}
+                >
+                  <div className="msgAvatar" title={m.sender?.username || ""}>
+                    {getAvatarSrc(m, meId, meAvatar) ? (
+                      <img src={getAvatarSrc(m, meId, meAvatar)} alt="" />
+                    ) : (
+                      <span>{initials(getDisplayName(m, meId, meUsername))}</span>
+                    )}
                   </div>
-                  {m.senderId === meId ? (
-                    <div className="msgMenu">
+                  <div className={m.senderId === meId ? "bubble me bubbleOwn bubbleWithActions" : "bubble bubbleWithActions"}>
+                    <div className={m.senderId === meId ? "reactBtnWrap right" : "reactBtnWrap left"}>
                       <button
                         type="button"
-                        className="msgMenuBtn"
-                        aria-label={t("menu")}
+                        className="reactBtn"
+                        aria-label="React"
                         onMouseDown={(e) => e.stopPropagation()}
                         onClick={(e) => {
                           e.stopPropagation();
-                          setMenuMessageId((id) => (id === m.id ? null : m.id));
+                          setReactionPickerForId((id) => (id === m.id ? null : m.id));
                         }}
                       >
-                        ⋯
+                        +
                       </button>
-                      {menuMessageId === m.id ? (
-                        <div className="msgMenuDropdown" role="menu">
-                          {!isBanned ? (
+                      {reactionPickerForId === m.id ? (
+                        <div className="reactPicker" role="menu" onMouseDown={(e) => e.stopPropagation()}>
+                          {["👍", "❤️", "😂", "😮", "😢", "🔥"].map((emo) => (
                             <button
+                              key={emo}
                               type="button"
-                              className="msgMenuItem"
-                              role="menuitem"
+                              className="reactPick"
                               onMouseDown={(e) => e.stopPropagation()}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setEditingMessageId(m.id);
-                                setText(String(m.text ?? ""));
-                                setMenuMessageId(null);
-                                onTyping?.(false);
+                                setReactionPickerForId(null);
+                                onToggleReaction?.(m.id, emo);
                               }}
                             >
-                              {t("edit")}
+                              {emo}
                             </button>
-                          ) : null}
-                          {isAdmin ? (
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                    {m.senderId === meId ? (
+                      <div className="msgMenu">
+                        <button
+                          type="button"
+                          className="msgMenuBtn"
+                          aria-label={t("menu")}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMenuMessageId((id) => (id === m.id ? null : m.id));
+                          }}
+                        >
+                          ⋯
+                        </button>
+                        {menuMessageId === m.id ? (
+                          <div className="msgMenuDropdown" role="menu">
+                            {!isBanned ? (
+                              <button
+                                type="button"
+                                className="msgMenuItem"
+                                role="menuitem"
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingMessageId(m.id);
+                                  setText(String(m.text ?? ""));
+                                  setMenuMessageId(null);
+                                  onTyping?.(false);
+                                }}
+                              >
+                                {t("edit")}
+                              </button>
+                            ) : null}
+                            {isAdmin ? (
+                              <button
+                                type="button"
+                                className="msgMenuItem"
+                                role="menuitem"
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setMenuMessageId(null);
+                                  onAdminDeleteMessage?.(m.id);
+                                }}
+                              >
+                                Delete
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : isAdmin ? (
+                      <div className="msgMenu">
+                        <button
+                          type="button"
+                          className="msgMenuBtn"
+                          aria-label={t("menu")}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMenuMessageId((id) => (id === m.id ? null : m.id));
+                          }}
+                        >
+                          ⋯
+                        </button>
+                        {menuMessageId === m.id ? (
+                          <div className="msgMenuDropdown" role="menu">
                             <button
                               type="button"
                               className="msgMenuItem"
@@ -268,83 +317,51 @@ export default function Chat({
                             >
                               Delete
                             </button>
-                          ) : null}
-                        </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {isGroup ? (
+                      <div className="msgSenderName">{m.sender?.username || "?"}</div>
+                    ) : null}
+                    <div className="bubbleText">
+                      {m.text}
+                      {m.editedAt ? (
+                        <span className="bubbleEdited"> {t("edited")}</span>
                       ) : null}
                     </div>
-                  ) : isAdmin ? (
-                    <div className="msgMenu">
-                      <button
-                        type="button"
-                        className="msgMenuBtn"
-                        aria-label={t("menu")}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setMenuMessageId((id) => (id === m.id ? null : m.id));
-                        }}
-                      >
-                        ⋯
-                      </button>
-                      {menuMessageId === m.id ? (
-                        <div className="msgMenuDropdown" role="menu">
+                    <div className="bubbleMeta">
+                      <span className="bubbleTime">{formatTime(m.createdAt)}</span>
+                      {m.senderId === meId ? (
+                        <span className="bubbleChecks" title={checksTitle(m, t)}>
+                          {renderChecks(m)}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {Array.isArray(m.reactions) && m.reactions.length ? (
+                      <div className="reactionsRow">
+                        {m.reactions.map((r) => (
                           <button
+                            key={r.emoji}
                             type="button"
-                            className="msgMenuItem"
-                            role="menuitem"
-                            onMouseDown={(e) => e.stopPropagation()}
+                            className={r.reactedByMe ? "reactionPill active" : "reactionPill"}
+                            disabled={isBanned}
                             onClick={(e) => {
                               e.stopPropagation();
-                              setMenuMessageId(null);
-                              onAdminDeleteMessage?.(m.id);
+                              onToggleReaction?.(m.id, r.emoji);
                             }}
                           >
-                            Delete
+                            <span className="reactionEmoji">{r.emoji}</span>
+                            <span className="reactionCount">{r.count}</span>
                           </button>
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
-                  {isGroup ? (
-                    <div className="msgSenderName">{m.sender?.username || "?"}</div>
-                  ) : null}
-                  <div className="bubbleText">
-                    {m.text}
-                    {m.editedAt ? (
-                      <span className="bubbleEdited"> {t("edited")}</span>
+                        ))}
+                      </div>
                     ) : null}
                   </div>
-                  <div className="bubbleMeta">
-                    <span className="bubbleTime">{formatTime(m.createdAt)}</span>
-                    {m.senderId === meId ? (
-                      <span className="bubbleChecks" title={checksTitle(m, t)}>
-                        {renderChecks(m)}
-                      </span>
-                    ) : null}
-                  </div>
-
-                  {Array.isArray(m.reactions) && m.reactions.length ? (
-                    <div className="reactionsRow">
-                      {m.reactions.map((r) => (
-                        <button
-                          key={r.emoji}
-                          type="button"
-                          className={r.reactedByMe ? "reactionPill active" : "reactionPill"}
-                          disabled={isBanned}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onToggleReaction?.(m.id, r.emoji);
-                          }}
-                        >
-                          <span className="reactionEmoji">{r.emoji}</span>
-                          <span className="reactionCount">{r.count}</span>
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
                 </div>
-              </div>
-            ))}
+              )
+            )}
           </div>
 
           <div className="composer">
@@ -390,6 +407,22 @@ export default function Chat({
       )}
     </main>
   );
+}
+
+function formatSystemLine(m, t) {
+  const p = m.systemPayload || {};
+  const actor = String(p.actorUsername || m.sender?.username || "?");
+  const target = String(p.targetUsername || "?");
+  switch (m.systemKind) {
+    case "group_created":
+      return t("systemGroupCreated").replace("{actor}", actor);
+    case "member_added":
+      return t("systemMemberAdded").replace("{actor}", actor).replace("{target}", target);
+    case "member_removed":
+      return t("systemMemberRemoved").replace("{actor}", actor).replace("{target}", target);
+    default:
+      return m.text || "";
+  }
 }
 
 function formatTime(v) {

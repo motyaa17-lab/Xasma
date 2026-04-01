@@ -40,6 +40,13 @@ export const translations = {
     groupNoMembers: "No members.",
     groupLoading: "Loading…",
 
+    participantCountOne: "1 participant",
+    participantCountMany: "{count} participants",
+
+    systemGroupCreated: "{actor} created the group",
+    systemMemberAdded: "{actor} added {target} to the group",
+    systemMemberRemoved: "{actor} removed {target} from the group",
+
     searchUsernamePlaceholder: "Search username...",
     searching: "Searching...",
     noChatsYet: "No chats yet.",
@@ -118,6 +125,13 @@ export const translations = {
     groupLoadError: "Не удалось загрузить группу.",
     groupNoMembers: "Нет участников.",
     groupLoading: "Загрузка…",
+
+    participantCountOne: "1 участник",
+    participantCountMany: "Участников: {count}",
+
+    systemGroupCreated: "{actor} создал(а) группу",
+    systemMemberAdded: "{actor} добавил(а) {target} в группу",
+    systemMemberRemoved: "{actor} удалил(а) {target} из группы",
 
     searchUsernamePlaceholder: "Поиск по имени...",
     searching: "Поиск...",

@@ -137,19 +137,10 @@ async function emitToChatMemberSockets(chatId, event, payload) {
   recipients.forEach((sid) => io.to(sid).emit(event, payload));
 }
 
-async function fetchMessageById(messageId) {
-  const messageRow = await query(
-    `
-      SELECT m.id, m.chat_id, m.sender_id, m.text, m.delivered_at, m.read_at, m.edited_at, m.created_at,
-             u.username, u.avatar_url
-      FROM messages m
-      JOIN users u ON u.id = m.sender_id
-      WHERE m.id = $1
-    `,
-    [messageId]
-  );
-  const mr = messageRow.rows[0];
+function messageRowToApi(mr, reactions = []) {
   if (!mr) return null;
+  const msgType = mr.message_type || "text";
+  const payload = mr.system_payload;
   return {
     id: Number(mr.id),
     chatId: Number(mr.chat_id),
@@ -160,12 +151,46 @@ async function fetchMessageById(messageId) {
     editedAt: mr.edited_at,
     createdAt: mr.created_at,
     sender: { id: Number(mr.sender_id), username: mr.username, avatar: mr.avatar_url },
+    type: msgType,
+    systemKind: mr.system_kind || null,
+    systemPayload: payload && typeof payload === "object" ? payload : null,
+    reactions,
   };
+}
+
+async function fetchMessageById(messageId) {
+  const messageRow = await query(
+    `
+      SELECT m.id, m.chat_id, m.sender_id, m.text, m.delivered_at, m.read_at, m.edited_at, m.created_at,
+             m.message_type, m.system_kind, m.system_payload,
+             u.username, u.avatar_url
+      FROM messages m
+      JOIN users u ON u.id = m.sender_id
+      WHERE m.id = $1
+    `,
+    [messageId]
+  );
+  return messageRowToApi(messageRow.rows[0], []);
+}
+
+async function insertSystemMessageAndBroadcast(chatId, actorUserId, systemKind, payload) {
+  const inserted = await query(
+    `
+    INSERT INTO messages (chat_id, sender_id, text, message_type, system_kind, system_payload)
+    VALUES ($1, $2, '', 'system', $3, $4::jsonb)
+    RETURNING id
+  `,
+    [chatId, actorUserId, systemKind, JSON.stringify(payload || {})]
+  );
+  const insertedId = Number(inserted.rows[0].id);
+  const message = await fetchMessageById(insertedId);
+  await emitToChatMemberSockets(chatId, "chat:message", message);
+  return message;
 }
 
 async function insertChatMessageAndBroadcast(chatId, senderId, bodyText) {
   const inserted = await query(
-    `INSERT INTO messages (chat_id, sender_id, text) VALUES ($1, $2, $3) RETURNING id`,
+    `INSERT INTO messages (chat_id, sender_id, text, message_type) VALUES ($1, $2, $3, 'text') RETURNING id`,
     [chatId, senderId, bodyText]
   );
   const insertedId = Number(inserted.rows[0].id);
@@ -368,14 +393,27 @@ app.get("/api/chats", authRequired, (req, res) => {
         other.last_seen_at AS other_last_seen_at,
         lm.text AS last_text,
         lm.created_at AS last_created_at,
-        lm.sender_id AS last_sender_id
+        lm.sender_id AS last_sender_id,
+        (SELECT COUNT(*)::int FROM chat_members cmx WHERE cmx.chat_id = c.id) AS member_count
       FROM chat_members mym
       JOIN chats c ON c.id = mym.chat_id
       LEFT JOIN users other
         ON c.type = 'direct'
         AND other.id = CASE WHEN c.user1_id = $1 THEN c.user2_id ELSE c.user1_id END
       LEFT JOIN LATERAL (
-        SELECT m.text, m.created_at, m.sender_id
+        SELECT
+          CASE
+            WHEN COALESCE(m.message_type, 'text') = 'system' THEN
+              CASE COALESCE(m.system_kind, '')
+                WHEN 'group_created' THEN '[Group created]'
+                WHEN 'member_added' THEN '[Member added]'
+                WHEN 'member_removed' THEN '[Member removed]'
+                ELSE '[Event]'
+              END
+            ELSE m.text
+          END AS text,
+          m.created_at,
+          m.sender_id
         FROM messages m
         WHERE m.chat_id = c.id
         ORDER BY m.created_at DESC, m.id DESC
@@ -395,6 +433,7 @@ app.get("/api/chats", authRequired, (req, res) => {
           type: isGroup ? "group" : "direct",
           title: isGroup ? c.chat_title : null,
           createdBy: c.chat_created_by != null ? Number(c.chat_created_by) : null,
+          memberCount: isGroup ? Number(c.member_count) : undefined,
           other: isGroup
             ? null
             : {
@@ -444,13 +483,14 @@ app.post("/api/groups", authRequired, (req, res) => {
     }
 
     const client = await pool.connect();
+    let chatId;
     try {
       await client.query("BEGIN");
       const ins = await client.query(
         `INSERT INTO chats (type, title, created_by, user1_id, user2_id) VALUES ('group', $1, $2, NULL, NULL) RETURNING id`,
         [title, creatorId]
       );
-      const chatId = Number(ins.rows[0].id);
+      chatId = Number(ins.rows[0].id);
       const allMembers = [...new Set([creatorId, ...memberIds])];
       for (const uid of allMembers) {
         await client.query(`INSERT INTO chat_members (chat_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [
@@ -459,13 +499,18 @@ app.post("/api/groups", authRequired, (req, res) => {
         ]);
       }
       await client.query("COMMIT");
-      return res.json({ chatId });
     } catch (e) {
       await client.query("ROLLBACK");
       throw e;
     } finally {
       client.release();
     }
+
+    await insertSystemMessageAndBroadcast(chatId, creatorId, "group_created", {
+      actorId: creatorId,
+      actorUsername: req.user.username,
+    });
+    return res.json({ chatId });
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });
 
@@ -523,13 +568,20 @@ app.post("/api/groups/:chatId/members", authRequired, (req, res) => {
     if (!chat || chat.type !== "group") return res.status(404).json({ error: "Group not found" });
     if (!canManageGroupMembers(req, chat)) return res.status(403).json({ error: "Only the creator or an admin can add members" });
 
-    const u = await query(`SELECT id FROM users WHERE id = $1`, [addUserId]);
+    const u = await query(`SELECT id, username FROM users WHERE id = $1`, [addUserId]);
     if (!u.rows[0]) return res.status(404).json({ error: "User not found" });
 
     const already = await query(`SELECT 1 FROM chat_members WHERE chat_id = $1 AND user_id = $2`, [chatId, addUserId]);
     if (already.rows[0]) return res.status(400).json({ error: "User already in group" });
 
     await query(`INSERT INTO chat_members (chat_id, user_id) VALUES ($1, $2)`, [chatId, addUserId]);
+
+    await insertSystemMessageAndBroadcast(chatId, Number(req.user.id), "member_added", {
+      actorId: Number(req.user.id),
+      actorUsername: req.user.username,
+      targetId: addUserId,
+      targetUsername: u.rows[0].username,
+    });
 
     return res.json({ ok: true });
   })().catch(() => res.status(500).json({ error: "Server error" }));
@@ -546,8 +598,18 @@ app.delete("/api/groups/:chatId/members/:userId", authRequired, (req, res) => {
     if (!canManageGroupMembers(req, chat)) return res.status(403).json({ error: "Only the creator or an admin can remove members" });
     if (targetUserId === Number(chat.created_by)) return res.status(400).json({ error: "Cannot remove the creator" });
 
+    const targetUser = await query(`SELECT username FROM users WHERE id = $1`, [targetUserId]);
+    if (!targetUser.rows[0]) return res.status(404).json({ error: "User not found" });
+
     const del = await query(`DELETE FROM chat_members WHERE chat_id = $1 AND user_id = $2`, [chatId, targetUserId]);
     if (del.rowCount === 0) return res.status(404).json({ error: "Member not in group" });
+
+    await insertSystemMessageAndBroadcast(chatId, Number(req.user.id), "member_removed", {
+      actorId: Number(req.user.id),
+      actorUsername: req.user.username,
+      targetId: targetUserId,
+      targetUsername: targetUser.rows[0].username,
+    });
 
     return res.json({ ok: true });
   })().catch(() => res.status(500).json({ error: "Server error" }));
@@ -595,6 +657,9 @@ app.get("/api/chats/:chatId/messages", authRequired, (req, res) => {
       m.read_at,
       m.edited_at,
       m.created_at,
+      m.message_type,
+      m.system_kind,
+      m.system_payload,
       u.username,
       u.avatar_url
     FROM messages m
@@ -606,28 +671,21 @@ app.get("/api/chats/:chatId/messages", authRequired, (req, res) => {
     [chatId, limit]
   );
 
-  const messageIds = messages.rows.map((m) => Number(m.id));
-  const reactionsByMessageId = await getGroupedReactionsForMessages(messageIds, uid);
+  const textMessageIds = messages.rows
+    .filter((m) => (m.message_type || "text") === "text")
+    .map((m) => Number(m.id));
+  const reactionsByMessageId = await getGroupedReactionsForMessages(textMessageIds, uid);
 
   return res.json({
-    messages: messages.rows.map((m) => ({
-      id: Number(m.id),
-      chatId: Number(m.chat_id),
-      senderId: Number(m.sender_id),
-      text: m.text,
-      deliveredAt: m.delivered_at,
-      readAt: m.read_at,
-      editedAt: m.edited_at,
-      createdAt: m.created_at,
-      sender: { id: Number(m.sender_id), username: m.username, avatar: m.avatar_url },
-      reactions: reactionsByMessageId.get(Number(m.id)) || [],
-    })),
+    messages: messages.rows.map((m) =>
+      messageRowToApi(m, reactionsByMessageId.get(Number(m.id)) || [])
+    ),
   });
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });
 
 async function getMessageRow(messageId) {
-  const r = await query(`SELECT id, chat_id, sender_id FROM messages WHERE id = $1`, [messageId]);
+  const r = await query(`SELECT id, chat_id, sender_id, message_type FROM messages WHERE id = $1`, [messageId]);
   return r.rows[0] || null;
 }
 
@@ -693,6 +751,7 @@ app.get("/api/messages/:messageId/reactions", authRequired, (req, res) => {
     if (!msg) return res.status(404).json({ error: "Message not found" });
 
     if (!(await isUserChatMember(Number(msg.chat_id), uid))) return res.status(403).json({ error: "Not a member of this chat" });
+    if ((msg.message_type || "text") === "system") return res.status(400).json({ error: "Invalid message" });
 
     const reactions = await getGroupedReactions(messageId, uid);
     return res.json({ reactions });
@@ -713,6 +772,7 @@ app.post("/api/messages/:messageId/reactions", authRequired, (req, res) => {
 
     const cid = Number(msg.chat_id);
     if (!(await isUserChatMember(cid, uid))) return res.status(403).json({ error: "Not a member of this chat" });
+    if ((msg.message_type || "text") === "system") return res.status(400).json({ error: "Invalid message" });
 
     const del = await query(
       `DELETE FROM message_reactions WHERE message_id = $1 AND user_id = $2 AND emoji = $3`,
@@ -747,9 +807,10 @@ app.put("/api/messages/:messageId", authRequired, (req, res) => {
 
   (async () => {
     const uid = Number(req.user.id);
-    const row = await query(`SELECT id, chat_id, sender_id FROM messages WHERE id = $1`, [messageId]);
+    const row = await query(`SELECT id, chat_id, sender_id, message_type FROM messages WHERE id = $1`, [messageId]);
     const msgRow = row.rows[0];
     if (!msgRow) return res.status(404).json({ error: "Message not found" });
+    if ((msgRow.message_type || "text") === "system") return res.status(403).json({ error: "Cannot edit this message" });
     if (Number(msgRow.sender_id) !== uid) return res.status(403).json({ error: "Not allowed" });
 
     const cidCheck = Number(msgRow.chat_id);
@@ -760,6 +821,7 @@ app.put("/api/messages/:messageId", authRequired, (req, res) => {
     const messageRow = await query(
       `
       SELECT m.id, m.chat_id, m.sender_id, m.text, m.delivered_at, m.read_at, m.edited_at, m.created_at,
+             m.message_type, m.system_kind, m.system_payload,
              u.username, u.avatar_url
       FROM messages m
       JOIN users u ON u.id = m.sender_id
@@ -768,17 +830,8 @@ app.put("/api/messages/:messageId", authRequired, (req, res) => {
       [messageId]
     );
     const m = messageRow.rows[0];
-    const message = {
-      id: Number(m.id),
-      chatId: Number(m.chat_id),
-      senderId: Number(m.sender_id),
-      text: m.text,
-      deliveredAt: m.delivered_at,
-      readAt: m.read_at,
-      editedAt: m.edited_at,
-      createdAt: m.created_at,
-      sender: { id: Number(m.sender_id), username: m.username, avatar: m.avatar_url },
-    };
+    const reactions = await getGroupedReactions(messageId, uid);
+    const message = messageRowToApi(m, reactions);
 
     const cid = Number(msgRow.chat_id);
     await emitToChatMemberSockets(cid, "message:edited", { chatId: cid, message });
@@ -983,6 +1036,7 @@ io.on("connection", (socket) => {
         AND sender_id != $2
         AND id <= $3
         AND delivered_at IS NULL
+        AND COALESCE(message_type, 'text') = 'text'
     `,
       [cid, Number(userId), upTo]
     );
@@ -996,6 +1050,7 @@ io.on("connection", (socket) => {
         AND sender_id != $2
         AND id <= $3
         AND read_at IS NULL
+        AND COALESCE(message_type, 'text') = 'text'
     `,
       [cid, Number(userId), upTo]
     );
@@ -1008,6 +1063,7 @@ io.on("connection", (socket) => {
         AND sender_id != $2
         AND id <= $3
         AND (delivered_at IS NOT NULL OR read_at IS NOT NULL)
+        AND COALESCE(message_type, 'text') = 'text'
       ORDER BY id ASC
     `,
       [cid, Number(userId), upTo]

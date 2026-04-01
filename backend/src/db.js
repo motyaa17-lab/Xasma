@@ -104,6 +104,11 @@ async function initDb() {
     ON CONFLICT DO NOTHING
   `);
 
+  // System / membership timeline events (group chats).
+  await query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS message_type TEXT NOT NULL DEFAULT 'text'`);
+  await query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS system_kind TEXT`);
+  await query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS system_payload JSONB`);
+
   // Ensure initial admin (safe if user doesn't exist).
   await query(`UPDATE users SET role = 'admin' WHERE username = 'Xasma'`);
 }
