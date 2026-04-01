@@ -7,7 +7,7 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const { Server } = require("socket.io");
 
-const { query, initDb } = require("./db");
+const { query, initDb, pool } = require("./db");
 
 const PORT = process.env.PORT || 4000;
 const JWT_SECRET = process.env.JWT_SECRET || "change_me";
@@ -62,16 +62,25 @@ function normalizeChatUsers(a, b) {
   return a < b ? [a, b] : [b, a];
 }
 
-async function getChatParticipants(chatId) {
+async function getChatById(chatId) {
   const r = await query(
-    `
-    SELECT user1_id, user2_id
-    FROM chats
-    WHERE id = $1
-  `,
+    `SELECT id, type, title, created_by, user1_id, user2_id FROM chats WHERE id = $1`,
     [chatId]
   );
   return r.rows[0] || null;
+}
+
+async function isUserChatMember(chatId, userId) {
+  const r = await query(
+    `SELECT 1 FROM chat_members WHERE chat_id = $1 AND user_id = $2`,
+    [chatId, userId]
+  );
+  return Boolean(r.rows[0]);
+}
+
+async function getChatMemberUserIds(chatId) {
+  const r = await query(`SELECT user_id FROM chat_members WHERE chat_id = $1`, [chatId]);
+  return r.rows.map((row) => Number(row.user_id));
 }
 
 async function getOrCreateChat(userA, userB) {
@@ -101,9 +110,72 @@ async function getOrCreateChat(userA, userB) {
   return chatId;
 }
 
-function getOtherUser(chatRow, meId) {
-  const otherId = chatRow.user1_id === meId ? chatRow.user2_id : chatRow.user1_id;
-  return otherId;
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: FRONTEND_ORIGIN,
+    credentials: true,
+  },
+});
+
+// Track sockets by authenticated user (direct + group chats).
+const userSockets = new Map(); // userId -> Set(socket.id)
+
+async function emitToChatMemberSockets(chatId, event, payload) {
+  const ids = await getChatMemberUserIds(chatId);
+  const recipients = new Set();
+  for (const uid of ids) {
+    const s = userSockets.get(uid);
+    if (s) s.forEach((sid) => recipients.add(sid));
+  }
+  recipients.forEach((sid) => io.to(sid).emit(event, payload));
+}
+
+async function fetchMessageById(messageId) {
+  const messageRow = await query(
+    `
+      SELECT m.id, m.chat_id, m.sender_id, m.text, m.delivered_at, m.read_at, m.edited_at, m.created_at,
+             u.username, u.avatar_url
+      FROM messages m
+      JOIN users u ON u.id = m.sender_id
+      WHERE m.id = $1
+    `,
+    [messageId]
+  );
+  const mr = messageRow.rows[0];
+  if (!mr) return null;
+  return {
+    id: Number(mr.id),
+    chatId: Number(mr.chat_id),
+    senderId: Number(mr.sender_id),
+    text: mr.text,
+    deliveredAt: mr.delivered_at,
+    readAt: mr.read_at,
+    editedAt: mr.edited_at,
+    createdAt: mr.created_at,
+    sender: { id: Number(mr.sender_id), username: mr.username, avatar: mr.avatar_url },
+  };
+}
+
+async function insertChatMessageAndBroadcast(chatId, senderId, bodyText) {
+  const inserted = await query(
+    `INSERT INTO messages (chat_id, sender_id, text) VALUES ($1, $2, $3) RETURNING id`,
+    [chatId, senderId, bodyText]
+  );
+  const insertedId = Number(inserted.rows[0].id);
+  const message = await fetchMessageById(insertedId);
+  await emitToChatMemberSockets(chatId, "chat:message", message);
+
+  const memberIds = await getChatMemberUserIds(chatId);
+  const othersOnline = memberIds.some((id) => id !== Number(senderId) && userSockets.get(id)?.size);
+  if (othersOnline) {
+    await query(`UPDATE messages SET delivered_at = now() WHERE id = $1 AND delivered_at IS NULL`, [message.id]);
+    const row = await query(`SELECT delivered_at FROM messages WHERE id = $1`, [message.id]);
+    const deliveredAt = row.rows[0]?.delivered_at || null;
+    const payload = { chatId, updates: [{ id: message.id, deliveredAt, readAt: null }] };
+    await emitToChatMemberSockets(chatId, "chat:message:status", payload);
+  }
+  return message;
 }
 
 app.post("/api/register", async (req, res) => {
@@ -278,6 +350,9 @@ app.get("/api/chats", authRequired, (req, res) => {
       `
       SELECT
         c.id AS chat_id,
+        c.type AS chat_type,
+        c.title AS chat_title,
+        c.created_by AS chat_created_by,
         c.user1_id,
         c.user2_id,
         other.id AS other_id,
@@ -288,9 +363,11 @@ app.get("/api/chats", authRequired, (req, res) => {
         lm.text AS last_text,
         lm.created_at AS last_created_at,
         lm.sender_id AS last_sender_id
-      FROM chats c
-      JOIN users other
-        ON other.id = CASE WHEN c.user1_id = $1 THEN c.user2_id ELSE c.user1_id END
+      FROM chat_members mym
+      JOIN chats c ON c.id = mym.chat_id
+      LEFT JOIN users other
+        ON c.type = 'direct'
+        AND other.id = CASE WHEN c.user1_id = $1 THEN c.user2_id ELSE c.user1_id END
       LEFT JOIN LATERAL (
         SELECT m.text, m.created_at, m.sender_id
         FROM messages m
@@ -298,26 +375,34 @@ app.get("/api/chats", authRequired, (req, res) => {
         ORDER BY m.created_at DESC, m.id DESC
         LIMIT 1
       ) lm ON true
-      WHERE c.user1_id = $1 OR c.user2_id = $1
+      WHERE mym.user_id = $1
       ORDER BY lm.created_at DESC NULLS LAST, c.id DESC
     `,
       [uid]
     );
 
     return res.json({
-      chats: chats.rows.map((c) => ({
-        id: Number(c.chat_id),
-        other: {
-          id: Number(c.other_id),
-          username: c.other_username,
-          avatar: c.other_avatar_url,
-          isOnline: Boolean(c.other_is_online),
-          lastSeenAt: c.other_last_seen_at,
-        },
-        last: c.last_text
-          ? { text: c.last_text, createdAt: c.last_created_at, senderId: Number(c.last_sender_id) }
-          : null,
-      })),
+      chats: chats.rows.map((c) => {
+        const isGroup = c.chat_type === "group";
+        return {
+          id: Number(c.chat_id),
+          type: isGroup ? "group" : "direct",
+          title: isGroup ? c.chat_title : null,
+          createdBy: c.chat_created_by != null ? Number(c.chat_created_by) : null,
+          other: isGroup
+            ? null
+            : {
+                id: Number(c.other_id),
+                username: c.other_username,
+                avatar: c.other_avatar_url,
+                isOnline: Boolean(c.other_is_online),
+                lastSeenAt: c.other_last_seen_at,
+              },
+          last: c.last_text
+            ? { text: c.last_text, createdAt: c.last_created_at, senderId: Number(c.last_sender_id) }
+            : null,
+        };
+      }),
     });
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });
@@ -336,6 +421,103 @@ app.post("/api/chats", authRequired, (req, res) => {
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });
 
+app.post("/api/groups", authRequired, (req, res) => {
+  const title = typeof req.body?.title === "string" ? req.body.title.trim() : "";
+  const rawIds = Array.isArray(req.body?.memberUserIds) ? req.body.memberUserIds : [];
+  if (!title) return res.status(400).json({ error: "title is required" });
+  if (title.length > 200) return res.status(400).json({ error: "title too long" });
+
+  const creatorId = Number(req.user.id);
+  const memberIds = [...new Set(rawIds.map((x) => Number(x)).filter((n) => n > 0 && n !== creatorId))];
+  if (memberIds.length < 1) return res.status(400).json({ error: "At least one other member is required" });
+
+  (async () => {
+    for (const mid of memberIds) {
+      const u = await query(`SELECT id FROM users WHERE id = $1`, [mid]);
+      if (!u.rows[0]) return res.status(404).json({ error: `User ${mid} not found` });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const ins = await client.query(
+        `INSERT INTO chats (type, title, created_by, user1_id, user2_id) VALUES ('group', $1, $2, NULL, NULL) RETURNING id`,
+        [title, creatorId]
+      );
+      const chatId = Number(ins.rows[0].id);
+      const allMembers = [...new Set([creatorId, ...memberIds])];
+      for (const uid of allMembers) {
+        await client.query(`INSERT INTO chat_members (chat_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [
+          chatId,
+          uid,
+        ]);
+      }
+      await client.query("COMMIT");
+      return res.json({ chatId });
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
+    } finally {
+      client.release();
+    }
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
+app.post("/api/groups/:chatId/members", authRequired, (req, res) => {
+  const chatId = Number(req.params.chatId);
+  const addUserId = Number(req.body?.userId);
+  if (!chatId || !addUserId) return res.status(400).json({ error: "userId is required" });
+
+  (async () => {
+    const chat = await getChatById(chatId);
+    if (!chat || chat.type !== "group") return res.status(404).json({ error: "Group not found" });
+    if (Number(chat.created_by) !== Number(req.user.id)) return res.status(403).json({ error: "Only the creator can add members" });
+
+    const u = await query(`SELECT id FROM users WHERE id = $1`, [addUserId]);
+    if (!u.rows[0]) return res.status(404).json({ error: "User not found" });
+    if (addUserId === Number(req.user.id)) return res.status(400).json({ error: "Already in group" });
+
+    await query(`INSERT INTO chat_members (chat_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [chatId, addUserId]);
+
+    return res.json({ ok: true });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
+app.delete("/api/groups/:chatId/members/:userId", authRequired, (req, res) => {
+  const chatId = Number(req.params.chatId);
+  const targetUserId = Number(req.params.userId);
+  if (!chatId || !targetUserId) return res.status(400).json({ error: "Invalid id" });
+
+  (async () => {
+    const chat = await getChatById(chatId);
+    if (!chat || chat.type !== "group") return res.status(404).json({ error: "Group not found" });
+    if (Number(chat.created_by) !== Number(req.user.id)) return res.status(403).json({ error: "Only the creator can remove members" });
+    if (targetUserId === Number(chat.created_by)) return res.status(400).json({ error: "Cannot remove the creator" });
+
+    const del = await query(`DELETE FROM chat_members WHERE chat_id = $1 AND user_id = $2`, [chatId, targetUserId]);
+    if (del.rowCount === 0) return res.status(404).json({ error: "Member not in group" });
+
+    return res.json({ ok: true });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
+app.post("/api/chats/:chatId/messages", authRequired, (req, res) => {
+  const chatId = Number(req.params.chatId);
+  const bodyText = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+  if (!chatId || !bodyText) return res.status(400).json({ error: "text is required" });
+  if (bodyText.length > 4000) return res.status(400).json({ error: "Message too long" });
+
+  (async () => {
+    const uid = Number(req.user.id);
+    const chat = await getChatById(chatId);
+    if (!chat) return res.status(404).json({ error: "Chat not found" });
+    if (!(await isUserChatMember(chatId, uid))) return res.status(403).json({ error: "Not a member of this chat" });
+
+    const message = await insertChatMessageAndBroadcast(chatId, uid, bodyText);
+    return res.json({ message });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
 app.get("/api/chats/:chatId/messages", authRequired, (req, res) => {
   const chatId = Number(req.params.chatId);
   const limit = Math.min(parseInt(String(req.query.limit || "50"), 10), 200);
@@ -344,12 +526,11 @@ app.get("/api/chats/:chatId/messages", authRequired, (req, res) => {
   // (also used by socket events)
   // async wrapper below
   (async () => {
-    const chat = await getChatParticipants(chatId);
-  if (!chat) return res.status(404).json({ error: "Chat not found" });
+    const chat = await getChatById(chatId);
+    if (!chat) return res.status(404).json({ error: "Chat not found" });
 
-  const uid = Number(req.user.id);
-  const isMember = Number(chat.user1_id) === uid || Number(chat.user2_id) === uid;
-  if (!isMember) return res.status(403).json({ error: "Not a member of this chat" });
+    const uid = Number(req.user.id);
+    if (!(await isUserChatMember(chatId, uid))) return res.status(403).json({ error: "Not a member of this chat" });
 
   const messages = await query(
     `
@@ -393,16 +574,8 @@ app.get("/api/chats/:chatId/messages", authRequired, (req, res) => {
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });
 
-async function getMessageWithChat(messageId) {
-  const r = await query(
-    `
-    SELECT m.id, m.chat_id, m.sender_id, c.user1_id, c.user2_id
-    FROM messages m
-    JOIN chats c ON c.id = m.chat_id
-    WHERE m.id = $1
-  `,
-    [messageId]
-  );
+async function getMessageRow(messageId) {
+  const r = await query(`SELECT id, chat_id, sender_id FROM messages WHERE id = $1`, [messageId]);
   return r.rows[0] || null;
 }
 
@@ -464,11 +637,10 @@ app.get("/api/messages/:messageId/reactions", authRequired, (req, res) => {
 
   (async () => {
     const uid = Number(req.user.id);
-    const msg = await getMessageWithChat(messageId);
+    const msg = await getMessageRow(messageId);
     if (!msg) return res.status(404).json({ error: "Message not found" });
 
-    const isMember = Number(msg.user1_id) === uid || Number(msg.user2_id) === uid;
-    if (!isMember) return res.status(403).json({ error: "Not a member of this chat" });
+    if (!(await isUserChatMember(Number(msg.chat_id), uid))) return res.status(403).json({ error: "Not a member of this chat" });
 
     const reactions = await getGroupedReactions(messageId, uid);
     return res.json({ reactions });
@@ -484,11 +656,11 @@ app.post("/api/messages/:messageId/reactions", authRequired, (req, res) => {
 
   (async () => {
     const uid = Number(req.user.id);
-    const msg = await getMessageWithChat(messageId);
+    const msg = await getMessageRow(messageId);
     if (!msg) return res.status(404).json({ error: "Message not found" });
 
-    const isMember = Number(msg.user1_id) === uid || Number(msg.user2_id) === uid;
-    if (!isMember) return res.status(403).json({ error: "Not a member of this chat" });
+    const cid = Number(msg.chat_id);
+    if (!(await isUserChatMember(cid, uid))) return res.status(403).json({ error: "Not a member of this chat" });
 
     const del = await query(
       `DELETE FROM message_reactions WHERE message_id = $1 AND user_id = $2 AND emoji = $3`,
@@ -503,35 +675,16 @@ app.post("/api/messages/:messageId/reactions", authRequired, (req, res) => {
 
     const reactions = await getGroupedReactions(messageId, uid);
 
-    const chatIdNum = Number(msg.chat_id);
-    const u1 = Number(msg.user1_id);
-    const u2 = Number(msg.user2_id);
-    const recipients = new Set([
-      ...(userSockets.get(u1) ? Array.from(userSockets.get(u1)) : []),
-      ...(userSockets.get(u2) ? Array.from(userSockets.get(u2)) : []),
-    ]);
-    recipients.forEach((sid) =>
-      io.to(sid).emit("message:reactionsUpdated", {
-        chatId: chatIdNum,
-        messageId,
-        reactions,
-      })
-    );
+    const chatIdNum = cid;
+    await emitToChatMemberSockets(chatIdNum, "message:reactionsUpdated", {
+      chatId: chatIdNum,
+      messageId,
+      reactions,
+    });
 
     return res.json({ reactions });
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });
-
-const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: FRONTEND_ORIGIN,
-    credentials: true,
-  },
-});
-
-// Track sockets by authenticated user so we can emit to both participants.
-const userSockets = new Map(); // userId -> Set(socket.id)
 
 app.put("/api/messages/:messageId", authRequired, (req, res) => {
   const messageId = Number(req.params.messageId);
@@ -547,10 +700,8 @@ app.put("/api/messages/:messageId", authRequired, (req, res) => {
     if (!msgRow) return res.status(404).json({ error: "Message not found" });
     if (Number(msgRow.sender_id) !== uid) return res.status(403).json({ error: "Not allowed" });
 
-    const chat = await getChatParticipants(Number(msgRow.chat_id));
-    if (!chat) return res.status(404).json({ error: "Chat not found" });
-    const isMember = Number(chat.user1_id) === uid || Number(chat.user2_id) === uid;
-    if (!isMember) return res.status(403).json({ error: "Not a member of this chat" });
+    const cidCheck = Number(msgRow.chat_id);
+    if (!(await isUserChatMember(cidCheck, uid))) return res.status(403).json({ error: "Not a member of this chat" });
 
     await query(`UPDATE messages SET text = $1, edited_at = now() WHERE id = $2`, [bodyText, messageId]);
 
@@ -578,13 +729,7 @@ app.put("/api/messages/:messageId", authRequired, (req, res) => {
     };
 
     const cid = Number(msgRow.chat_id);
-    const u1 = Number(chat.user1_id);
-    const u2 = Number(chat.user2_id);
-    const recipients = new Set([
-      ...(userSockets.get(u1) ? Array.from(userSockets.get(u1)) : []),
-      ...(userSockets.get(u2) ? Array.from(userSockets.get(u2)) : []),
-    ]);
-    recipients.forEach((sid) => io.to(sid).emit("message:edited", { chatId: cid, message }));
+    await emitToChatMemberSockets(cid, "message:edited", { chatId: cid, message });
 
     return res.json({ message });
   })().catch(() => res.status(500).json({ error: "Server error" }));
@@ -687,23 +832,14 @@ app.delete("/api/admin/messages/:messageId", authRequired, requireAdmin, (req, r
   if (!messageId) return res.status(400).json({ error: "Invalid message id" });
 
   (async () => {
-    const r = await query(
-      `SELECT m.id, m.chat_id, c.user1_id, c.user2_id FROM messages m JOIN chats c ON c.id = m.chat_id WHERE m.id = $1`,
-      [messageId]
-    );
+    const r = await query(`SELECT m.id, m.chat_id FROM messages m WHERE m.id = $1`, [messageId]);
     const row = r.rows[0];
     if (!row) return res.status(404).json({ error: "Message not found" });
 
     await query(`DELETE FROM messages WHERE id = $1`, [messageId]);
 
     const chatId = Number(row.chat_id);
-    const u1 = Number(row.user1_id);
-    const u2 = Number(row.user2_id);
-    const recipients = new Set([
-      ...(userSockets.get(u1) ? Array.from(userSockets.get(u1)) : []),
-      ...(userSockets.get(u2) ? Array.from(userSockets.get(u2)) : []),
-    ]);
-    recipients.forEach((sid) => io.to(sid).emit("message:deleted", { chatId, messageId }));
+    await emitToChatMemberSockets(chatId, "message:deleted", { chatId, messageId });
 
     return res.json({ ok: true });
   })().catch(() => res.status(500).json({ error: "Server error" }));
@@ -763,7 +899,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Receive a new message and broadcast it to both chat participants.
   socket.on("chat:send", async ({ chatId, text } = {}) => {
     const cid = Number(chatId);
     const bodyText = String(text || "").trim();
@@ -771,76 +906,21 @@ io.on("connection", (socket) => {
     if (!cid || !bodyText) return;
     if (bodyText.length > 4000) return;
 
-    const chat = await getChatParticipants(cid);
+    const chat = await getChatById(cid);
     if (!chat) return;
+    if (!(await isUserChatMember(cid, Number(userId)))) return;
 
-    const isMember = Number(chat.user1_id) === Number(userId) || Number(chat.user2_id) === Number(userId);
-    if (!isMember) return;
-
-    const inserted = await query(
-      `INSERT INTO messages (chat_id, sender_id, text) VALUES ($1, $2, $3) RETURNING id`,
-      [cid, Number(userId), bodyText]
-    );
-    const insertedId = Number(inserted.rows[0].id);
-    const messageRow = await query(
-      `
-      SELECT m.id, m.chat_id, m.sender_id, m.text, m.delivered_at, m.read_at, m.edited_at, m.created_at,
-             u.username, u.avatar_url
-      FROM messages m
-      JOIN users u ON u.id = m.sender_id
-      WHERE m.id = $1
-    `,
-      [insertedId]
-    );
-    const mr = messageRow.rows[0];
-
-    const message = {
-      id: Number(mr.id),
-      chatId: Number(mr.chat_id),
-      senderId: Number(mr.sender_id),
-      text: mr.text,
-      deliveredAt: mr.delivered_at,
-      readAt: mr.read_at,
-      editedAt: mr.edited_at,
-      createdAt: mr.created_at,
-      sender: { id: Number(mr.sender_id), username: mr.username, avatar: mr.avatar_url },
-    };
-
-    // Emit to both users that are connected.
-    const u1 = Number(chat.user1_id);
-    const u2 = Number(chat.user2_id);
-    const recipients = new Set([
-      ...(userSockets.get(u1) ? Array.from(userSockets.get(u1)) : []),
-      ...(userSockets.get(u2) ? Array.from(userSockets.get(u2)) : []),
-    ]);
-
-    recipients.forEach((sid) => io.to(sid).emit("chat:message", message));
-
-    // Mark delivered if recipient is currently connected.
-    const otherId = Number(chat.user1_id) === Number(userId) ? Number(chat.user2_id) : Number(chat.user1_id);
-    if (userSockets.get(otherId)?.size) {
-      await query(`UPDATE messages SET delivered_at = now() WHERE id = $1 AND delivered_at IS NULL`, [message.id]);
-      const row = await query(`SELECT delivered_at FROM messages WHERE id = $1`, [message.id]);
-      const deliveredAt = row.rows[0]?.delivered_at || null;
-      const payload = { chatId: cid, updates: [{ id: message.id, deliveredAt, readAt: null }] };
-      const both = new Set([
-        ...(userSockets.get(userId) ? Array.from(userSockets.get(userId)) : []),
-        ...(userSockets.get(otherId) ? Array.from(userSockets.get(otherId)) : []),
-      ]);
-      both.forEach((sid) => io.to(sid).emit("chat:message:status", payload));
-    }
+    await insertChatMessageAndBroadcast(cid, Number(userId), bodyText);
   });
 
-  // Mark messages as read up to messageId for this chat (1:1).
   socket.on("chat:read", async ({ chatId, upToMessageId } = {}) => {
     const cid = Number(chatId);
     const upTo = Number(upToMessageId);
     if (!cid || !upTo) return;
 
-    const chat = await getChatParticipants(cid);
+    const chat = await getChatById(cid);
     if (!chat) return;
-    const isMember = Number(chat.user1_id) === Number(userId) || Number(chat.user2_id) === Number(userId);
-    if (!isMember) return;
+    if (!(await isUserChatMember(cid, Number(userId)))) return;
 
     // Mark delivered for any messages from the other user that were never delivered.
     await query(
@@ -883,7 +963,6 @@ io.on("connection", (socket) => {
 
     if (!updated.rows.length) return;
 
-    const otherId = Number(chat.user1_id) === Number(userId) ? Number(chat.user2_id) : Number(chat.user1_id);
     const payload = {
       chatId: cid,
       updates: updated.rows.map((r) => ({
@@ -893,26 +972,23 @@ io.on("connection", (socket) => {
       })),
     };
 
-    const recipients = new Set([
-      ...(userSockets.get(userId) ? Array.from(userSockets.get(userId)) : []),
-      ...(userSockets.get(otherId) ? Array.from(userSockets.get(otherId)) : []),
-    ]);
-    recipients.forEach((sid) => io.to(sid).emit("chat:message:status", payload));
+    await emitToChatMemberSockets(cid, "chat:message:status", payload);
   });
 
-  // Typing indicator: forwarded only to the other participant.
   socket.on("chat:typing", ({ chatId, isTyping } = {}) => {
     const cid = Number(chatId);
     const typing = Boolean(isTyping);
     if (!cid) return;
 
     (async () => {
-      const chat = await getChatParticipants(cid);
+      const chat = await getChatById(cid);
       if (!chat) return;
-      const isMember = Number(chat.user1_id) === Number(userId) || Number(chat.user2_id) === Number(userId);
-      if (!isMember) return;
-      const otherId = Number(chat.user1_id) === Number(userId) ? Number(chat.user2_id) : Number(chat.user1_id);
-      emitToUser(otherId, "chat:typing", { chatId: cid, userId: Number(userId), isTyping: typing });
+      if (!(await isUserChatMember(cid, Number(userId)))) return;
+      const members = await getChatMemberUserIds(cid);
+      for (const mid of members) {
+        if (Number(mid) === Number(userId)) continue;
+        emitToUser(mid, "chat:typing", { chatId: cid, userId: Number(userId), isTyping: typing });
+      }
     })().catch(() => {});
   });
 

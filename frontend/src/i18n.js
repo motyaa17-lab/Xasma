@@ -19,6 +19,15 @@ export const translations = {
 
     chats: "Chats",
     newChat: "New chat",
+    createGroup: "Create group",
+    groupTitleLabel: "Group name",
+    groupPickMembers: "Pick members from search",
+    groupCreateSubmit: "Create",
+    groupChat: "Group",
+    groupErrorTitle: "Enter a group name.",
+    groupErrorMembers: "Select at least one other member.",
+    cancel: "Cancel",
+
     searchUsernamePlaceholder: "Search username...",
     searching: "Searching...",
     noChatsYet: "No chats yet.",
@@ -77,6 +86,15 @@ export const translations = {
 
     chats: "Чаты",
     newChat: "Новый чат",
+    createGroup: "Создать группу",
+    groupTitleLabel: "Название группы",
+    groupPickMembers: "Выберите участников в поиске",
+    groupCreateSubmit: "Создать",
+    groupChat: "Группа",
+    groupErrorTitle: "Введите название группы.",
+    groupErrorMembers: "Выберите хотя бы одного участника.",
+    cancel: "Отмена",
+
     searchUsernamePlaceholder: "Поиск по имени...",
     searching: "Поиск...",
     noChatsYet: "Пока нет чатов.",

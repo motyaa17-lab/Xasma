@@ -922,6 +922,13 @@ body {
   font-weight: 600;
 }
 
+.msgSenderName {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(229, 231, 235, 0.88);
+  margin-bottom: 4px;
+}
+
 .bubbleText {
   white-space: pre-wrap;
   word-wrap: break-word;
@@ -992,5 +999,125 @@ body {
 .sendBtn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.sidebarChatsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.sidebarChatsRow .sectionTitle {
+  margin-bottom: 0;
+}
+
+.sidebarMiniBtn {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(37, 99, 235, 0.45);
+  background: rgba(37, 99, 235, 0.15);
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sidebarMiniBtn:hover {
+  background: rgba(37, 99, 235, 0.28);
+}
+
+.presenceDot.placeholder {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.groupModalCard {
+  width: 440px;
+  max-width: 96vw;
+}
+
+.groupModalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.groupFieldLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.groupHint {
+  margin-top: 4px;
+}
+
+.groupSearchResults {
+  max-height: 200px;
+}
+
+.searchResult.selectedPick {
+  border-color: rgba(37, 99, 235, 0.55);
+  background: rgba(37, 99, 235, 0.12);
+}
+
+.searchResultMain {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1;
+  gap: 8px;
+}
+
+.selectedChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.memberChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.18);
+  border: 1px solid rgba(37, 99, 235, 0.35);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.chipRemove {
+  border: none;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+}
+
+.groupModalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.iconCloseBtn {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.iconCloseBtn:hover {
+  color: var(--text);
 }
 

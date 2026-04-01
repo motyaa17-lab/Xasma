@@ -29,6 +29,8 @@ export default function Chat({
   const typingStopTimerRef = useRef(null);
   const typingActiveRef = useRef(false);
 
+  const isGroup = chat?.type === "group";
+
   useEffect(() => {
     const el = listRef.current;
     if (!el) return;
@@ -116,16 +118,20 @@ export default function Chat({
           <div className="chatHeader">
             <div className="chatHeaderLeft">
               <div className="avatarSm">
-                {chat?.other?.avatar ? (
+                {isGroup ? (
+                  <span>{initials(chat?.title || "")}</span>
+                ) : chat?.other?.avatar ? (
                   <img src={chat.other.avatar} alt="" />
                 ) : (
                   <span>{initials(chat?.other?.username || "")}</span>
                 )}
               </div>
               <div className="chatHeaderInfo">
-                <div className="chatHeaderName">{chat?.other?.username || ""}</div>
+                <div className="chatHeaderName">
+                  {isGroup ? chat?.title || t("groupChat") : chat?.other?.username || ""}
+                </div>
                 <div className="chatHeaderStatus">
-                  {otherTyping ? t("typing") : renderPresence(chat?.other, lang)}
+                  {otherTyping ? t("typing") : isGroup ? t("groupChat") : renderPresence(chat?.other, lang)}
                 </div>
               </div>
             </div>
@@ -261,6 +267,9 @@ export default function Chat({
                         </div>
                       ) : null}
                     </div>
+                  ) : null}
+                  {isGroup ? (
+                    <div className="msgSenderName">{m.sender?.username || "?"}</div>
                   ) : null}
                   <div className="bubbleText">
                     {m.text}

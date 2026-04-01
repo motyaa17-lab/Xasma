@@ -8,6 +8,7 @@ import UserMenu from "./components/UserMenu.jsx";
 import { t as tr } from "./i18n.js";
 import {
   createChat,
+  createGroup,
   getChats,
   getMe,
   getMessages,
@@ -306,6 +307,13 @@ export default function App() {
     await selectChat(chatId);
   }
 
+  async function handleCreateGroup({ title, memberUserIds }) {
+    const chatId = await createGroup({ title, memberUserIds });
+    const list = await getChats();
+    setChats(list);
+    await selectChat(chatId);
+  }
+
   function handleSend(text) {
     if (!socketRef.current || !socketReady) return;
     if (!selectedChatId) return;
@@ -401,6 +409,7 @@ export default function App() {
               me={me}
               onSelectChat={selectChat}
               onStartChat={startChat}
+              onCreateGroup={handleCreateGroup}
               t={t}
               lang={settings.lang}
             />

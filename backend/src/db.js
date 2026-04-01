@@ -76,6 +76,34 @@ async function initDb() {
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user'`);
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS banned BOOLEAN NOT NULL DEFAULT FALSE`);
 
+  // Group chats: type, title, creator; direct chats keep ordered user1_id/user2_id.
+  await query(`ALTER TABLE chats ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'direct'`);
+  await query(`ALTER TABLE chats ADD COLUMN IF NOT EXISTS title TEXT`);
+  await query(`ALTER TABLE chats ADD COLUMN IF NOT EXISTS created_by BIGINT REFERENCES users(id)`);
+  await query(`ALTER TABLE chats ALTER COLUMN user1_id DROP NOT NULL`);
+  await query(`ALTER TABLE chats ALTER COLUMN user2_id DROP NOT NULL`);
+
+  await query(`ALTER TABLE chats DROP CONSTRAINT IF EXISTS chats_unique_pair`);
+  await query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS chats_direct_pair_uidx
+    ON chats (user1_id, user2_id)
+    WHERE type = 'direct' AND user1_id IS NOT NULL AND user2_id IS NOT NULL
+  `);
+
+  // Ensure chat_members has rows for existing direct chats (idempotent).
+  await query(`
+    INSERT INTO chat_members (chat_id, user_id)
+    SELECT c.id, c.user1_id FROM chats c
+    WHERE c.user1_id IS NOT NULL
+    ON CONFLICT DO NOTHING
+  `);
+  await query(`
+    INSERT INTO chat_members (chat_id, user_id)
+    SELECT c.id, c.user2_id FROM chats c
+    WHERE c.user2_id IS NOT NULL
+    ON CONFLICT DO NOTHING
+  `);
+
   // Ensure initial admin (safe if user doesn't exist).
   await query(`UPDATE users SET role = 'admin' WHERE username = 'Xasma'`);
 }

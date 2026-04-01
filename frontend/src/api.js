@@ -84,6 +84,35 @@ export async function createChat(withUserId) {
   return data.chatId;
 }
 
+export async function createGroup({ title, memberUserIds }) {
+  const data = await apiFetch("/api/groups", {
+    method: "POST",
+    body: { title, memberUserIds },
+  });
+  return data.chatId;
+}
+
+export async function addGroupMember(chatId, userId) {
+  return apiFetch(`/api/groups/${chatId}/members`, {
+    method: "POST",
+    body: { userId },
+  });
+}
+
+export async function removeGroupMember(chatId, userId) {
+  return apiFetch(`/api/groups/${chatId}/members/${userId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function postChatMessage(chatId, text) {
+  const data = await apiFetch(`/api/chats/${chatId}/messages`, {
+    method: "POST",
+    body: { text },
+  });
+  return data.message;
+}
+
 export async function getMessages(chatId, limit = 50) {
   const data = await apiFetch(`/api/chats/${chatId}/messages?limit=${limit}`);
   return data.messages;

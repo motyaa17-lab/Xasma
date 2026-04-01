@@ -1,15 +1,25 @@
 import React, { useEffect, useMemo, useState } from "react";
 
-export default function Sidebar({ chats, me, onSelectChat, onStartChat, t, lang }) {
+export default function Sidebar({ chats, me, onSelectChat, onStartChat, onCreateGroup, t, lang }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
 
+  const [showGroupModal, setShowGroupModal] = useState(false);
+  const [groupTitle, setGroupTitle] = useState("");
+  const [groupQuery, setGroupQuery] = useState("");
+  const [groupResults, setGroupResults] = useState([]);
+  const [groupSearching, setGroupSearching] = useState(false);
+  const [selectedMembers, setSelectedMembers] = useState([]);
+  const [groupError, setGroupError] = useState("");
+  const [groupSubmitting, setGroupSubmitting] = useState(false);
+
   const canSearch = useMemo(() => query.trim().length >= 1, [query]);
+  const canGroupSearch = useMemo(() => groupQuery.trim().length >= 1, [groupQuery]);
 
   useEffect(() => {
-    let t = null;
+    let timer = null;
     async function run() {
       if (!canSearch) {
         setResults([]);
@@ -19,7 +29,6 @@ export default function Sidebar({ chats, me, onSelectChat, onStartChat, t, lang 
       setSearching(true);
       setSearchError("");
       try {
-        // Import lazily to keep this component simple.
         const mod = await import("../api.js");
         const users = await mod.searchUsers(query.trim());
         setResults(users);
@@ -30,9 +39,73 @@ export default function Sidebar({ chats, me, onSelectChat, onStartChat, t, lang 
       }
     }
 
-    t = setTimeout(run, 250);
-    return () => clearTimeout(t);
+    timer = setTimeout(run, 250);
+    return () => clearTimeout(timer);
   }, [query, canSearch]);
+
+  useEffect(() => {
+    let timer = null;
+    async function run() {
+      if (!canGroupSearch) {
+        setGroupResults([]);
+        return;
+      }
+      setGroupSearching(true);
+      try {
+        const mod = await import("../api.js");
+        const users = await mod.searchUsers(groupQuery.trim());
+        setGroupResults(users);
+      } catch {
+        setGroupResults([]);
+      } finally {
+        setGroupSearching(false);
+      }
+    }
+    timer = setTimeout(run, 250);
+    return () => clearTimeout(timer);
+  }, [groupQuery, canGroupSearch]);
+
+  function toggleMember(user) {
+    setSelectedMembers((prev) => {
+      const exists = prev.find((x) => x.id === user.id);
+      if (exists) return prev.filter((x) => x.id !== user.id);
+      return [...prev, user];
+    });
+  }
+
+  function memberSelected(id) {
+    return selectedMembers.some((x) => x.id === id);
+  }
+
+  async function submitGroup() {
+    setGroupError("");
+    const title = groupTitle.trim();
+    if (!title) {
+      setGroupError(t("groupErrorTitle"));
+      return;
+    }
+    if (selectedMembers.length < 1) {
+      setGroupError(t("groupErrorMembers"));
+      return;
+    }
+    if (!onCreateGroup) return;
+    setGroupSubmitting(true);
+    try {
+      await onCreateGroup({
+        title,
+        memberUserIds: selectedMembers.map((u) => u.id),
+      });
+      setShowGroupModal(false);
+      setGroupTitle("");
+      setGroupQuery("");
+      setGroupResults([]);
+      setSelectedMembers([]);
+    } catch (e) {
+      setGroupError(e.message || "Failed");
+    } finally {
+      setGroupSubmitting(false);
+    }
+  }
 
   return (
     <aside className="sidebar">
@@ -46,40 +119,60 @@ export default function Sidebar({ chats, me, onSelectChat, onStartChat, t, lang 
       </div>
 
       <div className="sidebarSection">
-        <div className="sectionTitle">{t("chats")}</div>
+        <div className="sidebarChatsRow">
+          <div className="sectionTitle">{t("chats")}</div>
+          {onCreateGroup ? (
+            <button type="button" className="sidebarMiniBtn" onClick={() => setShowGroupModal(true)}>
+              {t("createGroup")}
+            </button>
+          ) : null}
+        </div>
 
         {chats.length === 0 ? <div className="muted">{t("noChatsYet")}</div> : null}
 
         <div className="chatList">
-          {chats.map((c) => (
-            <button
-              key={c.id}
-              className="chatListItem"
-              onClick={() => onSelectChat(c.id)}
-              type="button"
-            >
-              <div className="chatItemTop">
-                <div className={c.other?.isOnline ? "avatarSm presence online" : "avatarSm presence"}>
-                  {c.other.avatar ? (
-                    <img src={c.other.avatar} alt="" />
-                  ) : (
-                    <span>{initials(c.other.username)}</span>
-                  )}
-                </div>
-                <div className="chatOther">
-                  <div className="chatOtherNameRow">
-                    <div className="chatOtherName">{c.other.username}</div>
-                    <div className={c.other?.isOnline ? "presenceDot online" : "presenceDot"} title={presenceText(c.other, t, lang)} />
+          {chats.map((c) => {
+            const isGroup = c.type === "group";
+            const other = c.other;
+            const label = isGroup ? c.title || t("groupChat") : other?.username || "";
+            const online = !isGroup && Boolean(other?.isOnline);
+            return (
+              <button
+                key={c.id}
+                className="chatListItem"
+                onClick={() => onSelectChat(c.id)}
+                type="button"
+              >
+                <div className="chatItemTop">
+                  <div className={!isGroup && online ? "avatarSm presence online" : "avatarSm presence"}>
+                    {!isGroup && other?.avatar ? (
+                      <img src={other.avatar} alt="" />
+                    ) : (
+                      <span>{initials(isGroup ? label : other?.username || "")}</span>
+                    )}
                   </div>
-                  {c.last ? (
-                    <div className="chatLast">{c.last.text}</div>
-                  ) : (
-                    <div className="chatLast muted">{t("noMessages")}</div>
-                  )}
+                  <div className="chatOther">
+                    <div className="chatOtherNameRow">
+                      <div className="chatOtherName">{label}</div>
+                      {!isGroup ? (
+                        <div
+                          className={online ? "presenceDot online" : "presenceDot"}
+                          title={presenceText(other, t, lang)}
+                        />
+                      ) : (
+                        <div className="presenceDot placeholder" aria-hidden />
+                      )}
+                    </div>
+                    {c.last ? (
+                      <div className="chatLast">{c.last.text}</div>
+                    ) : (
+                      <div className="chatLast muted">{t("noMessages")}</div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </button>
-          ))}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -114,6 +207,103 @@ export default function Sidebar({ chats, me, onSelectChat, onStartChat, t, lang 
           </div>
         ) : null}
       </div>
+
+      {showGroupModal ? (
+        <div className="modalBackdrop" role="presentation" onClick={() => !groupSubmitting && setShowGroupModal(false)}>
+          <div
+            className="modalCard groupModalCard"
+            role="dialog"
+            aria-labelledby="groupModalTitle"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modalHeader">
+              <div className="modalTitle" id="groupModalTitle">
+                {t("createGroup")}
+              </div>
+              <button
+                type="button"
+                className="iconCloseBtn"
+                onClick={() => !groupSubmitting && setShowGroupModal(false)}
+                aria-label={t("close")}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modalBody groupModalBody">
+              <label className="groupFieldLabel">{t("groupTitleLabel")}</label>
+              <input
+                className="searchInput"
+                value={groupTitle}
+                onChange={(e) => setGroupTitle(e.target.value)}
+                placeholder={t("groupTitleLabel")}
+              />
+              <div className="muted small groupHint">{t("groupPickMembers")}</div>
+              <input
+                className="searchInput"
+                value={groupQuery}
+                onChange={(e) => setGroupQuery(e.target.value)}
+                placeholder={t("searchUsernamePlaceholder")}
+              />
+              {groupSearching ? <div className="muted small">{t("searching")}</div> : null}
+
+              {groupResults.length > 0 ? (
+                <div className="searchResults groupSearchResults">
+                  {groupResults.map((u) => (
+                    <button
+                      key={u.id}
+                      type="button"
+                      className={memberSelected(u.id) ? "searchResult selectedPick" : "searchResult"}
+                      onClick={() => toggleMember(u)}
+                    >
+                      <div className="avatarSm">
+                        {u.avatar ? <img src={u.avatar} alt="" /> : <span>{initials(u.username)}</span>}
+                      </div>
+                      <div className="searchResultMain">
+                        <div className="searchUser">{u.username}</div>
+                        <div className="muted small">{memberSelected(u.id) ? "✓" : ""}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              {selectedMembers.length > 0 ? (
+                <div className="selectedChips">
+                  {selectedMembers.map((u) => (
+                    <span key={u.id} className="memberChip">
+                      {u.username}
+                      <button type="button" className="chipRemove" onClick={() => toggleMember(u)} aria-label={t("remove")}>
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+
+              {groupError ? <div className="authError">{groupError}</div> : null}
+
+              <div className="groupModalActions">
+                <button
+                  type="button"
+                  className="ghostBtn"
+                  disabled={groupSubmitting}
+                  onClick={() => setShowGroupModal(false)}
+                >
+                  {t("cancel")}
+                </button>
+                <button
+                  type="button"
+                  className="primaryBtn"
+                  disabled={groupSubmitting || !groupTitle.trim() || selectedMembers.length < 1}
+                  onClick={submitGroup}
+                >
+                  {groupSubmitting ? t("saving") : t("groupCreateSubmit")}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </aside>
   );
 }
@@ -139,4 +329,3 @@ function initials(name) {
   const b = parts[1]?.[0] || "";
   return (a + b).toUpperCase() || "?";
 }
-
