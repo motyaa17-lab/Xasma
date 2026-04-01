@@ -69,6 +69,8 @@ export const translations = {
     uploadImageTypeError: "Please choose a JPEG, PNG, WebP, or GIF image.",
     removeAttachedPhoto: "Remove attached photo",
 
+    voicePlay: "Play",
+    voicePause: "Pause",
     voiceRecord: "Record voice message",
     voiceRecording: "Recording…",
     voiceStopSend: "Stop & send",
@@ -179,6 +181,8 @@ export const translations = {
     uploadImageTypeError: "Выберите изображение JPEG, PNG, WebP или GIF.",
     removeAttachedPhoto: "Убрать фото",
 
+    voicePlay: "Воспроизвести",
+    voicePause: "Пауза",
     voiceRecord: "Голосовое сообщение",
     voiceRecording: "Идёт запись…",
     voiceStopSend: "Стоп и отправить",

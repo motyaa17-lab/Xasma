@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { tf } from "../i18n.js";
 import { uploadChatImage, uploadChatAudio, getApiBase } from "../api.js";
 import GroupInfoModal from "./GroupInfoModal.jsx";
+import VoiceRecorderPanel from "./VoiceRecorderPanel.jsx";
+import VoiceMessagePlayer from "./VoiceMessagePlayer.jsx";
 
 export default function Chat({
   chatId,
@@ -33,6 +35,7 @@ export default function Chat({
   const [pendingPreviewObjectUrl, setPendingPreviewObjectUrl] = useState(null);
   const [imageUploading, setImageUploading] = useState(false);
   const [voiceRecording, setVoiceRecording] = useState(false);
+  const [recordingStream, setRecordingStream] = useState(null);
   const [voiceUploading, setVoiceUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const listRef = useRef(null);
@@ -66,6 +69,7 @@ export default function Chat({
     setPendingImageUrl(null);
     setImageUploading(false);
     setVoiceRecording(false);
+    setRecordingStream(null);
     setVoiceUploading(false);
     setUploadError("");
     setPendingPreviewObjectUrl((prev) => {
@@ -198,6 +202,7 @@ export default function Chat({
           if (e.data.size > 0) recordChunksRef.current.push(e.data);
         };
         rec.onstop = () => {
+          setRecordingStream(null);
           mediaStreamRef.current?.getTracks().forEach((tr) => tr.stop());
           mediaStreamRef.current = null;
           const cancelled = recordCancelledRef.current;
@@ -232,6 +237,7 @@ export default function Chat({
           })();
         };
         rec.start(200);
+        setRecordingStream(stream);
         setVoiceRecording(true);
       })
       .catch(() => {
@@ -536,12 +542,12 @@ export default function Chat({
                       </a>
                     ) : null}
                     {m.audioUrl ? (
-                      <audio
-                        className="msgAudio"
-                        controls
+                      <VoiceMessagePlayer
                         src={messageMediaAbsUrl(m.audioUrl)}
-                        preload="metadata"
-                        onClick={(e) => e.stopPropagation()}
+                        messageId={m.id}
+                        isOwn={m.senderId === meId}
+                        playLabel={t("voicePlay")}
+                        pauseLabel={t("voicePause")}
                       />
                     ) : null}
                     {String(m.text ?? "").trim() ? (
@@ -593,17 +599,13 @@ export default function Chat({
           <div className="composer">
             {isBanned ? <div className="banBanner">{t("authBanned")}</div> : null}
             {uploadError ? <div className="uploadErrBanner">{uploadError}</div> : null}
-            {voiceRecording ? (
-              <div className="voiceRecordBar" role="status">
-                <span className="voiceRecordDot" aria-hidden />
-                <span className="voiceRecordLabel">{t("voiceRecording")}</span>
-                <button type="button" className="voiceBarBtn voiceBarBtnPrimary" onClick={finishVoiceRecording}>
-                  {t("voiceStopSend")}
-                </button>
-                <button type="button" className="voiceBarBtn" onClick={cancelVoiceRecording}>
-                  {t("voiceCancel")}
-                </button>
-              </div>
+            {voiceRecording && recordingStream ? (
+              <VoiceRecorderPanel
+                audioStream={recordingStream}
+                onStopSend={finishVoiceRecording}
+                onCancel={cancelVoiceRecording}
+                t={t}
+              />
             ) : null}
             {imageUploading ? <div className="uploadProgressHint">{t("uploadImageProgress")}</div> : null}
             {voiceUploading ? <div className="uploadProgressHint">{t("voiceSending")}</div> : null}
