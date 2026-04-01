@@ -1223,75 +1223,89 @@ body {
   background: rgba(0, 0, 0, 0.25);
 }
 
-/* ----- Voice recording (composer) — minimal ----- */
-.voiceRecorderPanel {
-  padding: 10px 0 0;
-  border-radius: 0;
-  background: transparent;
-  border: none;
-}
-
-.voiceRecorderTitle {
-  display: flex;
+/* ----- Inline recording indicator (composer) ----- */
+.composerMain--recording {
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(226, 232, 240, 0.88);
-  margin-bottom: 14px;
 }
 
-.voiceRecorderDot {
-  width: 8px;
-  height: 8px;
+.recInlineIndicator {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: rgba(203, 213, 225, 0.72);
+  white-space: nowrap;
+  max-width: 42%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recInlineDot {
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: #f87171;
   flex-shrink: 0;
-  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.2);
+  animation: recPulse 1.2s ease-in-out infinite;
 }
 
-.voiceRecorderMeter {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 6px;
-  height: 36px;
-  margin-bottom: 14px;
-  padding: 0 8px;
+.recInlineDot--video {
+  background: #60a5fa;
+  animation: recPulseVideo 1.2s ease-in-out infinite;
 }
 
-.voiceRecorderMeterBar {
+@keyframes recPulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
+}
+
+@keyframes recPulseVideo {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
+}
+
+.inlineVideoRecWrap {
+  flex-shrink: 0;
+  width: 0;
+  height: 44px;
+  opacity: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  pointer-events: none;
+  transition: width 0.15s ease, opacity 0.15s ease, margin 0.15s ease;
+  margin: 0;
+}
+
+.inlineVideoRecWrap--on {
+  width: 44px;
+  opacity: 1;
+  margin-right: 2px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.inlineVideoRec {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
   display: block;
-  width: 3px;
-  height: 28px;
-  border-radius: 99px;
-  background: rgba(255, 255, 255, 0.35);
-  transform-origin: center bottom;
-  transition: transform 0.08s ease-out;
-  opacity: 0.85;
-}
-
-.voiceRecorderFooter {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  justify-content: space-between;
-}
-
-.voiceRecorderDuration {
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  font-size: 14px;
-  color: rgba(248, 250, 252, 0.9);
-  letter-spacing: 0.02em;
-}
-
-.voiceRecorderActions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  border-radius: 50%;
 }
 
 /* ----- Voice message playback — soft Telegram-like bubble (single surface, no inner frame) ----- */
@@ -1578,6 +1592,13 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  touch-action: manipulation;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease,
+    border-color 0.12s ease,
+    background 0.12s ease,
+    color 0.12s ease;
 }
 
 .voiceMicBtn:hover:not(:disabled) {
@@ -1590,6 +1611,13 @@ body {
   color: #f87171;
   border-color: rgba(248, 113, 113, 0.35);
   background: rgba(248, 113, 113, 0.08);
+}
+
+.voiceMicBtn--pressing {
+  transform: scale(1.08);
+  border-color: rgba(248, 113, 113, 0.5);
+  background: rgba(248, 113, 113, 0.14);
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.22), 0 0 18px rgba(248, 113, 113, 0.18);
 }
 
 .voiceMicBtn--recording:disabled {
@@ -1619,6 +1647,13 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  touch-action: manipulation;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease,
+    border-color 0.12s ease,
+    background 0.12s ease,
+    color 0.12s ease;
 }
 
 .videoCamBtn:hover:not(:disabled) {
@@ -1633,6 +1668,13 @@ body {
   background: rgba(59, 130, 246, 0.12);
 }
 
+.videoCamBtn--pressing {
+  transform: scale(1.08);
+  border-color: rgba(96, 165, 250, 0.55);
+  background: rgba(59, 130, 246, 0.2);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2), 0 0 18px rgba(59, 130, 246, 0.15);
+}
+
 .videoCamBtn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -1641,91 +1683,6 @@ body {
 .videoCamIcon {
   width: 21px;
   height: 21px;
-}
-
-.videoNoteRoot {
-  padding: 0;
-  border-radius: 0;
-  background: transparent;
-  border: none;
-  text-align: center;
-}
-
-.videoNotePreviewWrap {
-  width: 220px;
-  max-width: 72vw;
-  aspect-ratio: 1;
-  margin: 0 auto 8px;
-  border-radius: 50%;
-  overflow: hidden;
-  background: transparent;
-  border: none;
-}
-
-.videoNotePreview {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.videoNoteHint {
-  font-size: 12px;
-  color: rgba(148, 163, 184, 0.85);
-  margin-bottom: 10px;
-}
-
-.videoNoteErr {
-  font-size: 13px;
-  color: rgba(252, 165, 165, 0.95);
-  margin-bottom: 10px;
-}
-
-.videoNoteActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
-  align-items: center;
-}
-
-.videoNoteBtn {
-  padding: 8px 14px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(248, 250, 252, 0.9);
-  font-weight: 600;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.videoNoteBtnPrimary {
-  background: rgba(59, 130, 246, 0.45);
-  border-color: rgba(59, 130, 246, 0.35);
-  color: white;
-}
-
-.videoNoteBtnStop {
-  background: rgba(248, 113, 113, 0.14);
-  border-color: rgba(248, 113, 113, 0.32);
-  color: #fecaca;
-}
-
-.videoNoteRecordingRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  width: 100%;
-}
-
-.videoNoteTimer {
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  font-size: 14px;
-  color: rgba(248, 250, 252, 0.92);
 }
 
 .circleVideoMsg {
@@ -1776,27 +1733,6 @@ body {
 .circleVideoSoundIcon {
   width: 18px;
   height: 18px;
-}
-
-.voiceBarBtn {
-  padding: 8px 14px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(248, 250, 252, 0.9);
-  font-weight: 600;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.voiceBarBtnPrimary {
-  background: rgba(59, 130, 246, 0.45);
-  border-color: rgba(59, 130, 246, 0.35);
-  color: white;
-}
-
-.voiceBarBtnPrimary:hover {
-  background: rgba(59, 130, 246, 0.55);
 }
 
 .uploadErrBanner {

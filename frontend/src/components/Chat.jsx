@@ -2,10 +2,10 @@ import React, { useEffect, useRef, useState } from "react";
 import { tf } from "../i18n.js";
 import { uploadChatImage, uploadChatAudio, uploadChatVideo, getApiBase } from "../api.js";
 import GroupInfoModal from "./GroupInfoModal.jsx";
-import VoiceRecorderPanel from "./VoiceRecorderPanel.jsx";
 import VoiceMessagePlayer from "./VoiceMessagePlayer.jsx";
-import VideoNoteRecorder from "./VideoNoteRecorder.jsx";
 import CircleVideoMessage from "./CircleVideoMessage.jsx";
+
+const MAX_VIDEO_NOTE_SEC = 60;
 
 export default function Chat({
   chatId,
@@ -37,9 +37,14 @@ export default function Chat({
   const [pendingPreviewObjectUrl, setPendingPreviewObjectUrl] = useState(null);
   const [imageUploading, setImageUploading] = useState(false);
   const [voiceRecording, setVoiceRecording] = useState(false);
-  const [recordingStream, setRecordingStream] = useState(null);
+  const [voiceArming, setVoiceArming] = useState(false);
+  const [voiceRecMs, setVoiceRecMs] = useState(0);
+  const [voicePressing, setVoicePressing] = useState(false);
   const [voiceUploading, setVoiceUploading] = useState(false);
-  const [videoNoteOpen, setVideoNoteOpen] = useState(false);
+  const [videoRecording, setVideoRecording] = useState(false);
+  const [videoArming, setVideoArming] = useState(false);
+  const [videoRecSec, setVideoRecSec] = useState(0);
+  const [videoPressing, setVideoPressing] = useState(false);
   const [videoNoteUploading, setVideoNoteUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const listRef = useRef(null);
@@ -49,6 +54,16 @@ export default function Chat({
   const recordChunksRef = useRef([]);
   const recordCancelledRef = useRef(false);
   const voiceStartingRef = useRef(false);
+  const abortPendingVoiceRef = useRef(false);
+  const voiceRecTimerRef = useRef(null);
+  const videoStreamRef = useRef(null);
+  const videoMediaRecorderRef = useRef(null);
+  const videoRecordChunksRef = useRef([]);
+  const videoRecordCancelledRef = useRef(false);
+  const videoStartingRef = useRef(false);
+  const abortPendingVideoRef = useRef(false);
+  const videoTickRef = useRef(null);
+  const inlineVideoRef = useRef(null);
   const typingStartTimerRef = useRef(null);
   const typingStopTimerRef = useRef(null);
   const typingActiveRef = useRef(false);
@@ -62,6 +77,8 @@ export default function Chat({
   }, [chatId, messages.length]);
 
   useEffect(() => {
+    abortPendingVoiceRef.current = false;
+    abortPendingVideoRef.current = false;
     typingActiveRef.current = false;
     if (typingStartTimerRef.current) clearTimeout(typingStartTimerRef.current);
     if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
@@ -73,9 +90,14 @@ export default function Chat({
     setPendingImageUrl(null);
     setImageUploading(false);
     setVoiceRecording(false);
-    setRecordingStream(null);
+    setVoiceArming(false);
+    setVoiceRecMs(0);
+    setVoicePressing(false);
     setVoiceUploading(false);
-    setVideoNoteOpen(false);
+    setVideoRecording(false);
+    setVideoArming(false);
+    setVideoRecSec(0);
+    setVideoPressing(false);
     setVideoNoteUploading(false);
     setUploadError("");
     setPendingPreviewObjectUrl((prev) => {
@@ -88,9 +110,17 @@ export default function Chat({
   useEffect(() => {
     return () => {
       recordCancelledRef.current = true;
+      videoRecordCancelledRef.current = true;
       try {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
           mediaRecorderRef.current.stop();
+        }
+      } catch {
+        // ignore
+      }
+      try {
+        if (videoMediaRecorderRef.current && videoMediaRecorderRef.current.state !== "inactive") {
+          videoMediaRecorderRef.current.stop();
         }
       } catch {
         // ignore
@@ -99,8 +129,57 @@ export default function Chat({
       mediaStreamRef.current = null;
       mediaRecorderRef.current = null;
       recordChunksRef.current = [];
+      videoStreamRef.current?.getTracks().forEach((t) => t.stop());
+      videoStreamRef.current = null;
+      videoMediaRecorderRef.current = null;
+      videoRecordChunksRef.current = [];
+      if (videoTickRef.current) {
+        clearInterval(videoTickRef.current);
+        videoTickRef.current = null;
+      }
+      const vel = inlineVideoRef.current;
+      if (vel) vel.srcObject = null;
     };
   }, [chatId]);
+
+  useEffect(() => {
+    if (!voiceRecording) {
+      setVoiceRecMs(0);
+      if (voiceRecTimerRef.current) {
+        clearInterval(voiceRecTimerRef.current);
+        voiceRecTimerRef.current = null;
+      }
+      return undefined;
+    }
+    const t0 = performance.now();
+    voiceRecTimerRef.current = window.setInterval(() => {
+      setVoiceRecMs(Math.floor(performance.now() - t0));
+    }, 100);
+    return () => {
+      if (voiceRecTimerRef.current) {
+        clearInterval(voiceRecTimerRef.current);
+        voiceRecTimerRef.current = null;
+      }
+    };
+  }, [voiceRecording]);
+
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key !== "Escape") return;
+      if (voiceRecording || voiceArming) {
+        e.preventDefault();
+        abortPendingVoiceRef.current = true;
+        cancelVoiceRecording();
+      }
+      if (videoRecording || videoArming) {
+        e.preventDefault();
+        abortPendingVideoRef.current = true;
+        cancelVideoRecording();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [voiceRecording, voiceArming, videoRecording, videoArming]);
 
   useEffect(() => {
     if (!editingMessageId) return;
@@ -161,13 +240,16 @@ export default function Chat({
     }
   }
 
-  async function handleVideoNoteSend(file) {
+  async function uploadVideoBlob(blob, mimeHint) {
     setUploadError("");
     setVideoNoteUploading(true);
     try {
+      const ext = extFromVideoMime(blob.type || mimeHint);
+      const file = new File([blob], `videonote-${Date.now()}${ext}`, {
+        type: blob.type || mimeHint || "video/webm",
+      });
       const url = await uploadChatVideo(file);
       onSend({ text: "", videoUrl: url });
-      setVideoNoteOpen(false);
     } catch (err) {
       const msg =
         err?.name === "ApiError" ? err.message : String(err?.message || t("videoNoteUploadError"));
@@ -177,7 +259,106 @@ export default function Chat({
     }
   }
 
-  function startVoiceRecording() {
+  function cleanupVideoStream() {
+    if (videoTickRef.current) {
+      clearInterval(videoTickRef.current);
+      videoTickRef.current = null;
+    }
+    videoStreamRef.current?.getTracks().forEach((tr) => tr.stop());
+    videoStreamRef.current = null;
+    const vel = inlineVideoRef.current;
+    if (vel) vel.srcObject = null;
+  }
+
+  function cancelVoiceRecording() {
+    abortPendingVoiceRef.current = true;
+    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === "inactive") {
+      mediaStreamRef.current?.getTracks().forEach((tr) => tr.stop());
+      mediaStreamRef.current = null;
+      mediaRecorderRef.current = null;
+      recordChunksRef.current = [];
+      setVoiceRecording(false);
+      setVoiceArming(false);
+      return;
+    }
+    recordCancelledRef.current = true;
+    mediaRecorderRef.current.stop();
+  }
+
+  function finishVoiceRecording() {
+    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === "inactive") {
+      mediaStreamRef.current?.getTracks().forEach((tr) => tr.stop());
+      mediaStreamRef.current = null;
+      setVoiceRecording(false);
+      setVoiceArming(false);
+      return;
+    }
+    recordCancelledRef.current = false;
+    mediaRecorderRef.current.stop();
+  }
+
+  function cancelVideoRecording() {
+    abortPendingVideoRef.current = true;
+    if (!videoMediaRecorderRef.current || videoMediaRecorderRef.current.state === "inactive") {
+      cleanupVideoStream();
+      videoMediaRecorderRef.current = null;
+      videoRecordChunksRef.current = [];
+      setVideoRecording(false);
+      setVideoArming(false);
+      setVideoRecSec(0);
+      return;
+    }
+    videoRecordCancelledRef.current = true;
+    videoMediaRecorderRef.current.stop();
+  }
+
+  function finishVideoRecording() {
+    if (!videoMediaRecorderRef.current || videoMediaRecorderRef.current.state === "inactive") {
+      cleanupVideoStream();
+      setVideoRecording(false);
+      setVideoArming(false);
+      setVideoRecSec(0);
+      return;
+    }
+    videoRecordCancelledRef.current = false;
+    videoMediaRecorderRef.current.stop();
+  }
+
+  function attachVoiceHoldEndListeners(pointerId) {
+    const onEnd = (ev) => {
+      if (ev.pointerId !== pointerId) return;
+      window.removeEventListener("pointerup", onEnd, true);
+      window.removeEventListener("pointercancel", onEnd, true);
+      setVoicePressing(false);
+      if (abortPendingVoiceRef.current) return;
+      if (!voiceRecording && voiceStartingRef.current) {
+        abortPendingVoiceRef.current = true;
+        return;
+      }
+      if (voiceRecording) finishVoiceRecording();
+    };
+    window.addEventListener("pointerup", onEnd, true);
+    window.addEventListener("pointercancel", onEnd, true);
+  }
+
+  function attachVideoHoldEndListeners(pointerId) {
+    const onEnd = (ev) => {
+      if (ev.pointerId !== pointerId) return;
+      window.removeEventListener("pointerup", onEnd, true);
+      window.removeEventListener("pointercancel", onEnd, true);
+      setVideoPressing(false);
+      if (abortPendingVideoRef.current) return;
+      if (!videoRecording && videoStartingRef.current) {
+        abortPendingVideoRef.current = true;
+        return;
+      }
+      if (videoRecording) finishVideoRecording();
+    };
+    window.addEventListener("pointerup", onEnd, true);
+    window.addEventListener("pointercancel", onEnd, true);
+  }
+
+  async function startVoiceHoldRecording() {
     if (typeof MediaRecorder === "undefined") {
       setUploadError(t("voiceNotSupported"));
       return;
@@ -192,104 +373,278 @@ export default function Chat({
       imageUploading ||
       voiceUploading ||
       voiceRecording ||
+      voiceArming ||
       pendingImageUrl ||
       voiceStartingRef.current ||
-      videoNoteOpen ||
+      videoRecording ||
+      videoArming ||
       videoNoteUploading
     ) {
       return;
     }
     setUploadError("");
+    abortPendingVoiceRef.current = false;
     recordCancelledRef.current = false;
     recordChunksRef.current = [];
+    setVoiceArming(true);
     voiceStartingRef.current = true;
-    navigator.mediaDevices
-      .getUserMedia({ audio: true })
-      .then((stream) => {
-        mediaStreamRef.current = stream;
-        const mime = pickRecorderMime();
-        let rec;
-        try {
-          rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
-        } catch {
-          try {
-            rec = new MediaRecorder(stream);
-          } catch {
-            stream.getTracks().forEach((tr) => tr.stop());
-            mediaStreamRef.current = null;
-            setUploadError(t("voiceNotSupported"));
-            return;
-          }
-        }
-        mediaRecorderRef.current = rec;
-        rec.ondataavailable = (e) => {
-          if (e.data.size > 0) recordChunksRef.current.push(e.data);
-        };
-        rec.onstop = () => {
-          setRecordingStream(null);
-          mediaStreamRef.current?.getTracks().forEach((tr) => tr.stop());
-          mediaStreamRef.current = null;
-          const cancelled = recordCancelledRef.current;
-          recordCancelledRef.current = false;
-          mediaRecorderRef.current = null;
-          setVoiceRecording(false);
-          const chunks = [...recordChunksRef.current];
-          recordChunksRef.current = [];
-          if (cancelled) return;
-          const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
-          if (blob.size < 256) {
-            setUploadError(t("voiceTooShort"));
-            return;
-          }
-          const ext = extForRecorderMime(rec.mimeType || blob.type);
-          const file = new File([blob], `voice-${Date.now()}${ext}`, {
-            type: blob.type || rec.mimeType || "application/octet-stream",
-          });
-          setVoiceUploading(true);
-          onTyping?.(false);
-          (async () => {
-            try {
-              const url = await uploadChatAudio(file);
-              onSend({ text: "", audioUrl: url });
-            } catch (err) {
-              const msg =
-                err?.name === "ApiError" ? err.message : String(err?.message || t("uploadVoiceError"));
-              setUploadError(msg);
-            } finally {
-              setVoiceUploading(false);
-            }
-          })();
-        };
-        rec.start(200);
-        setRecordingStream(stream);
-        setVoiceRecording(true);
-      })
-      .catch(() => {
-        setUploadError(t("voiceMicDenied"));
-      })
-      .finally(() => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (abortPendingVoiceRef.current) {
+        stream.getTracks().forEach((tr) => tr.stop());
+        setVoiceArming(false);
         voiceStartingRef.current = false;
+        return;
+      }
+      mediaStreamRef.current = stream;
+      const mime = pickRecorderMime();
+      let rec;
+      try {
+        rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+      } catch {
+        try {
+          rec = new MediaRecorder(stream);
+        } catch {
+          stream.getTracks().forEach((tr) => tr.stop());
+          mediaStreamRef.current = null;
+          setUploadError(t("voiceNotSupported"));
+          setVoiceArming(false);
+          voiceStartingRef.current = false;
+          return;
+        }
+      }
+      mediaRecorderRef.current = rec;
+      rec.ondataavailable = (e) => {
+        if (e.data.size > 0) recordChunksRef.current.push(e.data);
+      };
+      rec.onstop = () => {
+        mediaStreamRef.current?.getTracks().forEach((tr) => tr.stop());
+        mediaStreamRef.current = null;
+        const cancelled = recordCancelledRef.current;
+        recordCancelledRef.current = false;
+        mediaRecorderRef.current = null;
+        setVoiceRecording(false);
+        setVoiceArming(false);
+        const chunks = [...recordChunksRef.current];
+        recordChunksRef.current = [];
+        if (cancelled) return;
+        const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
+        if (blob.size < 256) {
+          setUploadError(t("voiceTooShort"));
+          return;
+        }
+        const ext = extForRecorderMime(rec.mimeType || blob.type);
+        const file = new File([blob], `voice-${Date.now()}${ext}`, {
+          type: blob.type || rec.mimeType || "application/octet-stream",
+        });
+        setVoiceUploading(true);
+        onTyping?.(false);
+        (async () => {
+          try {
+            const url = await uploadChatAudio(file);
+            onSend({ text: "", audioUrl: url });
+          } catch (err) {
+            const msg =
+              err?.name === "ApiError" ? err.message : String(err?.message || t("uploadVoiceError"));
+            setUploadError(msg);
+          } finally {
+            setVoiceUploading(false);
+          }
+        })();
+      };
+      if (abortPendingVoiceRef.current) {
+        stream.getTracks().forEach((tr) => tr.stop());
+        mediaStreamRef.current = null;
+        mediaRecorderRef.current = null;
+        setVoiceArming(false);
+        voiceStartingRef.current = false;
+        return;
+      }
+      rec.start(200);
+      setVoiceRecording(true);
+      setVoiceArming(false);
+    } catch {
+      setUploadError(t("voiceMicDenied"));
+      setVoiceArming(false);
+    } finally {
+      voiceStartingRef.current = false;
+    }
+  }
+
+  async function startVideoHoldRecording() {
+    if (typeof MediaRecorder === "undefined") {
+      setUploadError(t("videoNoteNotSupported"));
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setUploadError(t("videoNoteNotSupported"));
+      return;
+    }
+    if (
+      isBanned ||
+      editingMessageId ||
+      imageUploading ||
+      voiceUploading ||
+      voiceRecording ||
+      voiceArming ||
+      pendingImageUrl ||
+      videoRecording ||
+      videoArming ||
+      videoStartingRef.current ||
+      videoNoteUploading
+    ) {
+      return;
+    }
+    setUploadError("");
+    abortPendingVideoRef.current = false;
+    videoRecordCancelledRef.current = false;
+    videoRecordChunksRef.current = [];
+    setVideoArming(true);
+    videoStartingRef.current = true;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "user",
+          width: { ideal: 480 },
+          height: { ideal: 480 },
+        },
+        audio: true,
       });
+      if (abortPendingVideoRef.current) {
+        stream.getTracks().forEach((tr) => tr.stop());
+        setVideoArming(false);
+        videoStartingRef.current = false;
+        return;
+      }
+      videoStreamRef.current = stream;
+      const vel = inlineVideoRef.current;
+      if (vel) {
+        vel.srcObject = stream;
+        vel.muted = true;
+        vel.playsInline = true;
+        void vel.play().catch(() => {});
+      }
+      const mime = pickVideoMime();
+      let rec;
+      try {
+        rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+      } catch {
+        try {
+          rec = new MediaRecorder(stream);
+        } catch {
+          cleanupVideoStream();
+          setUploadError(t("videoNoteNotSupported"));
+          setVideoArming(false);
+          videoStartingRef.current = false;
+          return;
+        }
+      }
+      videoMediaRecorderRef.current = rec;
+      rec.ondataavailable = (e) => {
+        if (e.data.size > 0) videoRecordChunksRef.current.push(e.data);
+      };
+      rec.onstop = () => {
+        if (videoTickRef.current) {
+          clearInterval(videoTickRef.current);
+          videoTickRef.current = null;
+        }
+        cleanupVideoStream();
+        videoMediaRecorderRef.current = null;
+        const cancelled = videoRecordCancelledRef.current;
+        videoRecordCancelledRef.current = false;
+        setVideoRecording(false);
+        setVideoArming(false);
+        setVideoRecSec(0);
+        const chunks = [...videoRecordChunksRef.current];
+        videoRecordChunksRef.current = [];
+        if (cancelled) return;
+        const blob = new Blob(chunks, { type: rec.mimeType || "video/webm" });
+        if (blob.size < 64) {
+          setUploadError(t("videoNoteTooShort"));
+          return;
+        }
+        void uploadVideoBlob(blob, rec.mimeType || blob.type);
+      };
+      if (abortPendingVideoRef.current) {
+        cleanupVideoStream();
+        videoMediaRecorderRef.current = null;
+        setVideoArming(false);
+        videoStartingRef.current = false;
+        return;
+      }
+      rec.start(250);
+      setVideoRecording(true);
+      setVideoArming(false);
+      setVideoRecSec(0);
+      if (videoTickRef.current) clearInterval(videoTickRef.current);
+      videoTickRef.current = window.setInterval(() => {
+        setVideoRecSec((s) => {
+          if (s + 1 >= MAX_VIDEO_NOTE_SEC) {
+            finishVideoRecording();
+            return MAX_VIDEO_NOTE_SEC;
+          }
+          return s + 1;
+        });
+      }, 1000);
+    } catch {
+      setUploadError(t("videoNoteCameraDenied"));
+      setVideoArming(false);
+      cleanupVideoStream();
+    } finally {
+      videoStartingRef.current = false;
+    }
   }
 
-  function cancelVoiceRecording() {
-    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === "inactive") return;
-    recordCancelledRef.current = true;
-    mediaRecorderRef.current.stop();
+  function onMicPointerDown(e) {
+    if (e.button !== 0) return;
+    if (
+      isBanned ||
+      editingMessageId ||
+      Boolean(pendingImageUrl) ||
+      imageUploading ||
+      voiceUploading ||
+      voiceRecording ||
+      voiceArming ||
+      videoRecording ||
+      videoArming ||
+      videoNoteUploading
+    ) {
+      return;
+    }
+    e.preventDefault();
+    setVoicePressing(true);
+    attachVoiceHoldEndListeners(e.pointerId);
+    void startVoiceHoldRecording();
   }
 
-  function finishVoiceRecording() {
-    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === "inactive") return;
-    recordCancelledRef.current = false;
-    mediaRecorderRef.current.stop();
+  function onVideoCamPointerDown(e) {
+    if (e.button !== 0) return;
+    if (
+      isBanned ||
+      editingMessageId ||
+      Boolean(pendingImageUrl) ||
+      imageUploading ||
+      voiceUploading ||
+      voiceRecording ||
+      voiceArming ||
+      videoRecording ||
+      videoArming ||
+      videoNoteUploading
+    ) {
+      return;
+    }
+    e.preventDefault();
+    setVideoPressing(true);
+    attachVideoHoldEndListeners(e.pointerId);
+    void startVideoHoldRecording();
   }
 
   async function handlePrimary() {
     const trimmed = String(text).trim();
     onTyping?.(false);
     if (isBanned) return;
-    if (voiceRecording) return;
-    if (videoNoteOpen) return;
+    if (voiceRecording || voiceArming) return;
+    if (videoRecording || videoArming) return;
     if (editingMessageId) {
       if (!trimmed) return;
       try {
@@ -302,7 +657,7 @@ export default function Chat({
       return;
     }
     if (!pendingImageUrl && !trimmed) return;
-    if (imageUploading || voiceRecording) return;
+    if (imageUploading || voiceRecording || voiceArming) return;
     onSend({ text: trimmed, imageUrl: pendingImageUrl || undefined });
     setText("");
     clearPendingImage();
@@ -647,21 +1002,6 @@ export default function Chat({
           <div className="composer">
             {isBanned ? <div className="banBanner">{t("authBanned")}</div> : null}
             {uploadError ? <div className="uploadErrBanner">{uploadError}</div> : null}
-            {videoNoteOpen ? (
-              <VideoNoteRecorder
-                onSend={handleVideoNoteSend}
-                onClose={() => setVideoNoteOpen(false)}
-                t={t}
-              />
-            ) : null}
-            {voiceRecording && recordingStream ? (
-              <VoiceRecorderPanel
-                audioStream={recordingStream}
-                onStopSend={finishVoiceRecording}
-                onCancel={cancelVoiceRecording}
-                t={t}
-              />
-            ) : null}
             {imageUploading ? <div className="uploadProgressHint">{t("uploadImageProgress")}</div> : null}
             {voiceUploading ? <div className="uploadProgressHint">{t("voiceSending")}</div> : null}
             {videoNoteUploading ? <div className="uploadProgressHint">{t("videoNoteUploading")}</div> : null}
@@ -672,7 +1012,14 @@ export default function Chat({
                   type="button"
                   className="pendingImageRemove"
                   onClick={clearPendingImage}
-                  disabled={imageUploading || voiceRecording || videoNoteOpen || videoNoteUploading}
+                  disabled={
+                    imageUploading ||
+                    voiceRecording ||
+                    voiceArming ||
+                    videoRecording ||
+                    videoArming ||
+                    videoNoteUploading
+                  }
                   aria-label={t("removeAttachedPhoto")}
                 >
                   ×
@@ -688,7 +1035,11 @@ export default function Chat({
               tabIndex={-1}
               onChange={onPickImage}
             />
-            <div className="composerMain">
+            <div
+              className={`composerMain${
+                voiceRecording || voiceArming || videoRecording || videoArming ? " composerMain--recording" : ""
+              }`}
+            >
               <button
                 type="button"
                 className="attachPhotoBtn"
@@ -698,7 +1049,9 @@ export default function Chat({
                   imageUploading ||
                   voiceUploading ||
                   voiceRecording ||
-                  videoNoteOpen ||
+                  voiceArming ||
+                  videoRecording ||
+                  videoArming ||
                   videoNoteUploading
                 }
                 aria-label={t("attachPhoto")}
@@ -707,6 +1060,32 @@ export default function Chat({
               >
                 📎
               </button>
+              {voiceArming || voiceRecording ? (
+                <span className="recInlineIndicator" role="status" aria-live="polite">
+                  <span className="recInlineDot" aria-hidden />
+                  {t("recordingInline")} {formatRecordingClock(voiceRecMs)}
+                </span>
+              ) : null}
+              <div
+                className={`inlineVideoRecWrap${
+                  videoArming || videoRecording ? " inlineVideoRecWrap--on" : ""
+                }`}
+              >
+                <video
+                  ref={inlineVideoRef}
+                  className="inlineVideoRec"
+                  playsInline
+                  muted
+                  autoPlay
+                  aria-hidden="true"
+                />
+              </div>
+              {videoArming || videoRecording ? (
+                <span className="recInlineIndicator recInlineIndicator--video" role="status" aria-live="polite">
+                  <span className="recInlineDot recInlineDot--video" aria-hidden />
+                  {t("recordingInline")} {formatRecordingClock(videoRecSec * 1000)}
+                </span>
+              ) : null}
               <textarea
                 className="composerInput"
                 value={text}
@@ -716,7 +1095,15 @@ export default function Chat({
                 }}
                 rows={1}
                 placeholder={t("typeMessagePlaceholder")}
-                disabled={isBanned || imageUploading || voiceRecording || videoNoteOpen || videoNoteUploading}
+                disabled={
+                  isBanned ||
+                  imageUploading ||
+                  voiceRecording ||
+                  voiceArming ||
+                  videoRecording ||
+                  videoArming ||
+                  videoNoteUploading
+                }
                 onKeyDown={(e) => {
                   if (e.key === "Escape" && editingMessageId) {
                     e.preventDefault();
@@ -733,20 +1120,22 @@ export default function Chat({
               />
               <button
                 type="button"
-                className={`videoCamBtn${videoNoteOpen ? " videoCamBtn--active" : ""}`}
+                className={`videoCamBtn${
+                  videoRecording || videoArming || videoPressing ? " videoCamBtn--active" : ""
+                }${videoPressing ? " videoCamBtn--pressing" : ""}`}
                 disabled={
                   isBanned ||
                   Boolean(editingMessageId) ||
                   Boolean(pendingImageUrl) ||
                   voiceRecording ||
+                  voiceArming ||
                   imageUploading ||
                   voiceUploading ||
-                  videoNoteOpen ||
                   videoNoteUploading
                 }
-                aria-label={t("videoNoteOpenCamera")}
-                title={t("videoNoteOpenCamera")}
-                onClick={() => setVideoNoteOpen(true)}
+                aria-label={t("videoNoteHoldRecord")}
+                title={t("videoNoteHoldRecord")}
+                onPointerDown={onVideoCamPointerDown}
               >
                 <svg
                   className="videoCamIcon"
@@ -764,20 +1153,22 @@ export default function Chat({
               </button>
               <button
                 type="button"
-                className={`voiceMicBtn${voiceRecording ? " voiceMicBtn--recording" : ""}`}
+                className={`voiceMicBtn${voiceRecording ? " voiceMicBtn--recording" : ""}${
+                  voicePressing ? " voiceMicBtn--pressing" : ""
+                }`}
                 disabled={
                   isBanned ||
                   Boolean(editingMessageId) ||
                   Boolean(pendingImageUrl) ||
-                  voiceRecording ||
                   imageUploading ||
                   voiceUploading ||
-                  videoNoteOpen ||
+                  videoRecording ||
+                  videoArming ||
                   videoNoteUploading
                 }
-                aria-label={t("voiceRecord")}
-                title={t("voiceRecord")}
-                onClick={startVoiceRecording}
+                aria-label={t("voiceHoldRecord")}
+                title={t("voiceHoldRecord")}
+                onPointerDown={onMicPointerDown}
               >
                 <svg
                   className="voiceMicIcon"
@@ -806,7 +1197,9 @@ export default function Chat({
                   isBanned ||
                   imageUploading ||
                   voiceRecording ||
-                  videoNoteOpen ||
+                  voiceArming ||
+                  videoRecording ||
+                  videoArming ||
                   videoNoteUploading ||
                   (editingMessageId ? !String(text).trim() : !String(text).trim() && !pendingImageUrl)
                 }
@@ -857,6 +1250,38 @@ function extForRecorderMime(mime) {
   if (m.includes("mpeg") || m.includes("mp3")) return ".mp3";
   if (m.includes("wav")) return ".wav";
   return ".webm";
+}
+
+function pickVideoMime() {
+  if (typeof MediaRecorder === "undefined") return "";
+  const types = [
+    "video/webm;codecs=vp9,opus",
+    "video/webm;codecs=vp8,opus",
+    "video/webm;codecs=h264,opus",
+    "video/webm",
+    "video/mp4",
+  ];
+  for (const typ of types) {
+    try {
+      if (MediaRecorder.isTypeSupported(typ)) return typ;
+    } catch {
+      // ignore
+    }
+  }
+  return "";
+}
+
+function extFromVideoMime(mime) {
+  const m = String(mime || "").toLowerCase();
+  if (m.includes("mp4")) return ".mp4";
+  return ".webm";
+}
+
+function formatRecordingClock(ms) {
+  const s = Math.max(0, Math.floor(Number(ms) / 1000));
+  const mm = String(Math.floor(s / 60)).padStart(2, "0");
+  const ss = String(s % 60).padStart(2, "0");
+  return `${mm}:${ss}`;
 }
 
 function formatSystemLine(m, t) {

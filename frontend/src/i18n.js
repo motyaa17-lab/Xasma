@@ -72,6 +72,8 @@ export const translations = {
     voicePlay: "Play",
     voicePause: "Pause",
     voiceRecord: "Record voice message",
+    voiceHoldRecord: "Hold to record, release to send",
+    recordingInline: "Recording",
     voiceRecording: "Recording…",
     voiceStopSend: "Stop & send",
     voiceCancel: "Cancel",
@@ -83,6 +85,7 @@ export const translations = {
     uploadVoiceError: "Could not upload the voice message. Please try again.",
 
     videoNoteOpenCamera: "Video message",
+    videoNoteHoldRecord: "Hold to record video, release to send",
     videoNoteTitle: "Video message",
     videoNoteStarting: "Starting camera…",
     videoNoteRecord: "Record",
@@ -202,6 +205,8 @@ export const translations = {
     voicePlay: "Воспроизвести",
     voicePause: "Пауза",
     voiceRecord: "Голосовое сообщение",
+    voiceHoldRecord: "Удерживайте для записи, отпустите для отправки",
+    recordingInline: "Запись",
     voiceRecording: "Идёт запись…",
     voiceStopSend: "Стоп и отправить",
     voiceCancel: "Отмена",
@@ -214,6 +219,7 @@ export const translations = {
     uploadVoiceError: "Не удалось загрузить голосовое сообщение. Попробуйте ещё раз.",
 
     videoNoteOpenCamera: "Видеосообщение",
+    videoNoteHoldRecord: "Удерживайте для видео, отпустите для отправки",
     videoNoteTitle: "Видеосообщение",
     videoNoteStarting: "Запуск камеры…",
     videoNoteRecord: "Запись",
