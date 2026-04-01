@@ -140,8 +140,12 @@ export default function Chat({
                     <span>{initials(getDisplayName(m, meId, meUsername))}</span>
                   )}
                 </div>
-                <div className={m.senderId === meId ? "bubble me bubbleOwn" : "bubble"}>
-                  <div className="reactBtnWrap">
+                <div
+                  className={
+                    m.senderId === meId ? "bubble me bubbleOwn bubbleWithActions" : "bubble bubbleWithActions"
+                  }
+                >
+                  <div className={m.senderId === meId ? "reactBtnWrap right" : "reactBtnWrap left"}>
                     <button
                       type="button"
                       className="reactBtn"
@@ -161,6 +165,7 @@ export default function Chat({
                             key={emo}
                             type="button"
                             className="reactPick"
+                            onMouseDown={(e) => e.stopPropagation()}
                             onClick={(e) => {
                               e.stopPropagation();
                               setReactionPickerForId(null);

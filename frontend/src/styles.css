@@ -711,11 +711,23 @@ body {
   padding-right: 34px;
 }
 
+.bubbleWithActions {
+  position: relative;
+}
+
 .reactBtnWrap {
   position: absolute;
   top: 6px;
+}
+
+.reactBtnWrap.left {
   left: -8px;
   transform: translateX(-100%);
+}
+
+.reactBtnWrap.right {
+  right: -8px;
+  transform: translateX(100%);
 }
 
 .reactBtn {

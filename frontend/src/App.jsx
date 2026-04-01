@@ -239,7 +239,8 @@ export default function App() {
       if (!openChatId || Number(chatId) !== openChatId) return;
       const mid = Number(messageId);
       if (!mid) return;
-      setMessages((prev) => prev.map((m) => (m.id === mid ? { ...m, reactions: reactions || [] } : m)));
+      const nextReactions = Array.isArray(reactions) ? reactions : [];
+      setMessages((prev) => prev.map((m) => (Number(m.id) === mid ? { ...m, reactions: nextReactions } : m)));
     });
 
     return () => {
@@ -298,9 +299,10 @@ export default function App() {
   }
 
   async function handleToggleReaction(messageId, emoji) {
-    const data = await toggleReaction(messageId, emoji);
+    const mid = Number(messageId);
+    const data = await toggleReaction(mid, emoji);
     const reactions = data.reactions || [];
-    setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, reactions } : m)));
+    setMessages((prev) => prev.map((m) => (Number(m.id) === mid ? { ...m, reactions } : m)));
   }
 
   async function handleLogin(data) {
