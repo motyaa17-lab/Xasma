@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { tf } from "../i18n.js";
+import { uploadChatImage, getApiBase } from "../api.js";
 import GroupInfoModal from "./GroupInfoModal.jsx";
 
 export default function Chat({
@@ -28,7 +29,12 @@ export default function Chat({
   const [menuMessageId, setMenuMessageId] = useState(null);
   const [reactionPickerForId, setReactionPickerForId] = useState(null);
   const [groupInfoOpen, setGroupInfoOpen] = useState(false);
+  const [pendingImageUrl, setPendingImageUrl] = useState(null);
+  const [pendingPreviewObjectUrl, setPendingPreviewObjectUrl] = useState(null);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const listRef = useRef(null);
+  const fileInputRef = useRef(null);
   const typingStartTimerRef = useRef(null);
   const typingStopTimerRef = useRef(null);
   const typingActiveRef = useRef(false);
@@ -50,6 +56,13 @@ export default function Chat({
     setMenuMessageId(null);
     setText("");
     setGroupInfoOpen(false);
+    setPendingImageUrl(null);
+    setImageUploading(false);
+    setUploadError("");
+    setPendingPreviewObjectUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatId]);
 
@@ -76,12 +89,48 @@ export default function Chat({
     return () => document.removeEventListener("mousedown", onDown);
   }, [reactionPickerForId]);
 
+  function clearPendingImage() {
+    setPendingImageUrl(null);
+    setUploadError("");
+    setPendingPreviewObjectUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+  }
+
+  async function onPickImage(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (!allowed.includes(file.type)) {
+      setUploadError(t("uploadImageTypeError"));
+      return;
+    }
+    setUploadError("");
+    setImageUploading(true);
+    try {
+      const url = await uploadChatImage(file);
+      setPendingPreviewObjectUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return URL.createObjectURL(file);
+      });
+      setPendingImageUrl(url);
+    } catch (err) {
+      const msg =
+        err?.name === "ApiError" ? err.message : String(err?.message || t("uploadImageError"));
+      setUploadError(msg);
+    } finally {
+      setImageUploading(false);
+    }
+  }
+
   async function handlePrimary() {
     const trimmed = String(text).trim();
-    if (!trimmed) return;
     onTyping?.(false);
     if (isBanned) return;
     if (editingMessageId) {
+      if (!trimmed) return;
       try {
         await onEditMessage(editingMessageId, trimmed);
       } catch {
@@ -91,8 +140,11 @@ export default function Chat({
       setText("");
       return;
     }
-    onSend(trimmed);
+    if (!pendingImageUrl && !trimmed) return;
+    if (imageUploading) return;
+    onSend({ text: trimmed, imageUrl: pendingImageUrl || undefined });
     setText("");
+    clearPendingImage();
   }
 
   function scheduleTyping() {
@@ -337,12 +389,34 @@ export default function Chat({
                     {isGroup ? (
                       <div className="msgSenderName">{m.sender?.username || "?"}</div>
                     ) : null}
-                    <div className="bubbleText">
-                      {m.text}
-                      {m.editedAt ? (
-                        <span className="bubbleEdited"> {t("edited")}</span>
-                      ) : null}
-                    </div>
+                    {m.imageUrl ? (
+                      <a
+                        href={messageImageAbsUrl(m.imageUrl)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="msgImageLink"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <img
+                          src={messageImageAbsUrl(m.imageUrl)}
+                          alt=""
+                          className="msgImage"
+                          loading="lazy"
+                        />
+                      </a>
+                    ) : null}
+                    {String(m.text ?? "").trim() ? (
+                      <div className="bubbleText">
+                        {m.text}
+                        {m.editedAt ? (
+                          <span className="bubbleEdited"> {t("edited")}</span>
+                        ) : null}
+                      </div>
+                    ) : m.editedAt ? (
+                      <div className="bubbleText bubbleTextMetaOnly">
+                        <span className="bubbleEdited">{t("edited")}</span>
+                      </div>
+                    ) : null}
                     <div className="bubbleMeta">
                       <span className="bubbleTime">{formatTime(m.createdAt)}</span>
                       {m.senderId === meId ? (
@@ -379,47 +453,96 @@ export default function Chat({
 
           <div className="composer">
             {isBanned ? <div className="banBanner">{t("authBanned")}</div> : null}
-            <textarea
-              className="composerInput"
-              value={text}
-              onChange={(e) => {
-                setText(e.target.value);
-                scheduleTyping();
-              }}
-              rows={1}
-              placeholder={t("typeMessagePlaceholder")}
-              disabled={isBanned}
-              onKeyDown={(e) => {
-                if (e.key === "Escape" && editingMessageId) {
-                  e.preventDefault();
-                  setEditingMessageId(null);
-                  setText("");
-                  onTyping?.(false);
-                  return;
-                }
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handlePrimary();
-                }
-              }}
+            {uploadError ? <div className="uploadErrBanner">{uploadError}</div> : null}
+            {imageUploading ? <div className="uploadProgressHint">{t("uploadImageProgress")}</div> : null}
+            {pendingPreviewObjectUrl && !editingMessageId ? (
+              <div className="pendingImageStrip">
+                <img src={pendingPreviewObjectUrl} alt="" className="pendingImageThumb" />
+                <button
+                  type="button"
+                  className="pendingImageRemove"
+                  onClick={clearPendingImage}
+                  disabled={imageUploading}
+                  aria-label={t("removeAttachedPhoto")}
+                >
+                  ×
+                </button>
+              </div>
+            ) : null}
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="composerFileInput"
+              accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
+              aria-hidden="true"
+              tabIndex={-1}
+              onChange={onPickImage}
             />
-            <button
-              className="sendBtn"
-              type="button"
-              onMouseDown={(e) => {
-                // Keep click from being lost when the textarea blurs first (browser focus order).
-                e.preventDefault();
-              }}
-              onClick={handlePrimary}
-              disabled={isBanned || !String(text).trim()}
-            >
-              {editingMessageId ? t("save") : t("send")}
-            </button>
+            <div className="composerMain">
+              <button
+                type="button"
+                className="attachPhotoBtn"
+                disabled={isBanned || Boolean(editingMessageId) || imageUploading}
+                aria-label={t("attachPhoto")}
+                title={t("attachPhoto")}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                📎
+              </button>
+              <textarea
+                className="composerInput"
+                value={text}
+                onChange={(e) => {
+                  setText(e.target.value);
+                  scheduleTyping();
+                }}
+                rows={1}
+                placeholder={t("typeMessagePlaceholder")}
+                disabled={isBanned || imageUploading}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape" && editingMessageId) {
+                    e.preventDefault();
+                    setEditingMessageId(null);
+                    setText("");
+                    onTyping?.(false);
+                    return;
+                  }
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handlePrimary();
+                  }
+                }}
+              />
+              <button
+                className="sendBtn"
+                type="button"
+                onMouseDown={(e) => {
+                  // Keep click from being lost when the textarea blurs first (browser focus order).
+                  e.preventDefault();
+                }}
+                onClick={handlePrimary}
+                disabled={
+                  isBanned ||
+                  imageUploading ||
+                  (editingMessageId ? !String(text).trim() : !String(text).trim() && !pendingImageUrl)
+                }
+              >
+                {editingMessageId ? t("save") : t("send")}
+              </button>
+            </div>
           </div>
         </>
       )}
     </main>
   );
+}
+
+function messageImageAbsUrl(pathOrUrl) {
+  if (!pathOrUrl) return "";
+  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
+  const base = getApiBase().replace(/\/$/, "");
+  const p = pathOrUrl.startsWith("/") ? pathOrUrl : `/${pathOrUrl}`;
+  return `${base}${p}`;
 }
 
 function formatSystemLine(m, t) {

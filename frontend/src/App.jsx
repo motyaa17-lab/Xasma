@@ -351,13 +351,21 @@ export default function App() {
     }
   }
 
-  function handleSend(text) {
+  function handleSend(payload) {
+    const isObj = payload && typeof payload === "object" && !Array.isArray(payload);
+    const text = isObj ? String(payload.text ?? "").trim() : String(payload ?? "").trim();
+    const imageUrl = isObj && payload.imageUrl ? String(payload.imageUrl).trim() : "";
+    if (!text && !imageUrl) return;
     if (!socketRef.current || !socketReady) return;
     if (!selectedChatId) return;
     if (me?.banned) return;
     // Sending implies typing stopped.
     socketRef.current.emit("chat:typing", { chatId: selectedChatId, isTyping: false });
-    socketRef.current.emit("chat:send", { chatId: selectedChatId, text });
+    socketRef.current.emit("chat:send", {
+      chatId: selectedChatId,
+      text,
+      ...(imageUrl ? { imageUrl } : {}),
+    });
   }
 
   function handleTyping(isTyping) {

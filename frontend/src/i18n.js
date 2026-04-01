@@ -63,6 +63,11 @@ export const translations = {
     selectChatHint: "Pick a conversation from the sidebar, or start a new one.",
 
     typeMessagePlaceholder: "Type a message...",
+    attachPhoto: "Attach photo",
+    uploadImageProgress: "Uploading image…",
+    uploadImageError: "Could not upload the image. Please try again.",
+    uploadImageTypeError: "Please choose a JPEG, PNG, WebP, or GIF image.",
+    removeAttachedPhoto: "Remove attached photo",
     send: "Send",
     save: "Save",
     edit: "Edit",
@@ -156,6 +161,11 @@ export const translations = {
     selectChatHint: "Выберите диалог слева или начните новый.",
 
     typeMessagePlaceholder: "Введите сообщение...",
+    attachPhoto: "Прикрепить фото",
+    uploadImageProgress: "Загрузка изображения…",
+    uploadImageError: "Не удалось загрузить изображение. Попробуйте ещё раз.",
+    uploadImageTypeError: "Выберите изображение JPEG, PNG, WebP или GIF.",
+    removeAttachedPhoto: "Убрать фото",
     send: "Отправить",
     save: "Сохранить",
     edit: "Изменить",

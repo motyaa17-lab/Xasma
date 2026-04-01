@@ -1,5 +1,9 @@
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:4000";
 
+export function getApiBase() {
+  return API_BASE;
+}
+
 /** Thrown by apiFetch; includes HTTP status (0 = network / unreachable). */
 export class ApiError extends Error {
   constructor(message, status) {
@@ -117,12 +121,34 @@ export async function removeGroupMember(chatId, userId) {
   });
 }
 
-export async function postChatMessage(chatId, text) {
+export async function postChatMessage(chatId, text, imageUrl) {
+  const body = { text: text || "" };
+  if (imageUrl) body.imageUrl = imageUrl;
   const data = await apiFetch(`/api/chats/${chatId}/messages`, {
     method: "POST",
-    body: { text },
+    body,
   });
   return data.message;
+}
+
+export async function uploadChatImage(file) {
+  const fd = new FormData();
+  fd.append("image", file);
+  const token = getToken();
+  let res;
+  try {
+    res = await fetch(`${API_BASE}/api/upload`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: fd,
+    });
+  } catch {
+    throw new ApiError("Network error", 0);
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(data.error || "Upload failed", res.status);
+  if (!data.url) throw new ApiError("Upload failed", res.status);
+  return data.url;
 }
 
 export async function getMessages(chatId, limit = 50) {

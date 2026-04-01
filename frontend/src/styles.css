@@ -1179,14 +1179,130 @@ body {
   color: rgba(229, 231, 235, 0.85);
 }
 
+.msgImageLink {
+  display: block;
+  margin-bottom: 6px;
+  border-radius: 12px;
+  overflow: hidden;
+  max-width: min(280px, 100%);
+  align-self: flex-start;
+}
+
+.bubble.me .msgImageLink {
+  align-self: flex-end;
+  margin-left: auto;
+}
+
+.msgImage {
+  display: block;
+  width: 100%;
+  max-width: 280px;
+  max-height: 240px;
+  height: auto;
+  object-fit: contain;
+  vertical-align: middle;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.bubbleTextMetaOnly {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
 .composer {
   position: relative;
   z-index: 2;
   flex-shrink: 0;
   padding: 14px 18px 18px;
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  gap: 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.composerMain {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  width: 100%;
+}
+
+.composerFileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.attachPhotoBtn {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--panel2);
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.attachPhotoBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.uploadErrBanner {
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.28);
+  color: rgba(252, 165, 165, 0.95);
+  font-size: 13px;
+}
+
+.uploadProgressHint {
+  font-size: 13px;
+  color: rgba(229, 231, 235, 0.65);
+}
+
+.pendingImageStrip {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.pendingImageThumb {
+  max-width: 120px;
+  max-height: 80px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.pendingImageRemove {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pendingImageRemove:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .banBanner {
@@ -1200,7 +1316,7 @@ body {
   margin-bottom: 10px;
 }
 
-.composerInput {
+.composerMain .composerInput {
   flex: 1;
   resize: none;
   border-radius: 12px;
