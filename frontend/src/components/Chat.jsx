@@ -124,7 +124,11 @@ export default function Chat({
             {isGroup ? (
               <button type="button" className="chatHeaderGroupTap" onClick={() => setGroupInfoOpen(true)}>
                 <div className="avatarSm">
-                  <span>{initials(chat?.title || "")}</span>
+                  {chat?.avatar ? (
+                    <img src={chat.avatar} alt="" />
+                  ) : (
+                    <span>{initials(chat?.title || "")}</span>
+                  )}
                 </div>
                 <div className="chatHeaderInfo">
                   <div className="chatHeaderName">
@@ -177,6 +181,7 @@ export default function Chat({
               onClose={() => setGroupInfoOpen(false)}
               chatId={chatId}
               chatTitle={chat?.title}
+              listGroupAvatar={chat?.avatar ?? ""}
               onMetaChanged={onGroupMetaChanged}
               presenceTick={presenceTick}
               t={t}

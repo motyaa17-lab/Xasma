@@ -278,6 +278,15 @@ export default function App() {
       }
     });
 
+    socket.on("group:avatarUpdated", ({ chatId, avatar }) => {
+      const cid = Number(chatId);
+      if (!cid) return;
+      const av = String(avatar || "");
+      setChats((prev) =>
+        prev.map((c) => (c.id === cid && c.type === "group" ? { ...c, avatar: av } : c))
+      );
+    });
+
     return () => {
       socket.off("chat:message");
       socket.off("user:avatar");
@@ -289,6 +298,7 @@ export default function App() {
       socket.off("message:deleted");
       socket.off("user:roleUpdated");
       socket.off("user:banned");
+      socket.off("group:avatarUpdated");
       socket.disconnect();
     };
   }, [token, socketEndpoint, me?.id]);

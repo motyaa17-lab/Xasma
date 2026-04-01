@@ -40,6 +40,11 @@ export const translations = {
     groupNoMembers: "No members.",
     groupLoading: "Loading…",
 
+    groupChangeAvatar: "Change group avatar",
+    groupAvatarApply: "Save avatar",
+    groupAvatarCancelPick: "Cancel",
+    groupAvatarHint: "PNG/JPEG, max ~400KB as data URL.",
+
     participantCountOne: "1 participant",
     participantCountMany: "{count} participants",
 
@@ -125,6 +130,11 @@ export const translations = {
     groupLoadError: "Не удалось загрузить группу.",
     groupNoMembers: "Нет участников.",
     groupLoading: "Загрузка…",
+
+    groupChangeAvatar: "Сменить аватар группы",
+    groupAvatarApply: "Сохранить аватар",
+    groupAvatarCancelPick: "Отмена",
+    groupAvatarHint: "PNG/JPEG, до ~400 КБ в виде data URL.",
 
     participantCountOne: "1 участник",
     participantCountMany: "Участников: {count}",

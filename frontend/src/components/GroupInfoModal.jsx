@@ -1,16 +1,18 @@
-import React, { useEffect, useState } from "react";
-import { addGroupMember, getGroup, removeGroupMember, searchUsers } from "../api.js";
+import React, { useEffect, useRef, useState } from "react";
+import { addGroupMember, getGroup, patchGroupAvatar, removeGroupMember, searchUsers } from "../api.js";
 
 export default function GroupInfoModal({
   open,
   onClose,
   chatId,
   chatTitle,
+  listGroupAvatar,
   onMetaChanged,
   presenceTick,
   t,
   lang,
 }) {
+  const fileRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [group, setGroup] = useState(null);
@@ -20,12 +22,15 @@ export default function GroupInfoModal({
   const [addSearching, setAddSearching] = useState(false);
   const [actionError, setActionError] = useState("");
   const [busyId, setBusyId] = useState(null);
+  const [avatarDraft, setAvatarDraft] = useState(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setAddQuery("");
       setActionError("");
       setAddResults([]);
+      setAvatarDraft(null);
     }
   }, [open]);
 
@@ -112,11 +117,65 @@ export default function GroupInfoModal({
     }
   }
 
+  function onPickAvatar(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !file.type.startsWith("image/")) {
+      setActionError(lang === "ru" ? "Выберите изображение" : "Choose an image file");
+      return;
+    }
+    if (file.size > 380 * 1024) {
+      setActionError(lang === "ru" ? "Файл слишком большой" : "File too large");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result || "");
+      if (dataUrl.startsWith("data:image/")) {
+        setAvatarDraft(dataUrl);
+        setActionError("");
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function applyAvatar(dataUrl) {
+    setActionError("");
+    setAvatarBusy(true);
+    try {
+      const g = await patchGroupAvatar(chatId, dataUrl);
+      setGroup((prev) => ({ ...(prev || {}), ...g }));
+      setAvatarDraft(null);
+      onMetaChanged?.();
+    } catch (e) {
+      setActionError(e.message || "Failed");
+    } finally {
+      setAvatarBusy(false);
+    }
+  }
+
+  async function clearGroupAvatar() {
+    setActionError("");
+    setAvatarBusy(true);
+    try {
+      const g = await patchGroupAvatar(chatId, "");
+      setGroup((prev) => ({ ...(prev || {}), ...g }));
+      setAvatarDraft(null);
+      onMetaChanged?.();
+    } catch (e) {
+      setActionError(e.message || "Failed");
+    } finally {
+      setAvatarBusy(false);
+    }
+  }
+
   if (!open) return null;
 
   const title = group?.title || chatTitle || t("groupChat");
   const count = group?.memberCount ?? members.length;
   const canManage = Boolean(group?.canManage);
+  const displayAvatar = avatarDraft || listGroupAvatar || group?.avatar || "";
+  const hasStoredAvatar = Boolean(!avatarDraft && (listGroupAvatar || group?.avatar));
 
   return (
     <div className="modalBackdrop" role="presentation" onClick={onClose}>
@@ -136,7 +195,57 @@ export default function GroupInfoModal({
             <div className="authError">{error}</div>
           ) : (
             <>
-              <div className="groupInfoHead">
+              <div className="groupInfoHead groupInfoHeadWithAvatar">
+                <div className="groupInfoAvatarBlock">
+                  <div className="groupInfoAvatarLg">
+                    {displayAvatar ? <img src={displayAvatar} alt="" /> : <span>{initials(title)}</span>}
+                  </div>
+                  {canManage ? (
+                    <div className="groupAvatarActions">
+                      <input
+                        ref={fileRef}
+                        type="file"
+                        accept="image/*"
+                        className="fileInput"
+                        onChange={onPickAvatar}
+                      />
+                      <button
+                        type="button"
+                        className="ghostBtn"
+                        disabled={avatarBusy}
+                        onClick={() => fileRef.current?.click()}
+                      >
+                        {t("groupChangeAvatar")}
+                      </button>
+                      {avatarDraft ? (
+                        <>
+                          <button
+                            type="button"
+                            className="primaryBtn"
+                            disabled={avatarBusy}
+                            onClick={() => applyAvatar(avatarDraft)}
+                          >
+                            {avatarBusy ? t("saving") : t("groupAvatarApply")}
+                          </button>
+                          <button
+                            type="button"
+                            className="ghostBtn"
+                            disabled={avatarBusy}
+                            onClick={() => setAvatarDraft(null)}
+                          >
+                            {t("groupAvatarCancelPick")}
+                          </button>
+                        </>
+                      ) : null}
+                      {hasStoredAvatar && !avatarDraft ? (
+                        <button type="button" className="ghostBtn" disabled={avatarBusy} onClick={clearGroupAvatar}>
+                          {t("remove")}
+                        </button>
+                      ) : null}
+                      <div className="muted small groupAvatarHint">{t("groupAvatarHint")}</div>
+                    </div>
+                  ) : null}
+                </div>
                 <div className="groupInfoTitleRow">{title}</div>
                 <div className="muted small">{t("groupParticipantCount").replace("{count}", String(count))}</div>
               </div>

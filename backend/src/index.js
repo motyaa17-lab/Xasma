@@ -70,7 +70,7 @@ function normalizeChatUsers(a, b) {
 
 async function getChatById(chatId) {
   const r = await query(
-    `SELECT id, type, title, created_by, user1_id, user2_id FROM chats WHERE id = $1`,
+    `SELECT id, type, title, created_by, user1_id, user2_id, avatar_url FROM chats WHERE id = $1`,
     [chatId]
   );
   return r.rows[0] || null;
@@ -384,6 +384,7 @@ app.get("/api/chats", authRequired, (req, res) => {
         c.type AS chat_type,
         c.title AS chat_title,
         c.created_by AS chat_created_by,
+        c.avatar_url AS chat_avatar_url,
         c.user1_id,
         c.user2_id,
         other.id AS other_id,
@@ -434,6 +435,7 @@ app.get("/api/chats", authRequired, (req, res) => {
           title: isGroup ? c.chat_title : null,
           createdBy: c.chat_created_by != null ? Number(c.chat_created_by) : null,
           memberCount: isGroup ? Number(c.member_count) : undefined,
+          avatar: isGroup ? c.chat_avatar_url || "" : undefined,
           other: isGroup
             ? null
             : {
@@ -545,6 +547,7 @@ app.get("/api/groups/:chatId", authRequired, (req, res) => {
         createdBy,
         memberCount: members.rows.length,
         canManage,
+        avatar: chat.avatar_url || "",
       },
       members: members.rows.map((u) => ({
         id: Number(u.id),
@@ -554,6 +557,47 @@ app.get("/api/groups/:chatId", authRequired, (req, res) => {
         lastSeenAt: u.last_seen_at,
         isCreator: Number(u.id) === createdBy,
       })),
+    });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
+app.patch("/api/groups/:chatId/avatar", authRequired, (req, res) => {
+  const chatId = Number(req.params.chatId);
+  const avatar = typeof req.body?.avatar === "string" ? req.body.avatar.trim() : "";
+  if (!chatId) return res.status(400).json({ error: "Invalid chat id" });
+
+  if (avatar) {
+    const isDataUrl = avatar.startsWith("data:image/");
+    if (!isDataUrl) return res.status(400).json({ error: "Avatar must be an image data URL" });
+    if (avatar.length > 400_000) return res.status(400).json({ error: "Avatar too large" });
+  }
+
+  (async () => {
+    const uid = Number(req.user.id);
+    const chat = await getChatById(chatId);
+    if (!chat || chat.type !== "group") return res.status(404).json({ error: "Group not found" });
+    if (!(await isUserChatMember(chatId, uid))) return res.status(403).json({ error: "Not a member of this group" });
+    if (!canManageGroupMembers(req, chat)) {
+      return res.status(403).json({ error: "Only the creator or an admin can change the group avatar" });
+    }
+
+    await query(`UPDATE chats SET avatar_url = $1 WHERE id = $2`, [avatar || null, chatId]);
+    const r = await query(`SELECT id, title, created_by, avatar_url FROM chats WHERE id = $1`, [chatId]);
+    const row = r.rows[0];
+    const cnt = await query(`SELECT COUNT(*)::int AS n FROM chat_members WHERE chat_id = $1`, [chatId]);
+
+    const av = row.avatar_url || "";
+    await emitToChatMemberSockets(chatId, "group:avatarUpdated", { chatId, avatar: av });
+
+    return res.json({
+      group: {
+        id: chatId,
+        title: row.title,
+        createdBy: Number(row.created_by),
+        memberCount: Number(cnt.rows[0].n),
+        canManage: canManageGroupMembers(req, chat),
+        avatar: av,
+      },
     });
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });

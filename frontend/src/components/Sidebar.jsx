@@ -145,7 +145,9 @@ export default function Sidebar({ chats, me, onSelectChat, onStartChat, onCreate
               >
                 <div className="chatItemTop">
                   <div className={!isGroup && online ? "avatarSm presence online" : "avatarSm presence"}>
-                    {!isGroup && other?.avatar ? (
+                    {isGroup && c.avatar ? (
+                      <img src={c.avatar} alt="" />
+                    ) : !isGroup && other?.avatar ? (
                       <img src={other.avatar} alt="" />
                     ) : (
                       <span>{initials(isGroup ? label : other?.username || "")}</span>
