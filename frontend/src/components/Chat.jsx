@@ -1838,38 +1838,50 @@ export default function Chat({
                   ) : null}
                 </>
               ) : null}
-              <textarea
-                className="composerInput"
-                value={text}
-                onChange={(e) => {
-                  setText(e.target.value);
-                  scheduleTyping();
-                }}
-                rows={1}
-                placeholder={t("typeMessagePlaceholder")}
-                disabled={
-                  isBanned ||
-                  imageUploading ||
-                  voiceRecording ||
-                  voiceArming ||
-                  videoRecording ||
-                  videoArming ||
-                  videoNoteUploading
-                }
-                onKeyDown={(e) => {
-                  if (e.key === "Escape" && editingMessageId) {
-                    e.preventDefault();
-                    setEditingMessageId(null);
-                    setText("");
-                    onTyping?.(false);
-                    return;
+              <div
+                className={`composerInputShell${String(text).length ? " composerInputShell--filled" : ""}`}
+              >
+                <span className="composerInputGhost" aria-hidden="true">
+                  {t("typeMessagePlaceholder")}
+                </span>
+                <textarea
+                  className="composerInput"
+                  value={text}
+                  onChange={(e) => {
+                    setText(e.target.value);
+                    scheduleTyping();
+                  }}
+                  rows={1}
+                  placeholder=""
+                  aria-label={t("typeMessagePlaceholder")}
+                  autoComplete="off"
+                  autoCorrect="on"
+                  spellCheck
+                  enterKeyHint={isMobileChat ? "send" : undefined}
+                  disabled={
+                    isBanned ||
+                    imageUploading ||
+                    voiceRecording ||
+                    voiceArming ||
+                    videoRecording ||
+                    videoArming ||
+                    videoNoteUploading
                   }
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handlePrimary();
-                  }
-                }}
-              />
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape" && editingMessageId) {
+                      e.preventDefault();
+                      setEditingMessageId(null);
+                      setText("");
+                      onTyping?.(false);
+                      return;
+                    }
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handlePrimary();
+                    }
+                  }}
+                />
+              </div>
               <button
                 type="button"
                 className={`videoCamBtn${

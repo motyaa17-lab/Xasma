@@ -2372,18 +2372,100 @@ body.body--mobileConversationOpen {
   margin-bottom: 10px;
 }
 
-.composerMain .composerInput {
+/* Stacked field + ghost hint: border/background on shell so placeholder can fade without layout shift */
+.composerMain .composerInputShell {
   flex: 1;
-  resize: none;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: var(--panel2);
-  color: var(--text);
-  padding: 12px 12px;
-  outline: none;
-  min-height: 44px;
-  max-height: 120px;
   min-width: 0;
+  min-height: 44px;
+  align-self: flex-end;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 1fr;
+  background: var(--panel2);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.composerMain .composerInputShell:focus-within {
+  border-color: rgba(59, 130, 246, 0.42);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18);
+}
+
+.composerMain .composerInputShell:has(.composerInput:disabled) {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.composerMain .composerInputShell .composerInputGhost,
+.composerMain .composerInputShell .composerInput {
+  grid-area: 1 / 1;
+  margin: 0;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.composerMain .composerInputShell .composerInput {
+  resize: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  padding: 11px 14px;
+  min-height: 42px;
+  max-height: 120px;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.4;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  transform: translateZ(0);
+  caret-color: var(--text);
+}
+
+.composerInputGhost {
+  pointer-events: none;
+  justify-self: stretch;
+  align-self: start;
+  padding: 11px 14px;
+  color: rgba(148, 163, 184, 0.78);
+  font-size: 15px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: hidden;
+  max-height: 120px;
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity 0.22s var(--ease-tg-out, cubic-bezier(0.25, 0.82, 0.22, 1)),
+    visibility 0s linear 0s;
+}
+
+.composerInputShell:focus-within:not(.composerInputShell--filled) .composerInputGhost {
+  opacity: 0.38;
+}
+
+.composerInputShell--filled .composerInputGhost {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.16s ease,
+    visibility 0s linear 0.16s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composerMain .composerInputShell {
+    transition: none;
+  }
+
+  .composerInputGhost,
+  .composerInputShell--filled .composerInputGhost {
+    transition: none;
+  }
 }
 
 .sendBtn {
@@ -2987,12 +3069,23 @@ body.body--mobileConversationOpen {
 
 .appShell--mobile .composerMain {
   gap: 6px;
+  align-items: flex-end;
 }
 
-.appShell--mobile .composerInput {
-  min-height: 44px;
-  padding: 10px 12px;
+.appShell--mobile .composerInputShell {
+  border-radius: 14px;
+  min-height: 48px;
+}
+
+.appShell--mobile .composerInputShell .composerInput,
+.appShell--mobile .composerInputShell .composerInputGhost {
+  padding: 12px 15px;
   font-size: 16px;
+  line-height: 1.45;
+}
+
+.appShell--mobile .composerInputShell .composerInput {
+  min-height: 46px;
 }
 
 .appShell--mobile .voiceMsgPill {
@@ -3388,7 +3481,7 @@ body.body--mobileConversationOpen {
 }
 
 .appShell--mobile .composerMain {
-  align-items: stretch;
+  align-items: flex-end;
   gap: 8px;
 }
 
@@ -3398,11 +3491,6 @@ body.body--mobileConversationOpen {
 .appShell--mobile .sendBtn {
   min-width: 48px;
   min-height: 48px;
-}
-
-.appShell--mobile .composerInput {
-  min-height: 48px;
-  font-size: 16px;
 }
 
 .appShell--mobile .messages {
