@@ -310,16 +310,20 @@ export default function Chat({
     setUploadError("");
     setVideoNoteUploading(true);
     try {
-      const detectedMime = (await detectVideoMime(blob, mimeHint)) || "video/webm";
+      const detectedMimeRaw = (await detectVideoMime(blob, mimeHint)) || "video/webm";
+      const detectedMime = normalizeMime(detectedMimeRaw) || "video/webm";
       const ext = extFromVideoMime(detectedMime);
-      const file = new File([blob], `videonote-${Date.now()}${ext}`, { type: detectedMime });
+      const filename = `videonote-${Date.now()}${ext}`;
+      const file = new File([blob], filename, { type: detectedMime });
 
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
         console.log("[Xasma] video upload", {
           mimeHint: String(mimeHint || ""),
           blobType: String(blob?.type || ""),
+          detectedMimeRaw,
           detectedMime,
+          ext,
           fileType: String(file.type || ""),
           fileName: file.name,
           size: blob?.size ?? 0,
@@ -1857,6 +1861,12 @@ function extFromVideoMime(mime) {
   if (m.includes("quicktime")) return ".mov";
   if (m.includes("3gpp")) return ".3gp";
   return ".webm";
+}
+
+function normalizeMime(mime) {
+  const s = String(mime || "").trim();
+  if (!s) return "";
+  return s.split(";")[0].trim();
 }
 
 function getVideoDurationSeconds(blob) {

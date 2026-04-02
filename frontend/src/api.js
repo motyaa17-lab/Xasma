@@ -174,6 +174,16 @@ export async function uploadChatAudio(file) {
 }
 
 export async function uploadChatVideo(file) {
+  if (import.meta.env.DEV) {
+    // eslint-disable-next-line no-console
+    console.log("[Xasma] uploadChatVideo", {
+      name: String(file?.name || ""),
+      type: String(file?.type || ""),
+      size: Number(file?.size || 0),
+      isFile: typeof File !== "undefined" ? file instanceof File : false,
+      isBlob: typeof Blob !== "undefined" ? file instanceof Blob : false,
+    });
+  }
   const fd = new FormData();
   fd.append("video", file);
   const token = getToken();

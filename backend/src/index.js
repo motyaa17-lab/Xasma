@@ -867,6 +867,13 @@ app.post(
   },
   (req, res) => {
     if (!req.file) return res.status(400).json({ error: "No video file" });
+    // eslint-disable-next-line no-console
+    console.log("[Xasma] upload/video ok", {
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      filename: req.file.filename,
+      size: req.file.size,
+    });
     const base = getPublicBase(req);
     return res.json({ url: `${base}/uploads/${req.file.filename}` });
   }
