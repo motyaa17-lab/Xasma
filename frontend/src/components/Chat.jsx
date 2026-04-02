@@ -7,6 +7,8 @@ import CircleVideoMessage from "./CircleVideoMessage.jsx";
 
 const MAX_VIDEO_NOTE_SEC = 60;
 const QUICK_REACTION_EMOJIS = ["❤️", "👍", "😂", "😮", "😢", "🔥"];
+/** Distance from bottom (px) to treat as "following" the chat for auto-scroll on new messages. */
+const SCROLL_NEAR_BOTTOM_PX = 100;
 
 export default function Chat({
   chatId,
@@ -54,6 +56,10 @@ export default function Chat({
   const [uploadError, setUploadError] = useState("");
   const [videoNoteDraft, setVideoNoteDraft] = useState(null); // { blob, mimeHint, url }
   const listRef = useRef(null);
+  const nearBottomRef = useRef(true);
+  const scrollAfterSendRef = useRef(false);
+  const scrollAfterSendClearTimerRef = useRef(null);
+  const prevMessagesScrollMetaRef = useRef({ chatId: null, len: 0, tailId: null });
   const fileInputRef = useRef(null);
   const mediaStreamRef = useRef(null);
   const mediaRecorderRef = useRef(null);
@@ -133,11 +139,110 @@ export default function Chat({
     console.log("[Xasma] Chat", { chatId, hasChat: Boolean(chat), mobileBack: Boolean(onMobileBack) });
   }, [chatId, chat?.id, onMobileBack]);
 
+  function scrollMessagesListToEnd(behavior) {
+    const el = listRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      el.scrollTo({ top: el.scrollHeight, behavior });
+    });
+  }
+
+  function requestScrollAfterSend() {
+    scrollAfterSendRef.current = true;
+    if (scrollAfterSendClearTimerRef.current) {
+      window.clearTimeout(scrollAfterSendClearTimerRef.current);
+    }
+    scrollAfterSendClearTimerRef.current = window.setTimeout(() => {
+      scrollAfterSendRef.current = false;
+      scrollAfterSendClearTimerRef.current = null;
+    }, 12000);
+  }
+
   useEffect(() => {
     const el = listRef.current;
     if (!el) return;
-    el.scrollTop = el.scrollHeight;
-  }, [chatId, messages.length]);
+    function onScroll() {
+      const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+      nearBottomRef.current = distance <= SCROLL_NEAR_BOTTOM_PX;
+    }
+    onScroll();
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [chatId]);
+
+  useEffect(() => {
+    if (!chatId) {
+      prevMessagesScrollMetaRef.current = { chatId: null, len: 0, tailId: null };
+      nearBottomRef.current = true;
+      scrollAfterSendRef.current = false;
+      if (scrollAfterSendClearTimerRef.current) {
+        window.clearTimeout(scrollAfterSendClearTimerRef.current);
+        scrollAfterSendClearTimerRef.current = null;
+      }
+      return;
+    }
+
+    const el = listRef.current;
+    if (!el) return;
+
+    const tailId = messages.length ? messages[messages.length - 1]?.id : null;
+    const meta = prevMessagesScrollMetaRef.current;
+
+    if (chatId !== meta.chatId) {
+      meta.chatId = chatId;
+      meta.len = messages.length;
+      meta.tailId = tailId;
+      nearBottomRef.current = true;
+      scrollAfterSendRef.current = false;
+      if (scrollAfterSendClearTimerRef.current) {
+        window.clearTimeout(scrollAfterSendClearTimerRef.current);
+        scrollAfterSendClearTimerRef.current = null;
+      }
+      scrollMessagesListToEnd("auto");
+      return;
+    }
+
+    const lenGrew = messages.length > meta.len;
+    const tailChanged = tailId !== meta.tailId;
+    if (!lenGrew && !tailChanged) {
+      return;
+    }
+
+    if (scrollAfterSendRef.current && lenGrew) {
+      const last = messages[messages.length - 1];
+      if (last && last.senderId === meId) {
+        scrollAfterSendRef.current = false;
+        if (scrollAfterSendClearTimerRef.current) {
+          window.clearTimeout(scrollAfterSendClearTimerRef.current);
+          scrollAfterSendClearTimerRef.current = null;
+        }
+        nearBottomRef.current = true;
+        meta.len = messages.length;
+        meta.tailId = tailId;
+        scrollMessagesListToEnd("smooth");
+        return;
+      }
+    }
+
+    if (lenGrew && nearBottomRef.current) {
+      meta.len = messages.length;
+      meta.tailId = tailId;
+      scrollMessagesListToEnd("smooth");
+      return;
+    }
+
+    meta.len = messages.length;
+    meta.tailId = tailId;
+  }, [chatId, messages, meId]);
+
+  useEffect(() => {
+    return () => {
+      if (scrollAfterSendClearTimerRef.current) {
+        window.clearTimeout(scrollAfterSendClearTimerRef.current);
+        scrollAfterSendClearTimerRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     detachVoiceHoldEnd();
@@ -388,6 +493,7 @@ export default function Chat({
         });
       }
       const url = await uploadChatVideo(file);
+      requestScrollAfterSend();
       onSend({ text: "", videoUrl: url });
     } catch (err) {
       const baseMsg =
@@ -818,6 +924,7 @@ export default function Chat({
               // eslint-disable-next-line no-console
               console.log("[Xasma] voice uploaded", { url });
             }
+            requestScrollAfterSend();
             onSend({ text: "", audioUrl: url });
           } catch (err) {
             const msg =
@@ -1118,6 +1225,7 @@ export default function Chat({
     }
     if (!pendingImageUrl && !trimmed) return;
     if (imageUploading || voiceRecording || voiceArming) return;
+    requestScrollAfterSend();
     onSend({ text: trimmed, imageUrl: pendingImageUrl || undefined });
     setText("");
     clearPendingImage();
