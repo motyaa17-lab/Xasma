@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { tf } from "../i18n.js";
 import { uploadChatImage, uploadChatAudio, uploadChatVideo, getApiBase } from "../api.js";
 import GroupInfoModal from "./GroupInfoModal.jsx";
@@ -12,6 +13,145 @@ const BUBBLE_PRESS_IGNORE =
   'button, a[href], input, textarea, select, [role="button"], [role="menu"], [role="menuitem"], .msgMenu, .msgMenuDropdown, video, audio, .circleVideoMsg, .circleVideoSoundBtn, .voiceMsgPill, .reactionPill';
 /** Distance from bottom (px) to treat as "following" the chat for auto-scroll on new messages. */
 const SCROLL_NEAR_BOTTOM_PX = 100;
+
+const MessageActionMenuPanel = forwardRef(function MessageActionMenuPanel(
+  {
+    t,
+    canQuickReact,
+    hasSecondaryActions,
+    canEditOwn,
+    canAdminDelete,
+    className,
+    style,
+    onToggleReaction,
+    onEdit,
+    onAdminDelete,
+    closeMenu,
+  },
+  ref
+) {
+  return (
+    <div
+      ref={ref}
+      className={className}
+      style={style}
+      role="menu"
+      onMouseDown={(e) => e.stopPropagation()}
+      onTouchStart={(e) => e.stopPropagation()}
+    >
+      {canQuickReact ? (
+        <>
+          <div className="msgMenuReactions" role="group" aria-label={t("messageMenuReactions")}>
+            {QUICK_REACTION_EMOJIS.map((emo) => (
+              <button
+                key={emo}
+                type="button"
+                className="msgMenuReactionBtn"
+                aria-label={emo}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeMenu();
+                  onToggleReaction?.(emo);
+                }}
+              >
+                {emo}
+              </button>
+            ))}
+          </div>
+          {hasSecondaryActions ? <div className="msgMenuDivider" aria-hidden /> : null}
+        </>
+      ) : null}
+      {canEditOwn ? (
+        <button
+          type="button"
+          className="msgMenuItem"
+          role="menuitem"
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit?.();
+            closeMenu();
+          }}
+        >
+          {t("edit")}
+        </button>
+      ) : null}
+      {canAdminDelete ? (
+        <button
+          type="button"
+          className="msgMenuItem msgMenuItem--danger"
+          role="menuitem"
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            closeMenu();
+            onAdminDelete?.();
+          }}
+        >
+          {t("deleteMessage")}
+        </button>
+      ) : null}
+    </div>
+  );
+});
+MessageActionMenuPanel.displayName = "MessageActionMenuPanel";
+
+/** Fixed-position menu placement for mobile (viewport + composer bounds). */
+function computeMobileMessageMenuPlacement(anchorEl, menuEl, composerEl, headerEl) {
+  if (!anchorEl || !menuEl) return null;
+
+  const margin = 10;
+  const gap = 6;
+  const ar = anchorEl.getBoundingClientRect();
+  const cr = composerEl?.getBoundingClientRect();
+  const hr = headerEl?.getBoundingClientRect();
+  const vv = typeof window !== "undefined" ? window.visualViewport : null;
+  const vw = Math.min(vv?.width ?? window.innerWidth, window.innerWidth);
+
+  const composerTop = cr?.top ?? window.innerHeight;
+  const headerBottom = hr?.bottom ?? 0;
+
+  const bandTop = headerBottom + margin;
+  const bandBottom = composerTop - margin;
+  const bandH = Math.max(120, bandBottom - bandTop);
+
+  const menuNaturalH = menuEl.offsetHeight;
+  const menuW = Math.min(280, Math.max(168, vw - margin * 2));
+
+  const spaceBelow = bandBottom - ar.bottom - gap;
+  const spaceAbove = ar.top - bandTop - gap;
+
+  let openUp = false;
+  let top;
+  let maxHeight = Math.min(menuNaturalH, bandH);
+
+  if (menuNaturalH <= spaceBelow) {
+    openUp = false;
+    top = ar.bottom + gap;
+  } else if (menuNaturalH <= spaceAbove) {
+    openUp = true;
+    top = ar.top - gap - menuNaturalH;
+  } else {
+    openUp = spaceAbove >= spaceBelow;
+    maxHeight = Math.max(100, Math.min(menuNaturalH, bandH - 2));
+    if (openUp) {
+      top = ar.top - gap - maxHeight;
+    } else {
+      top = ar.bottom + gap;
+    }
+  }
+
+  top = Math.max(bandTop, Math.min(top, bandBottom - maxHeight));
+
+  let left = ar.right - menuW;
+  left = Math.max(margin, Math.min(left, vw - menuW - margin));
+
+  return { top, left, width: menuW, maxHeight, openUp };
+}
 
 export default function Chat({
   chatId,
@@ -90,6 +230,11 @@ export default function Chat({
   const typingStopTimerRef = useRef(null);
   const typingActiveRef = useRef(false);
   const swipeBackRef = useRef({ active: false, startX: 0, startY: 0, handled: false });
+  const menuAnchorRef = useRef(null);
+  const mobileFloatingMenuRef = useRef(null);
+  const composerRef = useRef(null);
+  const chatHeaderRef = useRef(null);
+  const [mobileMenuPlacement, setMobileMenuPlacement] = useState(null);
 
   const onBubblePointerDown = useCallback((e) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
@@ -125,6 +270,30 @@ export default function Chat({
   const isGroup = chat?.type === "group";
   const isMobileChat = Boolean(onMobileBack);
   const showVideoNoteOverlay = isMobileChat && (videoArming || videoRecording || Boolean(videoNoteDraft));
+
+  const mobileMenuTarget = useMemo(() => {
+    if (menuMessageId == null) return null;
+    const m = messages.find((x) => x.id === menuMessageId);
+    if (!m || m.type === "system") return null;
+    return m;
+  }, [messages, menuMessageId]);
+
+  const mobileMenuFlags = useMemo(() => {
+    const m = mobileMenuTarget;
+    if (!m) return null;
+    const showMessageMenu =
+      (m.senderId === meId && (!isBanned || isAdmin)) ||
+      (m.senderId !== meId && (isAdmin || !isBanned));
+    if (!showMessageMenu) return null;
+    const canEditOwn = m.senderId === meId && !isBanned;
+    const canAdminDelete = Boolean(isAdmin);
+    return {
+      canQuickReact: !isBanned,
+      canEditOwn,
+      canAdminDelete,
+      hasSecondaryActions: canEditOwn || canAdminDelete,
+    };
+  }, [mobileMenuTarget, meId, isBanned, isAdmin]);
   function onChatTouchStart(e) {
     if (!isMobileChat || !onMobileBack) return;
     if (showVideoNoteOverlay) return;
@@ -433,6 +602,47 @@ export default function Chat({
       document.removeEventListener("touchstart", onDown);
     };
   }, [menuMessageId]);
+
+  useLayoutEffect(() => {
+    if (!isMobileChat || menuMessageId == null || !mobileMenuTarget || !mobileMenuFlags) {
+      setMobileMenuPlacement(null);
+      return;
+    }
+
+    const run = () => {
+      const place = computeMobileMessageMenuPlacement(
+        menuAnchorRef.current,
+        mobileFloatingMenuRef.current,
+        composerRef.current,
+        chatHeaderRef.current
+      );
+      if (place) setMobileMenuPlacement(place);
+    };
+
+    run();
+    let raf1 = 0;
+    let raf2 = 0;
+    raf1 = requestAnimationFrame(() => {
+      run();
+      raf2 = requestAnimationFrame(run);
+    });
+
+    const vv = window.visualViewport;
+    const listEl = listRef.current;
+    vv?.addEventListener("resize", run);
+    vv?.addEventListener("scroll", run);
+    window.addEventListener("resize", run);
+    listEl?.addEventListener("scroll", run, { passive: true });
+
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+      vv?.removeEventListener("resize", run);
+      vv?.removeEventListener("scroll", run);
+      window.removeEventListener("resize", run);
+      listEl?.removeEventListener("scroll", run);
+    };
+  }, [isMobileChat, menuMessageId, mobileMenuTarget, mobileMenuFlags]);
 
   const lastAnimChatIdRef = useRef(null);
   const skipMessageEnterRef = useRef(false);
@@ -1410,7 +1620,7 @@ export default function Chat({
               </div>
             </div>
           ) : null}
-          <div className="chatHeader">
+          <div className="chatHeader" ref={chatHeaderRef}>
             <div className="chatHeaderLead">
               {onMobileBack ? (
                 <button
@@ -1564,6 +1774,7 @@ export default function Chat({
                           type="button"
                           className="msgMenuBtn"
                           aria-label={t("menu")}
+                          ref={isMobileChat && menuMessageId === m.id ? menuAnchorRef : undefined}
                           onMouseDown={(e) => e.stopPropagation()}
                           onTouchStart={(e) => e.stopPropagation()}
                           onClick={(e) => {
@@ -1573,76 +1784,23 @@ export default function Chat({
                         >
                           ⋯
                         </button>
-                        {menuMessageId === m.id ? (
-                          <div
+                        {menuMessageId === m.id && !isMobileChat ? (
+                          <MessageActionMenuPanel
+                            t={t}
+                            canQuickReact={canQuickReact}
+                            hasSecondaryActions={hasSecondaryActions}
+                            canEditOwn={canEditOwn}
+                            canAdminDelete={canAdminDelete}
                             className="msgMenuDropdown"
-                            role="menu"
-                            onMouseDown={(e) => e.stopPropagation()}
-                            onTouchStart={(e) => e.stopPropagation()}
-                          >
-                            {canQuickReact ? (
-                              <>
-                                <div
-                                  className="msgMenuReactions"
-                                  role="group"
-                                  aria-label={t("messageMenuReactions")}
-                                >
-                                  {QUICK_REACTION_EMOJIS.map((emo) => (
-                                    <button
-                                      key={emo}
-                                      type="button"
-                                      className="msgMenuReactionBtn"
-                                      aria-label={emo}
-                                      onMouseDown={(e) => e.stopPropagation()}
-                                      onTouchStart={(e) => e.stopPropagation()}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setMenuMessageId(null);
-                                        onToggleReaction?.(m.id, emo);
-                                      }}
-                                    >
-                                      {emo}
-                                    </button>
-                                  ))}
-                                </div>
-                                {hasSecondaryActions ? <div className="msgMenuDivider" aria-hidden /> : null}
-                              </>
-                            ) : null}
-                            {canEditOwn ? (
-                              <button
-                                type="button"
-                                className="msgMenuItem"
-                                role="menuitem"
-                                onMouseDown={(e) => e.stopPropagation()}
-                                onTouchStart={(e) => e.stopPropagation()}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingMessageId(m.id);
-                                  setText(String(m.text ?? ""));
-                                  setMenuMessageId(null);
-                                  onTyping?.(false);
-                                }}
-                              >
-                                {t("edit")}
-                              </button>
-                            ) : null}
-                            {canAdminDelete ? (
-                              <button
-                                type="button"
-                                className="msgMenuItem msgMenuItem--danger"
-                                role="menuitem"
-                                onMouseDown={(e) => e.stopPropagation()}
-                                onTouchStart={(e) => e.stopPropagation()}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setMenuMessageId(null);
-                                  onAdminDeleteMessage?.(m.id);
-                                }}
-                              >
-                                {t("deleteMessage")}
-                              </button>
-                            ) : null}
-                          </div>
+                            onToggleReaction={(emo) => onToggleReaction?.(m.id, emo)}
+                            onEdit={() => {
+                              setEditingMessageId(m.id);
+                              setText(String(m.text ?? ""));
+                              onTyping?.(false);
+                            }}
+                            onAdminDelete={() => onAdminDeleteMessage?.(m.id)}
+                            closeMenu={() => setMenuMessageId(null)}
+                          />
                         ) : null}
                       </div>
                     ) : null}
@@ -1754,7 +1912,7 @@ export default function Chat({
             </div>
           </div>
 
-          <div className="composer">
+          <div className="composer" ref={composerRef}>
             {isBanned ? <div className="banBanner">{t("authBanned")}</div> : null}
             {uploadError ? <div className="uploadErrBanner">{uploadError}</div> : null}
             {imageUploading ? <div className="uploadProgressHint">{t("uploadImageProgress")}</div> : null}
@@ -2045,6 +2203,55 @@ export default function Chat({
             </div>
             {/* Telegram-style recording bar is shown above; keep this area clean. */}
           </div>
+            {isMobileChat &&
+            menuMessageId != null &&
+            mobileMenuTarget &&
+            mobileMenuFlags &&
+            typeof document !== "undefined"
+              ? createPortal(
+                  <MessageActionMenuPanel
+                    ref={mobileFloatingMenuRef}
+                    t={t}
+                    canQuickReact={mobileMenuFlags.canQuickReact}
+                    hasSecondaryActions={mobileMenuFlags.hasSecondaryActions}
+                    canEditOwn={mobileMenuFlags.canEditOwn}
+                    canAdminDelete={mobileMenuFlags.canAdminDelete}
+                    className={`msgMenuDropdown msgMenuDropdown--mobileFixed${
+                      mobileMenuPlacement?.openUp ? " msgMenuDropdown--openUp" : ""
+                    }`}
+                    style={
+                      mobileMenuPlacement
+                        ? {
+                            position: "fixed",
+                            top: mobileMenuPlacement.top,
+                            left: mobileMenuPlacement.left,
+                            width: mobileMenuPlacement.width,
+                            maxHeight: mobileMenuPlacement.maxHeight,
+                            zIndex: 200,
+                          }
+                        : {
+                            position: "fixed",
+                            top: 0,
+                            left: 0,
+                            width: 280,
+                            maxHeight: 560,
+                            visibility: "hidden",
+                            pointerEvents: "none",
+                            zIndex: 200,
+                          }
+                    }
+                    onToggleReaction={(emo) => onToggleReaction?.(mobileMenuTarget.id, emo)}
+                    onEdit={() => {
+                      setEditingMessageId(mobileMenuTarget.id);
+                      setText(String(mobileMenuTarget.text ?? ""));
+                      onTyping?.(false);
+                    }}
+                    onAdminDelete={() => onAdminDeleteMessage?.(mobileMenuTarget.id)}
+                    closeMenu={() => setMenuMessageId(null)}
+                  />,
+                  document.body
+                )
+              : null}
         </>
       )}
     </main>
