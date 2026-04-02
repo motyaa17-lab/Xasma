@@ -60,6 +60,7 @@ export default function App() {
   const chatsPresenceRefreshTimer = useRef(null);
   const lastReadSentRef = useRef({}); // chatId -> messageId
   const readEmitTimerRef = useRef(null);
+  const mobileInboxSidebarRef = useRef(null);
 
   const socketEndpoint = useMemo(() => getSocketEndpoint(), []);
   const isMobile = useIsMobile(900);
@@ -566,9 +567,24 @@ export default function App() {
                   {socketReady ? t("realtimeOn") : t("realtimeReconnecting")}
                 </div>
               </div>
-              <UserMenu {...userMenuProps} variant="dropdown" />
+              <div className="mobileMainHeaderActions">
+                {sidebarProps.onCreateGroup ? (
+                  <button
+                    type="button"
+                    className="mobileHeaderIconBtn"
+                    onClick={() => mobileInboxSidebarRef.current?.openCreateGroup?.()}
+                    aria-label={t("createGroup")}
+                    title={t("createGroup")}
+                  >
+                    <span className="mobileHeaderIconPlus" aria-hidden>
+                      +
+                    </span>
+                  </button>
+                ) : null}
+                <UserMenu {...userMenuProps} variant="dropdown" />
+              </div>
             </header>
-            <Sidebar {...sidebarProps} mobileLayout />
+            <Sidebar ref={mobileInboxSidebarRef} {...sidebarProps} mobileLayout />
           </div>
         ) : null}
 

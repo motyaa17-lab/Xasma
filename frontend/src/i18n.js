@@ -6,6 +6,9 @@ export const translations = {
 
     back: "Back",
     searchChatsPlaceholder: "Search chats…",
+    searchUnifiedPlaceholder: "Search",
+    searchUsersHeading: "People",
+    searchNoResults: "No results",
     newActivity: "Last message from contact",
     navChats: "Chats",
     navCalls: "Calls",
@@ -153,6 +156,9 @@ export const translations = {
 
     back: "Назад",
     searchChatsPlaceholder: "Поиск чатов…",
+    searchUnifiedPlaceholder: "Поиск",
+    searchUsersHeading: "Пользователи",
+    searchNoResults: "Ничего не найдено",
     newActivity: "Сообщение от собеседника",
     navChats: "Чаты",
     navCalls: "Звонки",

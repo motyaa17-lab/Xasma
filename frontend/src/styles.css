@@ -2749,6 +2749,40 @@ body.body--mobileConversationOpen {
   min-width: 0;
 }
 
+.mobileMainHeaderActions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mobileHeaderIconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(15, 23, 42, 0.55);
+  color: #e5e7eb;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobileHeaderIconBtn:active {
+  background: rgba(37, 99, 235, 0.22);
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+.mobileHeaderIconPlus {
+  font-size: 26px;
+  font-weight: 300;
+  line-height: 1;
+  margin-top: -2px;
+}
+
 .mobileBrandTitle {
   font-size: 19px;
   font-weight: 800;
@@ -2792,24 +2826,39 @@ body.body--mobileConversationOpen {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
-.mobileChatSearch--compact {
-  padding: 9px 11px;
-  font-size: 16px;
-  margin-top: 6px;
-}
-
 .mobileChatListScroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 0 8px 8px;
+  padding: 0 8px max(8px, env(safe-area-inset-bottom));
 }
 
 .mobileChatListEmpty {
   padding: 22px 14px;
   text-align: center;
   font-size: 14px;
+}
+
+.mobileSearchStatus {
+  padding: 6px 10px 10px;
+  font-size: 13px;
+}
+
+.mobileSearchInlineErr {
+  margin: 0 2px 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.mobileSearchSectionLabel {
+  padding: 14px 10px 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.85);
 }
 
 .mobileChatRow {
@@ -2929,42 +2978,6 @@ body.body--mobileConversationOpen {
   background: rgba(34, 197, 94, 0.9);
 }
 
-.mobileNewChatSection {
-  flex-shrink: 0;
-  padding: 12px 14px;
-  padding-bottom: max(12px, env(safe-area-inset-bottom));
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(11, 18, 32, 0.75);
-}
-
-.mobileNewChatToolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 4px;
-}
-
-.mobileNewChatTitle {
-  font-weight: 800;
-  font-size: 14px;
-}
-
-.mobileToolbarBtn {
-  padding: 8px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(59, 130, 246, 0.35);
-  background: rgba(37, 99, 235, 0.2);
-  color: #dbeafe;
-  font-weight: 700;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.mobileSearchHint {
-  margin-top: 6px;
-}
-
 .mobileSearchResults {
   display: flex;
   flex-direction: column;
@@ -2972,6 +2985,12 @@ body.body--mobileConversationOpen {
   margin-top: 10px;
   max-height: 200px;
   overflow-y: auto;
+}
+
+.mobileSearchResults.mobileSearchResults--inList {
+  max-height: none;
+  margin-top: 0;
+  margin-bottom: max(8px, env(safe-area-inset-bottom));
 }
 
 .mobileSearchResultBtn {
