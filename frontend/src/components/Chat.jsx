@@ -58,6 +58,7 @@ export default function Chat({
   const [videoNoteUploading, setVideoNoteUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [videoNoteDraft, setVideoNoteDraft] = useState(null); // { blob, mimeHint, url }
+  const [sendAckActive, setSendAckActive] = useState(false);
   const listRef = useRef(null);
   const nearBottomRef = useRef(true);
   const scrollAfterSendRef = useRef(false);
@@ -180,6 +181,31 @@ export default function Chat({
       el.scrollTo({ top: el.scrollHeight, behavior });
     });
   }
+
+  /** Subtle outline pulse + optional light haptic when a message is sent (not edit-save). */
+  function playSendAck() {
+    const reduce =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!reduce && typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+      try {
+        navigator.vibrate(10);
+      } catch {
+        /* ignore */
+      }
+    }
+    if (reduce) return;
+    setSendAckActive(false);
+    requestAnimationFrame(() => {
+      setSendAckActive(true);
+    });
+  }
+
+  useEffect(() => {
+    if (!sendAckActive) return;
+    const t = window.setTimeout(() => setSendAckActive(false), 520);
+    return () => window.clearTimeout(t);
+  }, [sendAckActive]);
 
   function requestScrollAfterSend() {
     scrollAfterSendRef.current = true;
@@ -527,6 +553,7 @@ export default function Chat({
         });
       }
       const url = await uploadChatVideo(file);
+      playSendAck();
       requestScrollAfterSend();
       onSend({ text: "", videoUrl: url });
     } catch (err) {
@@ -958,6 +985,7 @@ export default function Chat({
               // eslint-disable-next-line no-console
               console.log("[Xasma] voice uploaded", { url });
             }
+            playSendAck();
             requestScrollAfterSend();
             onSend({ text: "", audioUrl: url });
           } catch (err) {
@@ -1259,6 +1287,7 @@ export default function Chat({
     }
     if (!pendingImageUrl && !trimmed) return;
     if (imageUploading || voiceRecording || voiceArming) return;
+    playSendAck();
     requestScrollAfterSend();
     onSend({ text: trimmed, imageUrl: pendingImageUrl || undefined });
     setText("");
@@ -1786,7 +1815,11 @@ export default function Chat({
             <div
               className={`composerMain${
                 voiceRecording || voiceArming || videoRecording || videoArming ? " composerMain--recording" : ""
-              }`}
+              }${sendAckActive ? " composerSendAck" : ""}`}
+              onAnimationEnd={(e) => {
+                if (e.target !== e.currentTarget) return;
+                setSendAckActive(false);
+              }}
             >
               <button
                 type="button"

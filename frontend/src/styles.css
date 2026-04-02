@@ -2096,6 +2096,32 @@ body.body--mobileConversationOpen {
   flex-wrap: nowrap;
 }
 
+@keyframes composerSendAck {
+  0% {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+  }
+  30% {
+    outline: 2px solid rgba(59, 130, 246, 0.32);
+    outline-offset: 3px;
+  }
+  100% {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+  }
+}
+
+.composerMain.composerSendAck {
+  animation: composerSendAck 0.4s var(--ease-tg-out, cubic-bezier(0.25, 0.82, 0.22, 1));
+  border-radius: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composerMain.composerSendAck {
+    animation: none;
+  }
+}
+
 .composerFileInput {
   position: absolute;
   width: 1px;
