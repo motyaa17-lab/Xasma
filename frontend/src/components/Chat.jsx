@@ -1731,6 +1731,11 @@ export default function Chat({
                 })()
               )
             )}
+            {chatId && !messages.some((m) => m.type !== "system") ? (
+              <div className="chatEmptyState" role="status">
+                <p className="chatEmptyStateText">{t("chatEmptyPrompt")}</p>
+              </div>
+            ) : null}
           </div>
 
           <div

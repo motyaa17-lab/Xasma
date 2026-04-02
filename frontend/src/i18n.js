@@ -67,6 +67,7 @@ export const translations = {
     searching: "Searching...",
     noChatsYet: "No chats yet.",
     noMessages: "No messages",
+    chatEmptyPrompt: "Start the conversation 👋",
 
     selectChatTitle: "Select a chat",
     selectChatHint: "Pick a conversation from the sidebar, or start a new one.",
@@ -213,6 +214,7 @@ export const translations = {
     searching: "Поиск...",
     noChatsYet: "Пока нет чатов.",
     noMessages: "Нет сообщений",
+    chatEmptyPrompt: "Начни диалог 👋",
 
     selectChatTitle: "Выберите чат",
     selectChatHint: "Выберите диалог слева или начните новый.",
