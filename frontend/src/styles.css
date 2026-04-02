@@ -1354,6 +1354,89 @@ body {
   filter: brightness(1.08);
 }
 
+/* ----- Telegram-style recording bar (mobile + desktop-safe) ----- */
+.recBottomBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(15, 23, 42, 0.55);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.recBottomBarLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.recBottomDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f87171;
+  box-shadow: 0 0 0 6px rgba(248, 113, 113, 0.14);
+  flex: 0 0 auto;
+}
+
+.recBottomText {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(226, 232, 240, 0.92);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.recBottomLock {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.recBottomHint {
+  font-size: 14px;
+  opacity: 0.55;
+}
+
+.recBottomBarActions {
+  display: flex;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.recBottomBtn {
+  min-height: 34px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(248, 250, 252, 0.92);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.recBottomBtn--primary {
+  background: rgba(59, 130, 246, 0.35);
+  border-color: rgba(59, 130, 246, 0.4);
+  color: white;
+}
+
+.recBottomBtn--ghost {
+  background: transparent;
+  color: rgba(203, 213, 225, 0.88);
+}
+
+.recBottomBtn:active {
+  transform: translateY(1px);
+}
+
 @keyframes recPulse {
   0%,
   100% {
@@ -2586,6 +2669,20 @@ body {
 
 .videoNoteBtn:active {
   transform: translateY(1px);
+}
+
+.videoNoteLockPill {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  min-height: 42px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(226, 232, 240, 0.95);
+  font-size: 16px;
 }
 
 .mobileChatBackBtn {

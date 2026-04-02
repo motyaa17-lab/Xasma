@@ -41,11 +41,13 @@ export default function Chat({
   const [voiceArming, setVoiceArming] = useState(false);
   const [voiceRecMs, setVoiceRecMs] = useState(0);
   const [voicePressing, setVoicePressing] = useState(false);
+  const [voiceLocked, setVoiceLocked] = useState(false);
   const [voiceUploading, setVoiceUploading] = useState(false);
   const [videoRecording, setVideoRecording] = useState(false);
   const [videoArming, setVideoArming] = useState(false);
   const [videoRecSec, setVideoRecSec] = useState(0);
   const [videoPressing, setVideoPressing] = useState(false);
+  const [videoLocked, setVideoLocked] = useState(false);
   const [videoNoteUploading, setVideoNoteUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [videoNoteDraft, setVideoNoteDraft] = useState(null); // { blob, mimeHint, url }
@@ -60,6 +62,7 @@ export default function Chat({
   const voiceRecTimerRef = useRef(null);
   const voiceHoldCleanupRef = useRef(null);
   const voiceHoldDoneRef = useRef(null);
+  const voiceLockActivatedRef = useRef(false);
   const videoStreamRef = useRef(null);
   const videoMediaRecorderRef = useRef(null);
   const videoRecordChunksRef = useRef([]);
@@ -69,6 +72,7 @@ export default function Chat({
   const videoTickRef = useRef(null);
   const videoHoldCleanupRef = useRef(null);
   const videoHoldDoneRef = useRef(null);
+  const videoLockActivatedRef = useRef(false);
   const inlineVideoRef = useRef(null);
   const typingStartTimerRef = useRef(null);
   const typingStopTimerRef = useRef(null);
@@ -152,11 +156,13 @@ export default function Chat({
     setVoiceArming(false);
     setVoiceRecMs(0);
     setVoicePressing(false);
+    setVoiceLocked(false);
     setVoiceUploading(false);
     setVideoRecording(false);
     setVideoArming(false);
     setVideoRecSec(0);
     setVideoPressing(false);
+    setVideoLocked(false);
     setVideoNoteUploading(false);
     setUploadError("");
     clearVideoNoteDraft();
@@ -358,6 +364,7 @@ export default function Chat({
     voiceHoldDoneRef.current = null;
     const fn = voiceHoldCleanupRef.current;
     voiceHoldCleanupRef.current = null;
+    voiceLockActivatedRef.current = false;
     if (fn) fn();
   }
 
@@ -365,12 +372,14 @@ export default function Chat({
     videoHoldDoneRef.current = null;
     const fn = videoHoldCleanupRef.current;
     videoHoldCleanupRef.current = null;
+    videoLockActivatedRef.current = false;
     if (fn) fn();
   }
 
   function cancelVoiceRecording() {
     detachVoiceHoldEnd();
     setVoicePressing(false);
+    setVoiceLocked(false);
     const rec = mediaRecorderRef.current;
     if (!rec || rec.state === "inactive") {
       abortPendingVoiceRef.current = true;
@@ -393,6 +402,7 @@ export default function Chat({
 
   function finishVoiceRecording() {
     abortPendingVoiceRef.current = false;
+    setVoiceLocked(false);
     if (!mediaRecorderRef.current || mediaRecorderRef.current.state === "inactive") {
       mediaStreamRef.current?.getTracks().forEach((tr) => tr.stop());
       mediaStreamRef.current = null;
@@ -424,6 +434,7 @@ export default function Chat({
   function cancelVideoRecording() {
     detachVideoHoldEnd();
     setVideoPressing(false);
+    setVideoLocked(false);
     clearVideoNoteDraft();
     const rec = videoMediaRecorderRef.current;
     if (!rec || rec.state === "inactive") {
@@ -447,6 +458,7 @@ export default function Chat({
 
   function finishVideoRecording() {
     abortPendingVideoRef.current = false;
+    setVideoLocked(false);
     if (!videoMediaRecorderRef.current || videoMediaRecorderRef.current.state === "inactive") {
       cleanupVideoStream();
       setVideoRecording(false);
@@ -469,6 +481,7 @@ export default function Chat({
   function attachVoiceHoldEndListeners(activePointerId) {
     detachVoiceHoldEnd();
     let handled = false;
+    let startY = null;
     const runRelease = () => {
       if (handled) return;
       handled = true;
@@ -478,6 +491,10 @@ export default function Chat({
       if (rm) rm();
       setVoicePressing(false);
       if (abortPendingVoiceRef.current) return;
+      if (voiceLockActivatedRef.current || voiceLocked) {
+        // Locked: finger release should NOT stop recording.
+        return;
+      }
       const rec = mediaRecorderRef.current;
       if (rec && (rec.state === "recording" || rec.state === "paused")) {
         abortPendingVoiceRef.current = false;
@@ -497,31 +514,59 @@ export default function Chat({
     };
     voiceHoldDoneRef.current = runRelease;
 
+    const onMove = (clientY) => {
+      if (handled) return;
+      if (startY == null) startY = clientY;
+      const dy = clientY - startY;
+      // Swipe up to lock.
+      if (!voiceLockActivatedRef.current && dy < -52) {
+        voiceLockActivatedRef.current = true;
+        setVoiceLocked(true);
+      }
+    };
+
     const onPointerUp = (ev) => {
       if (activePointerId != null && ev.pointerId !== activePointerId) return;
       runRelease();
     };
+    const onPointerMove = (ev) => {
+      if (activePointerId != null && ev.pointerId !== activePointerId) return;
+      onMove(ev.clientY);
+    };
     const onTouchEnd = () => runRelease();
+    const onTouchMove = (ev) => {
+      const t0 = ev.touches?.[0];
+      if (!t0) return;
+      onMove(t0.clientY);
+    };
     const onMouseUp = () => runRelease();
+    const onMouseMove = (ev) => onMove(ev.clientY);
 
     window.addEventListener("pointerup", onPointerUp, true);
     window.addEventListener("pointercancel", onPointerUp, true);
+    window.addEventListener("pointermove", onPointerMove, true);
     window.addEventListener("touchend", onTouchEnd, { capture: true, passive: true });
     window.addEventListener("touchcancel", onTouchEnd, { capture: true, passive: true });
+    window.addEventListener("touchmove", onTouchMove, { capture: true, passive: false });
     window.addEventListener("mouseup", onMouseUp, true);
+    window.addEventListener("mousemove", onMouseMove, true);
 
     voiceHoldCleanupRef.current = () => {
       window.removeEventListener("pointerup", onPointerUp, true);
       window.removeEventListener("pointercancel", onPointerUp, true);
+      window.removeEventListener("pointermove", onPointerMove, true);
       window.removeEventListener("touchend", onTouchEnd, true);
       window.removeEventListener("touchcancel", onTouchEnd, true);
+      window.removeEventListener("touchmove", onTouchMove, true);
       window.removeEventListener("mouseup", onMouseUp, true);
+      window.removeEventListener("mousemove", onMouseMove, true);
     };
   }
 
   function attachVideoHoldEndListeners(activePointerId) {
     detachVideoHoldEnd();
     let handled = false;
+    let startY = null;
     const runRelease = () => {
       if (handled) return;
       handled = true;
@@ -531,6 +576,10 @@ export default function Chat({
       if (rm) rm();
       setVideoPressing(false);
       if (abortPendingVideoRef.current) return;
+      if (videoLockActivatedRef.current || videoLocked) {
+        // Locked: finger release should NOT stop recording.
+        return;
+      }
       const rec = videoMediaRecorderRef.current;
       if (rec && (rec.state === "recording" || rec.state === "paused")) {
         abortPendingVideoRef.current = false;
@@ -550,25 +599,51 @@ export default function Chat({
     };
     videoHoldDoneRef.current = runRelease;
 
+    const onMove = (clientY) => {
+      if (handled) return;
+      if (startY == null) startY = clientY;
+      const dy = clientY - startY;
+      if (!videoLockActivatedRef.current && dy < -52) {
+        videoLockActivatedRef.current = true;
+        setVideoLocked(true);
+      }
+    };
+
     const onPointerUp = (ev) => {
       if (activePointerId != null && ev.pointerId !== activePointerId) return;
       runRelease();
     };
+    const onPointerMove = (ev) => {
+      if (activePointerId != null && ev.pointerId !== activePointerId) return;
+      onMove(ev.clientY);
+    };
     const onTouchEnd = () => runRelease();
+    const onTouchMove = (ev) => {
+      const t0 = ev.touches?.[0];
+      if (!t0) return;
+      onMove(t0.clientY);
+    };
     const onMouseUp = () => runRelease();
+    const onMouseMove = (ev) => onMove(ev.clientY);
 
     window.addEventListener("pointerup", onPointerUp, true);
     window.addEventListener("pointercancel", onPointerUp, true);
+    window.addEventListener("pointermove", onPointerMove, true);
     window.addEventListener("touchend", onTouchEnd, { capture: true, passive: true });
     window.addEventListener("touchcancel", onTouchEnd, { capture: true, passive: true });
+    window.addEventListener("touchmove", onTouchMove, { capture: true, passive: false });
     window.addEventListener("mouseup", onMouseUp, true);
+    window.addEventListener("mousemove", onMouseMove, true);
 
     videoHoldCleanupRef.current = () => {
       window.removeEventListener("pointerup", onPointerUp, true);
       window.removeEventListener("pointercancel", onPointerUp, true);
+      window.removeEventListener("pointermove", onPointerMove, true);
       window.removeEventListener("touchend", onTouchEnd, true);
       window.removeEventListener("touchcancel", onTouchEnd, true);
+      window.removeEventListener("touchmove", onTouchMove, true);
       window.removeEventListener("mouseup", onMouseUp, true);
+      window.removeEventListener("mousemove", onMouseMove, true);
     };
   }
 
@@ -880,6 +955,8 @@ export default function Chat({
     }
     e.preventDefault?.();
     setVoicePressing(true);
+    setVoiceLocked(false);
+    voiceLockActivatedRef.current = false;
     const pid = typeof e.pointerId === "number" ? e.pointerId : null;
     attachVoiceHoldEndListeners(pid);
     void startVoiceHoldRecording();
@@ -929,6 +1006,8 @@ export default function Chat({
     }
     e.preventDefault?.();
     setVideoPressing(true);
+    setVideoLocked(false);
+    videoLockActivatedRef.current = false;
     const pid = typeof e.pointerId === "number" ? e.pointerId : null;
     attachVideoHoldEndListeners(pid);
     void startVideoHoldRecording();
@@ -1066,6 +1145,7 @@ export default function Chat({
                       <button type="button" className="videoNoteBtn videoNoteBtn--ghost" onClick={cancelVideoRecording}>
                         {t("videoNoteCancel")}
                       </button>
+                      {videoLocked ? <div className="videoNoteLockPill" aria-label="Locked">🔒</div> : null}
                       <button type="button" className="videoNoteBtn videoNoteBtn--primary" onClick={finishVideoRecording}>
                         {t("videoNoteStop")}
                       </button>
@@ -1410,6 +1490,33 @@ export default function Chat({
             {imageUploading ? <div className="uploadProgressHint">{t("uploadImageProgress")}</div> : null}
             {voiceUploading ? <div className="uploadProgressHint">{t("voiceSending")}</div> : null}
             {videoNoteUploading ? <div className="uploadProgressHint">{t("videoNoteUploading")}</div> : null}
+            {voiceArming || voiceRecording ? (
+              <div className="recBottomBar" role="group" aria-label={t("voiceRecordingControls")}>
+                <div className="recBottomBarLeft">
+                  <span className="recBottomDot" aria-hidden />
+                  <span className="recBottomText">
+                    {t("recordingInline")} {formatRecordingClock(voiceRecMs)}
+                  </span>
+                  {voiceLocked ? (
+                    <span className="recBottomLock" aria-label="Locked">
+                      🔒
+                    </span>
+                  ) : (
+                    <span className="recBottomHint" aria-hidden>
+                      ↑
+                    </span>
+                  )}
+                </div>
+                <div className="recBottomBarActions">
+                  <button type="button" className="recBottomBtn recBottomBtn--ghost" onClick={onVoiceFallbackCancel}>
+                    {t("voiceCancel")}
+                  </button>
+                  <button type="button" className="recBottomBtn recBottomBtn--primary" onClick={onVoiceFallbackSend}>
+                    {t("voiceStopSend")}
+                  </button>
+                </div>
+              </div>
+            ) : null}
             {pendingPreviewObjectUrl && !editingMessageId ? (
               <div className="pendingImageStrip">
                 <img src={pendingPreviewObjectUrl} alt="" className="pendingImageThumb" />
@@ -1634,16 +1741,7 @@ export default function Chat({
                 {editingMessageId ? t("save") : t("send")}
               </button>
             </div>
-            {voiceArming || voiceRecording ? (
-              <div className="voiceRecFallbackRow" role="group" aria-label={t("voiceRecordingControls")}>
-                <button type="button" className="voiceRecFallbackSend" onClick={onVoiceFallbackSend}>
-                  {t("voiceStopSend")}
-                </button>
-                <button type="button" className="voiceRecFallbackCancel" onClick={onVoiceFallbackCancel}>
-                  {t("voiceCancel")}
-                </button>
-              </div>
-            ) : null}
+            {/* Telegram-style recording bar is shown above; keep this area clean. */}
           </div>
         </>
       )}

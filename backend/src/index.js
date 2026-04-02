@@ -95,7 +95,7 @@ const videoUpload = multer({
     if (videoMimeOk(mime)) return cb(null, true);
     if (!mime && allowedExt.includes(ext)) return cb(null, true);
 
-    return cb(new Error("Unsupported video format (use WebM or MP4)"));
+    return cb(new Error("Unsupported video format (use WebM, MP4, or MOV)"));
   },
 });
 const JWT_SECRET = process.env.JWT_SECRET || "change_me";
