@@ -2470,6 +2470,124 @@ body {
   height: 16px;
 }
 
+/* ----- Video circle recording overlay (mobile, Telegram-like) ----- */
+.videoNoteOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+}
+
+.videoNoteOverlayBackdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(3, 7, 18, 0.58);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.videoNoteOverlayCard {
+  position: relative;
+  width: min(360px, 92vw);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 14px 12px;
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+}
+
+.videoNoteOverlayTop {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.videoNoteOverlayTitle {
+  font-weight: 900;
+  font-size: 14px;
+  color: rgba(226, 232, 240, 0.92);
+}
+
+.videoNoteOverlayTimer {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 800;
+  color: rgba(191, 219, 254, 0.95);
+}
+
+.videoNoteOverlayPreviewWrap {
+  position: relative;
+  width: min(280px, 72vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(2, 6, 23, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.videoNoteOverlayPreview {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.videoNoteOverlayRecDot {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f87171;
+  box-shadow: 0 0 0 6px rgba(248, 113, 113, 0.14);
+}
+
+.videoNoteOverlayActions {
+  width: 100%;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.videoNoteBtn {
+  flex: 1;
+  min-height: 42px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(226, 232, 240, 0.95);
+  font-weight: 900;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.videoNoteBtn--ghost {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.videoNoteBtn--primary {
+  background: rgba(37, 99, 235, 0.22);
+  border-color: rgba(37, 99, 235, 0.40);
+}
+
+.videoNoteBtn:active {
+  transform: translateY(1px);
+}
+
 .mobileChatBackBtn {
   flex-shrink: 0;
   width: 38px;

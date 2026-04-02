@@ -48,6 +48,7 @@ export default function Chat({
   const [videoPressing, setVideoPressing] = useState(false);
   const [videoNoteUploading, setVideoNoteUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [videoNoteDraft, setVideoNoteDraft] = useState(null); // { blob, mimeHint, url }
   const listRef = useRef(null);
   const fileInputRef = useRef(null);
   const mediaStreamRef = useRef(null);
@@ -74,6 +75,15 @@ export default function Chat({
   const typingActiveRef = useRef(false);
 
   const isGroup = chat?.type === "group";
+  const isMobileChat = Boolean(onMobileBack);
+  const showVideoNoteOverlay = isMobileChat && (videoArming || videoRecording || Boolean(videoNoteDraft));
+
+  function clearVideoNoteDraft() {
+    setVideoNoteDraft((prev) => {
+      if (prev?.url) URL.revokeObjectURL(prev.url);
+      return null;
+    });
+  }
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -113,6 +123,7 @@ export default function Chat({
     setVideoPressing(false);
     setVideoNoteUploading(false);
     setUploadError("");
+    clearVideoNoteDraft();
     setPendingPreviewObjectUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return null;
@@ -283,6 +294,19 @@ export default function Chat({
     }
   }
 
+  async function sendVideoNoteDraft() {
+    if (!videoNoteDraft) return;
+    await uploadVideoBlob(videoNoteDraft.blob, videoNoteDraft.mimeHint);
+    clearVideoNoteDraft();
+  }
+
+  function retakeVideoNote() {
+    clearVideoNoteDraft();
+    detachVideoHoldEnd();
+    setVideoPressing(false);
+    void startVideoHoldRecording();
+  }
+
   function cleanupVideoStream() {
     if (videoTickRef.current) {
       clearInterval(videoTickRef.current);
@@ -364,6 +388,7 @@ export default function Chat({
   function cancelVideoRecording() {
     detachVideoHoldEnd();
     setVideoPressing(false);
+    clearVideoNoteDraft();
     const rec = videoMediaRecorderRef.current;
     if (!rec || rec.state === "inactive") {
       abortPendingVideoRef.current = true;
@@ -657,6 +682,7 @@ export default function Chat({
       return;
     }
     setUploadError("");
+    clearVideoNoteDraft();
     abortPendingVideoRef.current = false;
     videoRecordCancelledRef.current = false;
     videoRecordChunksRef.current = [];
@@ -741,7 +767,10 @@ export default function Chat({
               return;
             }
           }
-          await uploadVideoBlob(blob, mimeHint);
+          setVideoNoteDraft((prev) => {
+            if (prev?.url) URL.revokeObjectURL(prev.url);
+            return { blob, mimeHint, url: URL.createObjectURL(blob) };
+          });
         })();
       };
       if (abortPendingVideoRef.current) {
@@ -921,6 +950,75 @@ export default function Chat({
         </div>
       ) : (
         <>
+          {showVideoNoteOverlay ? (
+            <div
+              className="videoNoteOverlay"
+              role="dialog"
+              aria-label={t("videoNoteTitle")}
+              aria-modal="true"
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.preventDefault()}
+            >
+              <div className="videoNoteOverlayBackdrop" onClick={cancelVideoRecording} />
+              <div className="videoNoteOverlayCard">
+                <div className="videoNoteOverlayTop">
+                  <div className="videoNoteOverlayTitle">{t("videoNoteTitle")}</div>
+                  <div className="videoNoteOverlayTimer" aria-live="polite">
+                    {videoArming || videoRecording ? formatRecordingClock(videoRecSec * 1000) : ""}
+                  </div>
+                </div>
+
+                <div className="videoNoteOverlayPreviewWrap">
+                  {videoNoteDraft ? (
+                    <video
+                      className="videoNoteOverlayPreview"
+                      src={videoNoteDraft.url}
+                      playsInline
+                      loop
+                      autoPlay
+                      muted
+                      preload="metadata"
+                    />
+                  ) : (
+                    <video
+                      ref={inlineVideoRef}
+                      className={`videoNoteOverlayPreview${videoRecording ? " videoNoteOverlayPreview--rec" : ""}`}
+                      playsInline
+                      muted
+                      autoPlay
+                      aria-hidden="true"
+                    />
+                  )}
+                  {videoRecording && !videoNoteDraft ? <div className="videoNoteOverlayRecDot" aria-hidden /> : null}
+                </div>
+
+                <div className="videoNoteOverlayActions">
+                  {videoNoteDraft ? (
+                    <>
+                      <button type="button" className="videoNoteBtn videoNoteBtn--ghost" onClick={cancelVideoRecording}>
+                        {t("videoNoteCancel")}
+                      </button>
+                      <button type="button" className="videoNoteBtn videoNoteBtn--ghost" onClick={retakeVideoNote}>
+                        {t("videoNoteRetake")}
+                      </button>
+                      <button type="button" className="videoNoteBtn videoNoteBtn--primary" onClick={sendVideoNoteDraft}>
+                        {t("videoNoteSend")}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button type="button" className="videoNoteBtn videoNoteBtn--ghost" onClick={cancelVideoRecording}>
+                        {t("videoNoteCancel")}
+                      </button>
+                      <button type="button" className="videoNoteBtn videoNoteBtn--primary" onClick={finishVideoRecording}>
+                        {t("videoNoteStop")}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : null}
           <div className="chatHeader">
             <div className="chatHeaderLead">
               {onMobileBack ? (
@@ -1317,25 +1415,29 @@ export default function Chat({
                   {t("recordingInline")} {formatRecordingClock(voiceRecMs)}
                 </span>
               ) : null}
-              <div
-                className={`inlineVideoRecWrap${
-                  videoArming || videoRecording ? " inlineVideoRecWrap--on" : ""
-                }`}
-              >
-                <video
-                  ref={inlineVideoRef}
-                  className="inlineVideoRec"
-                  playsInline
-                  muted
-                  autoPlay
-                  aria-hidden="true"
-                />
-              </div>
-              {videoArming || videoRecording ? (
-                <span className="recInlineIndicator recInlineIndicator--video" role="status" aria-live="polite">
-                  <span className="recInlineDot recInlineDot--video" aria-hidden />
-                  {t("recordingInline")} {formatRecordingClock(videoRecSec * 1000)}
-                </span>
+              {!isMobileChat ? (
+                <>
+                  <div
+                    className={`inlineVideoRecWrap${
+                      videoArming || videoRecording ? " inlineVideoRecWrap--on" : ""
+                    }`}
+                  >
+                    <video
+                      ref={inlineVideoRef}
+                      className="inlineVideoRec"
+                      playsInline
+                      muted
+                      autoPlay
+                      aria-hidden="true"
+                    />
+                  </div>
+                  {videoArming || videoRecording ? (
+                    <span className="recInlineIndicator recInlineIndicator--video" role="status" aria-live="polite">
+                      <span className="recInlineDot recInlineDot--video" aria-hidden />
+                      {t("recordingInline")} {formatRecordingClock(videoRecSec * 1000)}
+                    </span>
+                  ) : null}
+                </>
               ) : null}
               <textarea
                 className="composerInput"
