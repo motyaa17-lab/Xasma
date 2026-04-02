@@ -13,6 +13,11 @@ const BUBBLE_PRESS_IGNORE =
   'button, a[href], input, textarea, select, [role="button"], [role="menu"], [role="menuitem"], .msgMenu, .msgMenuDropdown, video, audio, .circleVideoMsg, .circleVideoSoundBtn, .voiceMsgPill, .reactionPill';
 /** Distance from bottom (px) to treat as "following" the chat for auto-scroll on new messages. */
 const SCROLL_NEAR_BOTTOM_PX = 100;
+/** Mobile long-press → message menu (ms). */
+const MOBILE_LONG_PRESS_MS = 420;
+/** Cancel long-press if finger moves farther than this (px) from start. */
+const MOBILE_LONG_PRESS_MOVE_CANCEL_PX = 14;
+const MOBILE_LONG_PRESS_MOVE_CANCEL_PX2 = MOBILE_LONG_PRESS_MOVE_CANCEL_PX * MOBILE_LONG_PRESS_MOVE_CANCEL_PX;
 
 const MessageActionMenuPanel = forwardRef(function MessageActionMenuPanel(
   {
@@ -235,6 +240,8 @@ export default function Chat({
   const composerRef = useRef(null);
   const chatHeaderRef = useRef(null);
   const [mobileMenuPlacement, setMobileMenuPlacement] = useState(null);
+  const longPressTimerRef = useRef(null);
+  const longPressTrackRef = useRef(null);
 
   const onBubblePointerDown = useCallback((e) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
@@ -294,6 +301,70 @@ export default function Chat({
       hasSecondaryActions: canEditOwn || canAdminDelete,
     };
   }, [mobileMenuTarget, meId, isBanned, isAdmin]);
+
+  const clearBubbleLongPress = useCallback(() => {
+    if (longPressTimerRef.current != null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressTrackRef.current = null;
+  }, []);
+
+  const triggerMobileMessageMenuHaptic = useCallback(() => {
+    try {
+      if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+        navigator.vibrate(12);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const onMobileBubbleTouchStart = useCallback(
+    (e, messageId, showMessageMenu) => {
+      if (!isMobileChat || !showMessageMenu || showVideoNoteOverlay) return;
+      if (e.touches.length !== 1) return;
+      const raw = e.target;
+      const el = raw instanceof Element ? raw : raw?.parentElement;
+      if (!(el instanceof Element) || el.closest(BUBBLE_PRESS_IGNORE)) return;
+      clearBubbleLongPress();
+      const t = e.touches[0];
+      longPressTrackRef.current = { x: t.clientX, y: t.clientY };
+      longPressTimerRef.current = window.setTimeout(() => {
+        longPressTimerRef.current = null;
+        longPressTrackRef.current = null;
+        triggerMobileMessageMenuHaptic();
+        setMenuMessageId(messageId);
+      }, MOBILE_LONG_PRESS_MS);
+    },
+    [isMobileChat, showVideoNoteOverlay, clearBubbleLongPress, triggerMobileMessageMenuHaptic]
+  );
+
+  const onMobileBubbleTouchMove = useCallback(
+    (e) => {
+      if (!isMobileChat || longPressTrackRef.current == null) return;
+      const t = e.touches[0];
+      if (!t) return;
+      const o = longPressTrackRef.current;
+      const dx = t.clientX - o.x;
+      const dy = t.clientY - o.y;
+      if (dx * dx + dy * dy > MOBILE_LONG_PRESS_MOVE_CANCEL_PX2) {
+        clearBubbleLongPress();
+      }
+    },
+    [isMobileChat, clearBubbleLongPress]
+  );
+
+  const onMobileBubbleTouchEnd = useCallback(() => {
+    if (!isMobileChat) return;
+    clearBubbleLongPress();
+  }, [isMobileChat, clearBubbleLongPress]);
+
+  const onMobileBubbleTouchCancel = useCallback(() => {
+    if (!isMobileChat) return;
+    clearBubbleLongPress();
+  }, [isMobileChat, clearBubbleLongPress]);
+
   function onChatTouchStart(e) {
     if (!isMobileChat || !onMobileBack) return;
     if (showVideoNoteOverlay) return;
@@ -393,11 +464,12 @@ export default function Chat({
     function onScroll() {
       const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
       nearBottomRef.current = distance <= SCROLL_NEAR_BOTTOM_PX;
+      if (isMobileChat) clearBubbleLongPress();
     }
     onScroll();
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
-  }, [chatId]);
+  }, [chatId, isMobileChat, clearBubbleLongPress]);
 
   useEffect(() => {
     if (!chatId) {
@@ -484,6 +556,11 @@ export default function Chat({
     onTyping?.(false);
     setEditingMessageId(null);
     setMenuMessageId(null);
+    if (longPressTimerRef.current != null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressTrackRef.current = null;
     setText("");
     setGroupInfoOpen(false);
     setPendingImageUrl(null);
@@ -1763,10 +1840,24 @@ export default function Chat({
                         ? `bubble me bubbleOwn bubbleWithActions${bubbleMediaBare}`
                         : `bubble bubbleWithActions${bubbleMediaBare}`
                     }
+                    ref={isMobileChat && menuMessageId === m.id ? menuAnchorRef : undefined}
                     onPointerDown={onBubblePointerDown}
                     onPointerUp={onBubblePointerUp}
                     onPointerCancel={onBubblePointerCancel}
                     onLostPointerCapture={onBubbleLostPointerCapture}
+                    onTouchStart={
+                      isMobileChat
+                        ? (e) => {
+                            onMobileBubbleTouchStart(e, m.id, showMessageMenu);
+                          }
+                        : undefined
+                    }
+                    onTouchMove={isMobileChat ? onMobileBubbleTouchMove : undefined}
+                    onTouchEnd={isMobileChat ? onMobileBubbleTouchEnd : undefined}
+                    onTouchCancel={isMobileChat ? onMobileBubbleTouchCancel : undefined}
+                    onContextMenu={
+                      isMobileChat && showMessageMenu ? (e) => e.preventDefault() : undefined
+                    }
                   >
                     {showMessageMenu ? (
                       <div className="msgMenu">
@@ -1774,7 +1865,6 @@ export default function Chat({
                           type="button"
                           className="msgMenuBtn"
                           aria-label={t("menu")}
-                          ref={isMobileChat && menuMessageId === m.id ? menuAnchorRef : undefined}
                           onMouseDown={(e) => e.stopPropagation()}
                           onTouchStart={(e) => e.stopPropagation()}
                           onClick={(e) => {

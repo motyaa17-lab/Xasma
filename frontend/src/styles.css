@@ -3116,6 +3116,14 @@ body.body--mobileConversationOpen {
   padding: 12px 12px 0;
 }
 
+/* Long-press message menu: avoid Safari text selection / link & image callouts on bubbles */
+.appShell--mobile .messages .bubble,
+.appShell--mobile .messages .bubble * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
 .appShell--mobile .bubbleRow {
   margin-bottom: 8px;
   gap: 8px;
