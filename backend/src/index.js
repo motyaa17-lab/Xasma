@@ -60,13 +60,27 @@ const audioUpload = multer({
 const videoMimeOk = (mime) =>
   /^video\/(webm|mp4|quicktime|x-msvideo|3gpp)$/i.test(String(mime || ""));
 
+function extFromVideoMime(mime) {
+  const m = String(mime || "").toLowerCase();
+  if (m.includes("mp4")) return ".mp4";
+  if (m.includes("quicktime")) return ".mov";
+  if (m.includes("3gpp")) return ".3gp";
+  if (m.includes("webm")) return ".webm";
+  return "";
+}
+
 const videoUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, uploadsDir),
     filename: (_req, file, cb) => {
       const ext = path.extname(file.originalname || "").toLowerCase();
       const allowed = [".webm", ".mp4", ".mov", ".3gp"];
-      const safeExt = allowed.includes(ext) ? ext : ".webm";
+      const mimeExt = extFromVideoMime(file.mimetype);
+      const safeExt = allowed.includes(ext)
+        ? ext
+        : allowed.includes(mimeExt)
+          ? mimeExt
+          : ".webm";
       cb(null, `${Date.now()}-${crypto.randomBytes(8).toString("hex")}${safeExt}`);
     },
   }),

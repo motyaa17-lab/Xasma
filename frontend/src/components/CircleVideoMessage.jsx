@@ -6,6 +6,7 @@ import React, { useEffect, useRef, useState } from "react";
 export default function CircleVideoMessage({ src, tapSoundLabel, soundOnLabel }) {
   const videoRef = useRef(null);
   const [muted, setMuted] = useState(true);
+  const [hadError, setHadError] = useState(false);
 
   useEffect(() => {
     const v = videoRef.current;
@@ -16,6 +17,7 @@ export default function CircleVideoMessage({ src, tapSoundLabel, soundOnLabel })
     };
     tryPlay();
     v.addEventListener("canplay", tryPlay);
+    v.addEventListener("loadedmetadata", tryPlay);
     return () => v.removeEventListener("canplay", tryPlay);
   }, [src, muted]);
 
@@ -35,7 +37,19 @@ export default function CircleVideoMessage({ src, tapSoundLabel, soundOnLabel })
         playsInline
         autoPlay
         preload="metadata"
+        onError={() => {
+          setHadError(true);
+          if (import.meta.env.DEV) {
+            // eslint-disable-next-line no-console
+            console.warn("[Xasma] circle video error", { src });
+          }
+        }}
       />
+      {hadError ? (
+        <a className="circleVideoFallbackLink" href={src} target="_blank" rel="noopener noreferrer">
+          Open video
+        </a>
+      ) : null}
       <button
         type="button"
         className="circleVideoSoundBtn"

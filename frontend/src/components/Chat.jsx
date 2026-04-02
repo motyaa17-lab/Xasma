@@ -257,10 +257,21 @@ export default function Chat({
     setUploadError("");
     setVideoNoteUploading(true);
     try {
-      const ext = extFromVideoMime(blob.type || mimeHint);
-      const file = new File([blob], `videonote-${Date.now()}${ext}`, {
-        type: blob.type || mimeHint || "video/webm",
-      });
+      const detectedMime = (await detectVideoMime(blob, mimeHint)) || "video/webm";
+      const ext = extFromVideoMime(detectedMime);
+      const file = new File([blob], `videonote-${Date.now()}${ext}`, { type: detectedMime });
+
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.log("[Xasma] video upload", {
+          mimeHint: String(mimeHint || ""),
+          blobType: String(blob?.type || ""),
+          detectedMime,
+          fileType: String(file.type || ""),
+          fileName: file.name,
+          size: blob?.size ?? 0,
+        });
+      }
       const url = await uploadChatVideo(file);
       onSend({ text: "", videoUrl: url });
     } catch (err) {
@@ -1495,6 +1506,9 @@ function pickVideoMime() {
     "video/webm;codecs=vp8,opus",
     "video/webm;codecs=h264,opus",
     "video/webm",
+    // Safari/iOS typically prefers MP4/H.264
+    "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+    "video/mp4;codecs=avc1,mp4a.40.2",
     "video/mp4",
   ];
   for (const typ of types) {
@@ -1510,7 +1524,43 @@ function pickVideoMime() {
 function extFromVideoMime(mime) {
   const m = String(mime || "").toLowerCase();
   if (m.includes("mp4")) return ".mp4";
+  if (m.includes("quicktime")) return ".mov";
+  if (m.includes("3gpp")) return ".3gp";
   return ".webm";
+}
+
+async function sniffVideoContainerMime(blob) {
+  try {
+    const head = await blob.slice(0, 32).arrayBuffer();
+    const b = new Uint8Array(head);
+    // WebM/Matroska: EBML header 1A 45 DF A3
+    if (b.length >= 4 && b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3) {
+      return "video/webm";
+    }
+    // ISO BMFF (MP4/MOV): bytes 4..7 = 'ftyp'
+    if (
+      b.length >= 12 &&
+      b[4] === 0x66 &&
+      b[5] === 0x74 &&
+      b[6] === 0x79 &&
+      b[7] === 0x70
+    ) {
+      // Could be mp4 or quicktime; both are widely handled as video/mp4 for Content-Type.
+      return "video/mp4";
+    }
+  } catch {
+    // ignore
+  }
+  return "";
+}
+
+async function detectVideoMime(blob, mimeHint) {
+  const hinted = String(mimeHint || "").trim();
+  const typed = String(blob?.type || "").trim();
+  if (typed) return typed;
+  if (hinted) return hinted;
+  const sniffed = await sniffVideoContainerMime(blob);
+  return sniffed;
 }
 
 function formatRecordingClock(ms) {
