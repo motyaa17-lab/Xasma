@@ -1180,6 +1180,30 @@ body.body--mobileConversationOpen {
   .mobileChatBackBtn {
     transition-duration: 0.01ms !important;
   }
+
+  .bubble {
+    transition-duration: 0.01ms !important;
+  }
+
+  .bubble.bubble--pressed {
+    transform: none !important;
+    box-shadow: none !important;
+  }
+
+  .bubble:not(.me).bubble--pressed {
+    background: #1f2937 !important;
+    border-color: rgba(255, 255, 255, 0.06) !important;
+  }
+
+  .bubble.me.bubble--pressed {
+    background: rgba(37, 99, 235, 0.25) !important;
+    border-color: rgba(37, 99, 235, 0.35) !important;
+  }
+
+  .bubble.bubbleMediaBare.bubble--pressed {
+    background: transparent !important;
+    border-color: transparent !important;
+  }
 }
 
 .messages {
@@ -1230,6 +1254,27 @@ body.body--mobileConversationOpen {
   border-radius: 14px;
   background: #1f2937;
   border: 1px solid rgba(255, 255, 255, 0.06);
+  transition:
+    transform 0.1s var(--ease-tg-snappy, cubic-bezier(0.2, 0.88, 0.28, 1)),
+    background 0.1s ease,
+    border-color 0.1s ease,
+    box-shadow 0.1s ease;
+  touch-action: manipulation;
+}
+
+.bubble.bubble--pressed {
+  transform: scale(0.987);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+.bubble:not(.me).bubble--pressed {
+  background: #283548;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.bubble.me.bubble--pressed {
+  background: rgba(37, 99, 235, 0.34);
+  border-color: rgba(96, 165, 250, 0.42);
 }
 
 .bubble.me {
@@ -1254,6 +1299,18 @@ body.body--mobileConversationOpen {
   margin-top: 2px;
   padding-left: 2px;
   padding-right: 2px;
+}
+
+.bubble.bubbleMediaBare.bubble--pressed {
+  transform: scale(0.992);
+  box-shadow: none;
+  background: transparent;
+  border-color: transparent;
+}
+
+.bubble.me.bubbleMediaBare.bubble--pressed {
+  background: transparent;
+  border-color: transparent;
 }
 
 .bubbleOwn {

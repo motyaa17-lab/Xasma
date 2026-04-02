@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { tf } from "../i18n.js";
 import { uploadChatImage, uploadChatAudio, uploadChatVideo, getApiBase } from "../api.js";
 import GroupInfoModal from "./GroupInfoModal.jsx";
@@ -7,6 +7,9 @@ import CircleVideoMessage from "./CircleVideoMessage.jsx";
 
 const MAX_VIDEO_NOTE_SEC = 60;
 const QUICK_REACTION_EMOJIS = ["❤️", "👍", "😂", "😮", "😢", "🔥"];
+/** Pointers on these elements skip bubble tap feedback (menu, links, media, reactions). */
+const BUBBLE_PRESS_IGNORE =
+  'button, a[href], input, textarea, select, [role="button"], [role="menu"], [role="menuitem"], .msgMenu, .msgMenuDropdown, video, audio, .circleVideoMsg, .circleVideoSoundBtn, .voiceMsgPill, .reactionPill';
 /** Distance from bottom (px) to treat as "following" the chat for auto-scroll on new messages. */
 const SCROLL_NEAR_BOTTOM_PX = 100;
 
@@ -86,6 +89,37 @@ export default function Chat({
   const typingStopTimerRef = useRef(null);
   const typingActiveRef = useRef(false);
   const swipeBackRef = useRef({ active: false, startX: 0, startY: 0, handled: false });
+
+  const onBubblePointerDown = useCallback((e) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const t = e.target;
+    if (t instanceof Element && t.closest(BUBBLE_PRESS_IGNORE)) return;
+    const node = e.currentTarget;
+    node.classList.add("bubble--pressed");
+    try {
+      node.setPointerCapture(e.pointerId);
+    } catch {
+      // ignore (e.g. pointer not capturable)
+    }
+  }, []);
+
+  const onBubblePointerUp = useCallback((e) => {
+    const node = e.currentTarget;
+    node.classList.remove("bubble--pressed");
+    try {
+      node.releasePointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const onBubblePointerCancel = useCallback((e) => {
+    e.currentTarget.classList.remove("bubble--pressed");
+  }, []);
+
+  const onBubbleLostPointerCapture = useCallback((e) => {
+    e.currentTarget.classList.remove("bubble--pressed");
+  }, []);
 
   const isGroup = chat?.type === "group";
   const isMobileChat = Boolean(onMobileBack);
@@ -1490,6 +1524,10 @@ export default function Chat({
                         ? `bubble me bubbleOwn bubbleWithActions${bubbleMediaBare}`
                         : `bubble bubbleWithActions${bubbleMediaBare}`
                     }
+                    onPointerDown={onBubblePointerDown}
+                    onPointerUp={onBubblePointerUp}
+                    onPointerCancel={onBubblePointerCancel}
+                    onLostPointerCapture={onBubbleLostPointerCapture}
                   >
                     {showMessageMenu ? (
                       <div className="msgMenu">
