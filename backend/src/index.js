@@ -58,7 +58,7 @@ const audioUpload = multer({
 });
 
 const videoMimeOk = (mime) =>
-  /^video\/(webm|mp4|quicktime|x-msvideo|3gpp)$/i.test(String(mime || ""));
+  /^video\/(webm|mp4|quicktime|x-msvideo|3gpp)(;.*)?$/i.test(String(mime || ""));
 
 function extFromVideoMime(mime) {
   const m = String(mime || "").toLowerCase();
@@ -93,9 +93,15 @@ const videoUpload = multer({
     // iOS Safari sometimes sends empty/unknown mimetype for MediaRecorder blobs.
     // If the extension is safe and known, accept it.
     if (videoMimeOk(mime)) return cb(null, true);
-    if (!mime && allowedExt.includes(ext)) return cb(null, true);
+    if ((!mime || mime === "application/octet-stream") && allowedExt.includes(ext)) return cb(null, true);
 
-    return cb(new Error("Unsupported video format (use WebM, MP4, or MOV)"));
+    return cb(
+      new Error(
+        `Unsupported video format (use WebM, MP4, or MOV). Rejected: mime="${mime || ""}" ext="${ext}" name="${String(
+          file.originalname || ""
+        )}"`
+      )
+    );
   },
 });
 const JWT_SECRET = process.env.JWT_SECRET || "change_me";

@@ -328,9 +328,16 @@ export default function Chat({
       const url = await uploadChatVideo(file);
       onSend({ text: "", videoUrl: url });
     } catch (err) {
-      const msg =
+      const baseMsg =
         err?.name === "ApiError" ? err.message : String(err?.message || t("videoNoteUploadError"));
-      setUploadError(msg);
+      // Temporary extra context for debugging iPhone Safari upload validation.
+      const debug =
+        import.meta.env.DEV || /Unsupported video format/i.test(baseMsg)
+          ? ` [debug: blob.type="${String(blob?.type || "")}" size=${Number(blob?.size || 0)} mimeHint="${String(
+              mimeHint || ""
+            )}"]`
+          : "";
+      setUploadError(`${baseMsg}${debug}`);
     } finally {
       setVideoNoteUploading(false);
     }
