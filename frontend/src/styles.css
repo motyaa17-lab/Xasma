@@ -2015,6 +2015,29 @@ body {
   cursor: not-allowed;
 }
 
+/* Keep mic↔send swap stable (no layout jump). */
+.composerActionSlot {
+  position: relative;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+}
+
+.composerActionBtn {
+  position: absolute;
+  inset: 0;
+}
+
+.composerActionBtn.isHidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.96);
+}
+
+.composerActionBtn {
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
 .sidebarChatsRow {
   display: flex;
   align-items: center;
@@ -2505,6 +2528,11 @@ body {
 .appShell--mobile .sendBtn {
   min-width: 42px;
   min-height: 42px;
+}
+
+.appShell--mobile .composerActionSlot {
+  width: 42px;
+  height: 42px;
 }
 
 .appShell--mobile .composerMain {
