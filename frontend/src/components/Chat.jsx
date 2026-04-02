@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { tf } from "../i18n.js";
 import { uploadChatImage, uploadChatAudio, uploadChatVideo, getApiBase } from "../api.js";
 import GroupInfoModal from "./GroupInfoModal.jsx";
@@ -33,6 +33,8 @@ export default function Chat({
   const [text, setText] = useState("");
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [menuMessageId, setMenuMessageId] = useState(null);
+  const [enteringMessageIds, setEnteringMessageIds] = useState(() => new Set());
+  const [chatOpening, setChatOpening] = useState(false);
   const [groupInfoOpen, setGroupInfoOpen] = useState(false);
   const [pendingImageUrl, setPendingImageUrl] = useState(null);
   const [pendingPreviewObjectUrl, setPendingPreviewObjectUrl] = useState(null);
@@ -266,6 +268,61 @@ export default function Chat({
       document.removeEventListener("touchstart", onDown);
     };
   }, [menuMessageId]);
+
+  const lastAnimChatIdRef = useRef(null);
+  const skipMessageEnterRef = useRef(false);
+  const lastMessageIdsRef = useRef(new Set());
+
+  useLayoutEffect(() => {
+    if (!chatId) {
+      setChatOpening(false);
+      return;
+    }
+    setChatOpening(true);
+    const t = window.setTimeout(() => setChatOpening(false), 300);
+    return () => window.clearTimeout(t);
+  }, [chatId]);
+
+  useEffect(() => {
+    if (!chatId) {
+      lastAnimChatIdRef.current = null;
+      lastMessageIdsRef.current = new Set();
+      skipMessageEnterRef.current = false;
+      setEnteringMessageIds(new Set());
+      return;
+    }
+
+    if (chatId !== lastAnimChatIdRef.current) {
+      lastAnimChatIdRef.current = chatId;
+      setEnteringMessageIds(new Set());
+      if (messages.length > 0) {
+        lastMessageIdsRef.current = new Set(messages.map((m) => String(m.id)));
+        skipMessageEnterRef.current = false;
+      } else {
+        lastMessageIdsRef.current = new Set();
+        skipMessageEnterRef.current = true;
+      }
+      return;
+    }
+
+    const nextIds = new Set(messages.map((m) => String(m.id)));
+    if (skipMessageEnterRef.current) {
+      lastMessageIdsRef.current = nextIds;
+      skipMessageEnterRef.current = false;
+      return;
+    }
+
+    const added = [];
+    for (const id of nextIds) {
+      if (!lastMessageIdsRef.current.has(id)) added.push(id);
+    }
+    lastMessageIdsRef.current = new Set(nextIds);
+    if (!added.length) return;
+
+    setEnteringMessageIds(new Set(added));
+    const t = window.setTimeout(() => setEnteringMessageIds(new Set()), 260);
+    return () => window.clearTimeout(t);
+  }, [chatId, messages]);
 
   function clearPendingImage() {
     setPendingImageUrl(null);
@@ -1084,9 +1141,17 @@ export default function Chat({
   const composerCanSend = editingMessageId ? composerHasText : composerHasText || composerHasMedia;
   const showSendAction = composerCanSend && !(voiceRecording || voiceArming || videoRecording || videoArming);
 
+  const chatMainClass = [
+    "chatMain",
+    chatTheme && `chatTheme-${chatTheme}`,
+    chatId && chatOpening ? "chatMain--opening" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <main
-      className={chatTheme ? `chatMain chatTheme-${chatTheme}` : "chatMain"}
+      className={chatMainClass}
       onTouchStart={onChatTouchStart}
       onTouchMove={onChatTouchMove}
       onTouchEnd={onChatTouchEnd}
@@ -1263,7 +1328,12 @@ export default function Chat({
           <div className="messages" ref={listRef}>
             {messages.map((m) =>
               m.type === "system" ? (
-                <div key={m.id} className="systemMessageRow">
+                <div
+                  key={m.id}
+                  className={`systemMessageRow${
+                    enteringMessageIds.has(String(m.id)) ? " systemMessageRow--enter" : ""
+                  }`}
+                >
                   <div className="systemMessageInner">{formatSystemLine(m, t)}</div>
                   <div className="systemMessageTime">{formatTime(m.createdAt)}</div>
                 </div>
@@ -1286,7 +1356,9 @@ export default function Chat({
                   return (
                 <div
                   key={m.id}
-                  className={m.senderId === meId ? "bubbleRow me" : "bubbleRow"}
+                  className={`bubbleRow${m.senderId === meId ? " me" : ""}${
+                    enteringMessageIds.has(String(m.id)) ? " bubbleRow--enter" : ""
+                  }`}
                 >
                   <div className="msgAvatar" title={m.sender?.username || ""}>
                     {getAvatarSrc(m, meId, meAvatar) ? (

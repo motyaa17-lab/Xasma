@@ -993,6 +993,117 @@ body.body--mobileConversationOpen {
   font-weight: 800;
 }
 
+/* ----- Chat motion (transform + opacity; OK on mobile Safari) ----- */
+@keyframes chatShellIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes chatMessagesShellIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes bubbleMessageIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes systemMessageIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes msgMenuDropdownIn {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes msgReactionPick {
+  0% {
+    transform: scale(1);
+  }
+  55% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.chatMain--opening .chatHeader {
+  animation: chatShellIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.chatMain--opening .messages {
+  animation: chatMessagesShellIn 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.chatMain--opening .composer {
+  animation: chatShellIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) 0.04s both;
+}
+
+.bubbleRow--enter {
+  animation: bubbleMessageIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.systemMessageRow--enter {
+  animation: systemMessageIn 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chatMain--opening .chatHeader,
+  .chatMain--opening .messages,
+  .chatMain--opening .composer,
+  .bubbleRow--enter,
+  .systemMessageRow--enter,
+  .msgMenuDropdown {
+    animation: none !important;
+  }
+
+  .msgMenuReactionBtn:active {
+    animation: none !important;
+  }
+
+  .attachPhotoBtn,
+  .sendBtn,
+  .voiceMicBtn,
+  .videoCamBtn,
+  .msgMenuBtn,
+  .reactionPill,
+  .composerActionBtn {
+    transition-duration: 0.01ms !important;
+  }
+}
+
 .messages {
   flex: 1;
   overflow: auto;
@@ -1095,6 +1206,15 @@ body.body--mobileConversationOpen {
   cursor: pointer;
   font-size: 12px;
   font-weight: 800;
+  transition:
+    transform 0.18s cubic-bezier(0.34, 1.35, 0.64, 1),
+    border-color 0.15s ease,
+    background 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.reactionPill:not(:disabled):active {
+  transform: scale(0.94);
 }
 
 .reactionPill.active {
@@ -1125,11 +1245,17 @@ body.body--mobileConversationOpen {
   line-height: 1;
   padding: 2px 4px;
   border-radius: 6px;
+  transition: transform 0.15s ease, background 0.12s ease, color 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .msgMenuBtn:hover {
   background: rgba(255, 255, 255, 0.08);
   color: var(--text);
+}
+
+.msgMenuBtn:active {
+  transform: scale(0.92);
 }
 
 .msgMenuDropdown {
@@ -1145,6 +1271,8 @@ body.body--mobileConversationOpen {
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
   z-index: 30;
   padding-bottom: 2px;
+  transform-origin: top right;
+  animation: msgMenuDropdownIn 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .msgMenuReactions {
@@ -1168,6 +1296,8 @@ body.body--mobileConversationOpen {
   font-size: 20px;
   line-height: 1;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .msgMenuReactionBtn:hover,
@@ -1175,6 +1305,10 @@ body.body--mobileConversationOpen {
   border-color: rgba(37, 99, 235, 0.55);
   background: rgba(37, 99, 235, 0.2);
   outline: none;
+}
+
+.msgMenuReactionBtn:active {
+  animation: msgReactionPick 0.34s cubic-bezier(0.34, 1.45, 0.64, 1);
 }
 
 .msgMenuDivider {
@@ -1764,6 +1898,11 @@ body.body--mobileConversationOpen {
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.12s ease, background 0.12s ease;
+}
+
+.attachPhotoBtn:not(:disabled):active {
+  transform: scale(0.95);
 }
 
 .attachPhotoBtn:disabled {
@@ -1813,6 +1952,10 @@ body.body--mobileConversationOpen {
   border-color: rgba(248, 113, 113, 0.5);
   background: rgba(248, 113, 113, 0.14);
   box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.22), 0 0 18px rgba(248, 113, 113, 0.18);
+}
+
+.voiceMicBtn:not(:disabled):not(.voiceMicBtn--pressing):not(.voiceMicBtn--recording):active {
+  transform: scale(0.95);
 }
 
 .voiceMicBtn--recording:disabled {
@@ -1880,6 +2023,10 @@ body.body--mobileConversationOpen {
   border-color: rgba(96, 165, 250, 0.55);
   background: rgba(59, 130, 246, 0.2);
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2), 0 0 18px rgba(59, 130, 246, 0.15);
+}
+
+.videoCamBtn:not(:disabled):not(.videoCamBtn--pressing):active {
+  transform: scale(0.95);
 }
 
 .videoCamBtn:disabled {
@@ -2023,6 +2170,11 @@ body.body--mobileConversationOpen {
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.12s ease, background 0.12s ease;
+}
+
+.sendBtn:not(:disabled):active {
+  transform: scale(0.95);
 }
 
 .sendBtn:disabled {
@@ -2061,7 +2213,11 @@ body.body--mobileConversationOpen {
 }
 
 .composerActionBtn {
-  transition: opacity 0.12s ease, transform 0.12s ease;
+  transition: opacity 0.12s ease, transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.composerActionSlot .composerActionBtn.sendBtn:not(:disabled):not(.isHidden):active {
+  transform: scale(0.95);
 }
 
 .sidebarChatsRow {
