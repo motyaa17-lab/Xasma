@@ -21,6 +21,11 @@ import {
   updateMyAvatar,
 } from "./api.js";
 import { getSocketEndpoint } from "./api.js";
+import {
+  MOBILE_CHAT_OPEN_BODY_CLASS,
+  syncAppRootHeight,
+  syncMobileChatVisualViewport,
+} from "./syncViewport.js";
 
 export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem("token") || "");
@@ -59,6 +64,32 @@ export default function App() {
   const socketEndpoint = useMemo(() => getSocketEndpoint(), []);
   const isMobile = useIsMobile(900);
   const [mobileTab, setMobileTab] = useState("chats");
+  const mobileConversationOpen = Boolean(isMobile && mobileTab === "chats" && selectedChatId);
+
+  useEffect(() => {
+    if (!mobileConversationOpen) {
+      document.body.classList.remove(MOBILE_CHAT_OPEN_BODY_CLASS);
+      syncAppRootHeight();
+      return undefined;
+    }
+    document.body.classList.add(MOBILE_CHAT_OPEN_BODY_CLASS);
+    syncAppRootHeight();
+    syncMobileChatVisualViewport();
+    const onVv = () => {
+      syncMobileChatVisualViewport();
+      syncAppRootHeight();
+    };
+    window.visualViewport?.addEventListener?.("resize", onVv);
+    window.visualViewport?.addEventListener?.("scroll", onVv);
+    window.addEventListener("resize", onVv);
+    return () => {
+      document.body.classList.remove(MOBILE_CHAT_OPEN_BODY_CLASS);
+      window.visualViewport?.removeEventListener?.("resize", onVv);
+      window.visualViewport?.removeEventListener?.("scroll", onVv);
+      window.removeEventListener("resize", onVv);
+      syncAppRootHeight();
+    };
+  }, [mobileConversationOpen]);
 
   const t = useMemo(() => (key) => tr(settings.lang, key), [settings.lang]);
 
@@ -543,7 +574,9 @@ export default function App() {
 
         {mobileTab === "chats" && selectedChatId ? (
           <div className="mobilePane mobilePane--conversation">
-            <Chat {...chatPropsMobile} />
+            <div className="mobileChatShell">
+              <Chat {...chatPropsMobile} />
+            </div>
           </div>
         ) : null}
 
@@ -608,7 +641,7 @@ export default function App() {
   );
 
   return (
-    <div className="appRoot">
+    <div className={`appRoot${mobileConversationOpen ? " appRoot--mobileConversationOpen" : ""}`}>
       {isMobile ? (
         <MobileLayoutErrorBoundary fallback={desktopShell}>{mobileShell}</MobileLayoutErrorBoundary>
       ) : (

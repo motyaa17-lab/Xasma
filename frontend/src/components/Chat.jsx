@@ -1637,19 +1637,6 @@ export default function Chat({
                   videoArming ||
                   videoNoteUploading
                 }
-                onFocus={() => {
-                  if (!isMobileChat) return;
-                  // iOS Safari: prevent the document from jumping to reveal the caret.
-                  window.setTimeout(() => {
-                    try {
-                      window.scrollTo(0, 0);
-                    } catch {
-                      // ignore
-                    }
-                    const el = listRef.current;
-                    if (el) el.scrollTop = el.scrollHeight;
-                  }, 0);
-                }}
                 onKeyDown={(e) => {
                   if (e.key === "Escape" && editingMessageId) {
                     e.preventDefault();

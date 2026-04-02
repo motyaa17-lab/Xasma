@@ -7,6 +7,9 @@
   --primary: #2563eb;
   --primary2: #1d4ed8;
   --danger: #ef4444;
+  /* Mobile open-chat shell (visualViewport); updated in JS when conversation is open */
+  --vv-offset-top: 0px;
+  --vv-height: 100dvh;
 }
 
 * {
@@ -49,6 +52,24 @@ body {
   min-height: -webkit-fill-available;
   min-height: var(--app-height, 100dvh);
   height: var(--app-height, 100dvh);
+}
+
+/* Open mobile chat: lock document scroll; inner messages list scrolls only */
+body.body--mobileConversationOpen {
+  overflow: hidden !important;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overscroll-behavior: none;
+}
+
+.appRoot--mobileConversationOpen {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  height: 100%;
+  max-height: 100%;
 }
 
 .authWrap {
@@ -2463,7 +2484,37 @@ body {
 }
 
 .mobilePane--conversation {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
   background: var(--bg);
+}
+
+/* Fixed to visual viewport (keyboard height) — set via syncMobileChatVisualViewport() */
+.mobileChatShell {
+  position: fixed;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 30;
+  top: var(--vv-offset-top, 0px);
+  height: var(--vv-height, 100%);
+  max-height: var(--vv-height, 100%);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.mobileChatShell .chatMain {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .mobilePane--conversation .chatMain {
