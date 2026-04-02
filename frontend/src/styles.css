@@ -23,6 +23,7 @@ body {
   min-height: 100dvh;
   min-height: -webkit-fill-available;
   min-height: var(--app-height, 100dvh);
+  height: 100%;
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Liberation Sans",
     sans-serif;
   background: var(--bg);
@@ -34,6 +35,7 @@ body {
   min-height: 100dvh;
   min-height: -webkit-fill-available;
   min-height: var(--app-height, 100dvh);
+  height: var(--app-height, 100dvh);
   display: flex;
   flex-direction: column;
 }
@@ -46,7 +48,7 @@ body {
   min-height: 100dvh;
   min-height: -webkit-fill-available;
   min-height: var(--app-height, 100dvh);
-  height: auto;
+  height: var(--app-height, 100dvh);
 }
 
 .authWrap {
@@ -127,7 +129,7 @@ body {
   input,
   textarea,
   select {
-    font-size: 16px;
+    font-size: 16px !important;
   }
 }
 

@@ -720,11 +720,29 @@ export default function Chat({
         videoRecordChunksRef.current = [];
         if (cancelled) return;
         const blob = new Blob(chunks, { type: rec.mimeType || "video/webm" });
-        if (blob.size < 64) {
-          setUploadError(t("videoNoteTooShort"));
-          return;
+        const mimeHint = rec.mimeType || blob.type;
+
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.log("[Xasma] video recorded", {
+            recorderMime: String(rec.mimeType || ""),
+            blobType: String(blob.type || ""),
+            size: blob.size,
+          });
         }
-        void uploadVideoBlob(blob, rec.mimeType || blob.type);
+
+        void (async () => {
+          // Some browsers (esp. iOS Safari) report duration as 0 until metadata is parsed.
+          const durationSec = await getVideoDurationSeconds(blob);
+          if (!Number.isFinite(durationSec) || durationSec <= 0.25) {
+            // Keep a small size-based escape hatch (Safari can still fail to parse duration).
+            if (blob.size < 2 * 1024) {
+              setUploadError(t("videoNoteTooShort"));
+              return;
+            }
+          }
+          await uploadVideoBlob(blob, mimeHint);
+        })();
       };
       if (abortPendingVideoRef.current) {
         cleanupVideoStream();
@@ -1531,6 +1549,86 @@ function extFromVideoMime(mime) {
   if (m.includes("quicktime")) return ".mov";
   if (m.includes("3gpp")) return ".3gp";
   return ".webm";
+}
+
+function getVideoDurationSeconds(blob) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(blob);
+    const v = document.createElement("video");
+    let settled = false;
+
+    const cleanup = () => {
+      if (settled) return;
+      settled = true;
+      try {
+        URL.revokeObjectURL(url);
+      } catch {
+        // ignore
+      }
+      v.removeAttribute("src");
+      v.load?.();
+      resolve(0);
+    };
+
+    const finish = (d) => {
+      if (settled) return;
+      settled = true;
+      try {
+        URL.revokeObjectURL(url);
+      } catch {
+        // ignore
+      }
+      v.removeAttribute("src");
+      v.load?.();
+      resolve(d);
+    };
+
+    const onMeta = () => {
+      const d = v.duration;
+      if (Number.isFinite(d) && d > 0) {
+        finish(d);
+        return;
+      }
+      // iOS Safari sometimes reports Infinity until we seek.
+      try {
+        v.currentTime = 1e101;
+      } catch {
+        // ignore
+      }
+    };
+
+    const onTimeUpdate = () => {
+      const d = v.duration;
+      if (Number.isFinite(d) && d > 0) {
+        finish(d);
+        return;
+      }
+      // Some implementations set currentTime to a huge value but only update duration later.
+      try {
+        v.currentTime = 0;
+      } catch {
+        // ignore
+      }
+    };
+
+    v.preload = "metadata";
+    v.muted = true;
+    v.playsInline = true;
+    v.addEventListener("loadedmetadata", onMeta, { once: true });
+    v.addEventListener("durationchange", onMeta);
+    v.addEventListener("timeupdate", onTimeUpdate);
+    v.addEventListener("error", cleanup, { once: true });
+
+    // Timeout so we don't block upload forever.
+    window.setTimeout(() => {
+      if (settled) return;
+      const d = v.duration;
+      if (Number.isFinite(d) && d > 0) finish(d);
+      else cleanup();
+    }, 1200);
+
+    v.src = url;
+  });
 }
 
 async function sniffVideoContainerMime(blob) {
