@@ -1666,6 +1666,22 @@ export default function Chat({
             )}
           </div>
 
+          <div
+            className={`typingIndicator${otherTyping && chatId ? " typingIndicator--on" : ""}`}
+            role="status"
+            aria-live="polite"
+            aria-hidden={!otherTyping || !chatId}
+          >
+            <div className="typingIndicatorInner">
+              <span className="typingIndicatorDots" aria-hidden="true">
+                <span className="typingIndicatorDot" />
+                <span className="typingIndicatorDot" />
+                <span className="typingIndicatorDot" />
+              </span>
+              <span className="typingIndicatorLabel">{t("typing")}</span>
+            </div>
+          </div>
+
           <div className="composer">
             {isBanned ? <div className="banBanner">{t("authBanned")}</div> : null}
             {uploadError ? <div className="uploadErrBanner">{uploadError}</div> : null}

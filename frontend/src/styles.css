@@ -1939,6 +1939,87 @@ body.body--mobileConversationOpen {
   opacity: 0.75;
 }
 
+/* Above composer: other user typing (socket: chat:typing) */
+@keyframes typingDotPulse {
+  0%,
+  70%,
+  100% {
+    opacity: 0.3;
+    transform: translate3d(0, 0, 0);
+  }
+  35% {
+    opacity: 1;
+    transform: translate3d(0, -3px, 0);
+  }
+}
+
+.typingIndicator {
+  flex-shrink: 0;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  padding: 0 18px;
+  transition:
+    max-height 0.32s var(--ease-tg-out, cubic-bezier(0.25, 0.82, 0.22, 1)),
+    opacity 0.28s ease,
+    padding 0.32s var(--ease-tg-out, cubic-bezier(0.25, 0.82, 0.22, 1));
+  pointer-events: none;
+}
+
+.typingIndicator--on {
+  max-height: 40px;
+  opacity: 1;
+  padding: 6px 18px 2px;
+}
+
+.typingIndicatorInner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 22px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(148, 163, 184, 0.92);
+  letter-spacing: 0.01em;
+}
+
+.typingIndicatorDots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.typingIndicatorDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(96, 165, 250, 0.75);
+  animation: typingDotPulse 1.15s ease-in-out infinite;
+}
+
+.typingIndicatorDot:nth-child(2) {
+  animation-delay: 0.14s;
+}
+
+.typingIndicatorDot:nth-child(3) {
+  animation-delay: 0.28s;
+}
+
+.typingIndicatorLabel {
+  font-size: 13px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .typingIndicator {
+    transition-duration: 0.12s;
+  }
+
+  .typingIndicatorDot {
+    animation: none;
+    opacity: 0.65;
+  }
+}
+
 .composer {
   position: relative;
   z-index: 2;
