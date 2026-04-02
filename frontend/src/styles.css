@@ -131,6 +131,13 @@ body {
   select {
     font-size: 16px !important;
   }
+
+  /* Keep the document from scrolling/jumping; inner panes scroll instead. */
+  body {
+    overflow: hidden;
+    overscroll-behavior: none;
+    -webkit-text-size-adjust: 100%;
+  }
 }
 
 .primaryBtn {
@@ -969,6 +976,7 @@ body {
   flex: 1;
   overflow: auto;
   padding: 18px 18px 0;
+  overscroll-behavior: contain;
 }
 
 .bubbleRow {
@@ -1681,7 +1689,11 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  touch-action: manipulation;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
   transition:
     transform 0.12s ease,
     box-shadow 0.12s ease,
@@ -1736,13 +1748,25 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  touch-action: manipulation;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
   transition:
     transform 0.12s ease,
     box-shadow 0.12s ease,
     border-color 0.12s ease,
     background 0.12s ease,
     color 0.12s ease;
+}
+
+.attachPhotoBtn,
+.sendBtn {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .videoCamBtn:hover:not(:disabled) {

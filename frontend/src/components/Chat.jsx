@@ -1386,10 +1386,15 @@ export default function Chat({
                 }
                 aria-label={t("videoNoteHoldRecord")}
                 title={t("videoNoteHoldRecord")}
+                onContextMenu={(e) => e.preventDefault()}
                 onPointerDown={onVideoCamPointerDown}
                 onMouseDown={onVideoCamMouseDown}
                 onMouseUp={onVideoCamMouseUp}
                 onTouchEnd={onVideoCamTouchEnd}
+                onTouchStart={(e) => {
+                  // iOS Safari: prevent long-press callout/selection while holding record.
+                  e.preventDefault();
+                }}
               >
                 <svg
                   className="videoCamIcon"
@@ -1424,10 +1429,15 @@ export default function Chat({
                   voiceRecording || voiceArming ? t("voiceTapStopSend") : t("voiceHoldRecord")
                 }
                 title={voiceRecording || voiceArming ? t("voiceTapStopSend") : t("voiceHoldRecord")}
+                onContextMenu={(e) => e.preventDefault()}
                 onPointerDown={onMicPointerDown}
                 onMouseDown={onMicMouseDown}
                 onMouseUp={onMicMouseUp}
                 onTouchEnd={onMicTouchEnd}
+                onTouchStart={(e) => {
+                  // iOS Safari: prevent long-press callout/selection while holding record.
+                  e.preventDefault();
+                }}
               >
                 <svg
                   className="voiceMicIcon"

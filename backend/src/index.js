@@ -86,8 +86,16 @@ const videoUpload = multer({
   }),
   limits: { fileSize: 32 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (videoMimeOk(file.mimetype)) cb(null, true);
-    else cb(new Error("Unsupported video format (use WebM or MP4)"));
+    const ext = path.extname(file.originalname || "").toLowerCase();
+    const allowedExt = [".webm", ".mp4", ".mov", ".3gp"];
+    const mime = String(file.mimetype || "").toLowerCase();
+
+    // iOS Safari sometimes sends empty/unknown mimetype for MediaRecorder blobs.
+    // If the extension is safe and known, accept it.
+    if (videoMimeOk(mime)) return cb(null, true);
+    if (!mime && allowedExt.includes(ext)) return cb(null, true);
+
+    return cb(new Error("Unsupported video format (use WebM or MP4)"));
   },
 });
 const JWT_SECRET = process.env.JWT_SECRET || "change_me";
