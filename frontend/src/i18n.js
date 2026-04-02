@@ -118,6 +118,8 @@ export const translations = {
     save: "Save",
     edit: "Edit",
     edited: "(edited)",
+    deleteMessage: "Delete",
+    messageMenuReactions: "Reactions",
 
     menu: "Menu",
     myProfile: "My Profile",
@@ -263,6 +265,8 @@ export const translations = {
     save: "Сохранить",
     edit: "Изменить",
     edited: "(изменено)",
+    deleteMessage: "Удалить",
+    messageMenuReactions: "Реакции",
 
     menu: "Меню",
     myProfile: "Мой профиль",

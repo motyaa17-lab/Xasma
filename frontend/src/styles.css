@@ -1076,67 +1076,6 @@ body.body--mobileConversationOpen {
   position: relative;
 }
 
-.reactBtnWrap {
-  position: absolute;
-  top: 6px;
-}
-
-.reactBtnWrap.left {
-  left: -8px;
-  transform: translateX(-100%);
-}
-
-.reactBtnWrap.right {
-  right: -8px;
-  transform: translateX(100%);
-}
-
-.reactBtn {
-  width: 26px;
-  height: 26px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(15, 23, 42, 0.7);
-  color: rgba(229, 231, 235, 0.85);
-  cursor: pointer;
-  font-weight: 900;
-}
-
-.reactBtn:hover {
-  border-color: rgba(37, 99, 235, 0.55);
-  background: rgba(37, 99, 235, 0.18);
-}
-
-.reactPicker {
-  position: absolute;
-  top: 30px;
-  left: 0;
-  display: flex;
-  gap: 6px;
-  padding: 8px;
-  border-radius: 12px;
-  background: rgba(17, 27, 46, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
-  z-index: 25;
-}
-
-.reactPick {
-  width: 30px;
-  height: 30px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  background: rgba(11, 18, 32, 0.25);
-  cursor: pointer;
-  color: var(--text);
-  font-size: 16px;
-}
-
-.reactPick:hover {
-  border-color: rgba(37, 99, 235, 0.55);
-  background: rgba(37, 99, 235, 0.18);
-}
-
 .reactionsRow {
   margin-top: 8px;
   display: flex;
@@ -1197,28 +1136,78 @@ body.body--mobileConversationOpen {
   position: absolute;
   top: 24px;
   right: 0;
-  min-width: 120px;
+  min-width: 168px;
+  max-width: min(280px, calc(100vw - 24px));
   background: rgba(17, 27, 46, 0.98);
   border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
-  z-index: 20;
+  z-index: 30;
+  padding-bottom: 2px;
+}
+
+.msgMenuReactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 8px 6px;
+}
+
+.msgMenuReactionBtn {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(11, 18, 32, 0.35);
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  padding: 0;
+}
+
+.msgMenuReactionBtn:hover,
+.msgMenuReactionBtn:focus-visible {
+  border-color: rgba(37, 99, 235, 0.55);
+  background: rgba(37, 99, 235, 0.2);
+  outline: none;
+}
+
+.msgMenuDivider {
+  height: 1px;
+  margin: 0;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .msgMenuItem {
   width: 100%;
   text-align: left;
-  padding: 10px 12px;
+  padding: 11px 14px;
   border: none;
   background: transparent;
   color: var(--text);
   cursor: pointer;
   font-size: 14px;
+  font-weight: 600;
 }
 
-.msgMenuItem:hover {
+.msgMenuItem:hover,
+.msgMenuItem:focus-visible {
   background: rgba(37, 99, 235, 0.15);
+  outline: none;
+}
+
+.msgMenuItem--danger {
+  color: rgba(252, 165, 165, 0.95);
+}
+
+.msgMenuItem--danger:hover,
+.msgMenuItem--danger:focus-visible {
+  background: rgba(239, 68, 68, 0.12);
 }
 
 .bubbleEdited {

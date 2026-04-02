@@ -6,6 +6,7 @@ import VoiceMessagePlayer from "./VoiceMessagePlayer.jsx";
 import CircleVideoMessage from "./CircleVideoMessage.jsx";
 
 const MAX_VIDEO_NOTE_SEC = 60;
+const QUICK_REACTION_EMOJIS = ["❤️", "👍", "😂", "😮", "😢", "🔥"];
 
 export default function Chat({
   chatId,
@@ -32,7 +33,6 @@ export default function Chat({
   const [text, setText] = useState("");
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [menuMessageId, setMenuMessageId] = useState(null);
-  const [reactionPickerForId, setReactionPickerForId] = useState(null);
   const [groupInfoOpen, setGroupInfoOpen] = useState(false);
   const [pendingImageUrl, setPendingImageUrl] = useState(null);
   const [pendingPreviewObjectUrl, setPendingPreviewObjectUrl] = useState(null);
@@ -260,15 +260,12 @@ export default function Chat({
     if (menuMessageId == null) return;
     const onDown = () => setMenuMessageId(null);
     document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
+    document.addEventListener("touchstart", onDown, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("touchstart", onDown);
+    };
   }, [menuMessageId]);
-
-  useEffect(() => {
-    if (reactionPickerForId == null) return;
-    const onDown = () => setReactionPickerForId(null);
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [reactionPickerForId]);
 
   function clearPendingImage() {
     setPendingImageUrl(null);
@@ -1278,6 +1275,14 @@ export default function Chat({
                   const isVoiceOnly =
                     Boolean(m.audioUrl) && !m.imageUrl && !m.videoUrl && !textTrim && !m.editedAt;
                   const bubbleMediaBare = isCircleVideoOnly || isVoiceOnly ? " bubbleMediaBare" : "";
+                  const showMessageMenu =
+                    (m.senderId === meId && (!isBanned || isAdmin)) ||
+                    (m.senderId !== meId && (isAdmin || !isBanned));
+                  const canQuickReact = !isBanned;
+                  const canEditOwn = m.senderId === meId && !isBanned;
+                  const canAdminDelete = Boolean(isAdmin);
+                  const hasSecondaryActions = canEditOwn || canAdminDelete;
+
                   return (
                 <div
                   key={m.id}
@@ -1297,46 +1302,14 @@ export default function Chat({
                         : `bubble bubbleWithActions${bubbleMediaBare}`
                     }
                   >
-                    <div className={m.senderId === meId ? "reactBtnWrap right" : "reactBtnWrap left"}>
-                      <button
-                        type="button"
-                        className="reactBtn"
-                        aria-label="React"
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setReactionPickerForId((id) => (id === m.id ? null : m.id));
-                        }}
-                      >
-                        +
-                      </button>
-                      {reactionPickerForId === m.id ? (
-                        <div className="reactPicker" role="menu" onMouseDown={(e) => e.stopPropagation()}>
-                          {["👍", "❤️", "😂", "😮", "😢", "🔥"].map((emo) => (
-                            <button
-                              key={emo}
-                              type="button"
-                              className="reactPick"
-                              onMouseDown={(e) => e.stopPropagation()}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setReactionPickerForId(null);
-                                onToggleReaction?.(m.id, emo);
-                              }}
-                            >
-                              {emo}
-                            </button>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                    {m.senderId === meId ? (
+                    {showMessageMenu ? (
                       <div className="msgMenu">
                         <button
                           type="button"
                           className="msgMenuBtn"
                           aria-label={t("menu")}
                           onMouseDown={(e) => e.stopPropagation()}
+                          onTouchStart={(e) => e.stopPropagation()}
                           onClick={(e) => {
                             e.stopPropagation();
                             setMenuMessageId((id) => (id === m.id ? null : m.id));
@@ -1345,13 +1318,47 @@ export default function Chat({
                           ⋯
                         </button>
                         {menuMessageId === m.id ? (
-                          <div className="msgMenuDropdown" role="menu">
-                            {!isBanned ? (
+                          <div
+                            className="msgMenuDropdown"
+                            role="menu"
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
+                          >
+                            {canQuickReact ? (
+                              <>
+                                <div
+                                  className="msgMenuReactions"
+                                  role="group"
+                                  aria-label={t("messageMenuReactions")}
+                                >
+                                  {QUICK_REACTION_EMOJIS.map((emo) => (
+                                    <button
+                                      key={emo}
+                                      type="button"
+                                      className="msgMenuReactionBtn"
+                                      aria-label={emo}
+                                      onMouseDown={(e) => e.stopPropagation()}
+                                      onTouchStart={(e) => e.stopPropagation()}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setMenuMessageId(null);
+                                        onToggleReaction?.(m.id, emo);
+                                      }}
+                                    >
+                                      {emo}
+                                    </button>
+                                  ))}
+                                </div>
+                                {hasSecondaryActions ? <div className="msgMenuDivider" aria-hidden /> : null}
+                              </>
+                            ) : null}
+                            {canEditOwn ? (
                               <button
                                 type="button"
                                 className="msgMenuItem"
                                 role="menuitem"
                                 onMouseDown={(e) => e.stopPropagation()}
+                                onTouchStart={(e) => e.stopPropagation()}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setEditingMessageId(m.id);
@@ -1363,53 +1370,22 @@ export default function Chat({
                                 {t("edit")}
                               </button>
                             ) : null}
-                            {isAdmin ? (
+                            {canAdminDelete ? (
                               <button
                                 type="button"
-                                className="msgMenuItem"
+                                className="msgMenuItem msgMenuItem--danger"
                                 role="menuitem"
                                 onMouseDown={(e) => e.stopPropagation()}
+                                onTouchStart={(e) => e.stopPropagation()}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setMenuMessageId(null);
                                   onAdminDeleteMessage?.(m.id);
                                 }}
                               >
-                                Delete
+                                {t("deleteMessage")}
                               </button>
                             ) : null}
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : isAdmin ? (
-                      <div className="msgMenu">
-                        <button
-                          type="button"
-                          className="msgMenuBtn"
-                          aria-label={t("menu")}
-                          onMouseDown={(e) => e.stopPropagation()}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setMenuMessageId((id) => (id === m.id ? null : m.id));
-                          }}
-                        >
-                          ⋯
-                        </button>
-                        {menuMessageId === m.id ? (
-                          <div className="msgMenuDropdown" role="menu">
-                            <button
-                              type="button"
-                              className="msgMenuItem"
-                              role="menuitem"
-                              onMouseDown={(e) => e.stopPropagation()}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setMenuMessageId(null);
-                                onAdminDeleteMessage?.(m.id);
-                              }}
-                            >
-                              Delete
-                            </button>
                           </div>
                         ) : null}
                       </div>
