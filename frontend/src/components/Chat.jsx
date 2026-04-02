@@ -659,7 +659,21 @@ export default function Chat({
         onTyping?.(false);
         (async () => {
           try {
+            if (import.meta.env.DEV) {
+              // eslint-disable-next-line no-console
+              console.log("[Xasma] voice recorded", {
+                recorderMime: String(rec.mimeType || ""),
+                blobType: String(blob.type || ""),
+                fileType: String(file.type || ""),
+                fileName: file.name,
+                size: blob.size,
+              });
+            }
             const url = await uploadChatAudio(file);
+            if (import.meta.env.DEV) {
+              // eslint-disable-next-line no-console
+              console.log("[Xasma] voice uploaded", { url });
+            }
             onSend({ text: "", audioUrl: url });
           } catch (err) {
             const msg =

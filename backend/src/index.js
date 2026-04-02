@@ -257,6 +257,24 @@ function validateMessageMediaUrl(req, url) {
   }
 }
 
+/**
+ * Socket sends don't have an Express req available.
+ * Accept only our uploads paths (or absolute URLs that point to /uploads/*) and normalize to path.
+ */
+function validateMessageMediaUrlFromSocket(url) {
+  if (!url || typeof url !== "string") return null;
+  const t = url.trim();
+  if (/^\/uploads\/[a-zA-Z0-9._-]+$/.test(t)) return t;
+  try {
+    const u = new URL(t);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    if (!/^\/uploads\/[a-zA-Z0-9._-]+$/.test(u.pathname)) return null;
+    return u.pathname;
+  } catch {
+    return null;
+  }
+}
+
 function messageRowToApi(mr, reactions = []) {
   if (!mr) return null;
   const msgType = mr.message_type || "text";
@@ -1258,9 +1276,9 @@ io.on("connection", (socket) => {
     const rawImg = typeof imageUrl === "string" ? imageUrl.trim() : "";
     const rawAud = typeof audioUrl === "string" ? audioUrl.trim() : "";
     const rawVid = typeof videoUrl === "string" ? videoUrl.trim() : "";
-    const img = validateMessageMediaUrl(rawImg);
-    const aud = validateMessageMediaUrl(rawAud);
-    const vid = validateMessageMediaUrl(rawVid);
+    const img = validateMessageMediaUrlFromSocket(rawImg);
+    const aud = validateMessageMediaUrlFromSocket(rawAud);
+    const vid = validateMessageMediaUrlFromSocket(rawVid);
     if (rawImg && !img) return;
     if (rawAud && !aud) return;
     if (rawVid && !vid) return;
@@ -1272,7 +1290,12 @@ io.on("connection", (socket) => {
     if (!chat) return;
     if (!(await isUserChatMember(cid, Number(userId)))) return;
 
-    await insertChatMessageAndBroadcast(cid, Number(userId), bodyText, img, aud, vid);
+    try {
+      await insertChatMessageAndBroadcast(cid, Number(userId), bodyText, img, aud, vid);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("[Xasma] chat:send failed", e);
+    }
   });
 
   socket.on("chat:read", async ({ chatId, upToMessageId } = {}) => {
