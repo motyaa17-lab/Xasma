@@ -1633,6 +1633,19 @@ export default function Chat({
                   videoArming ||
                   videoNoteUploading
                 }
+                onFocus={() => {
+                  if (!isMobileChat) return;
+                  // iOS Safari: prevent the document from jumping to reveal the caret.
+                  window.setTimeout(() => {
+                    try {
+                      window.scrollTo(0, 0);
+                    } catch {
+                      // ignore
+                    }
+                    const el = listRef.current;
+                    if (el) el.scrollTop = el.scrollHeight;
+                  }, 0);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Escape" && editingMessageId) {
                     e.preventDefault();
@@ -1750,7 +1763,23 @@ export default function Chat({
                     (editingMessageId ? !composerHasText : !composerHasText && !pendingImageUrl)
                   }
                 >
-                  {editingMessageId ? t("save") : t("send")}
+                  {isMobileChat ? (
+                    <svg
+                      className="sendIcon"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M22 2L11 13" />
+                      <path d="M22 2l-7 20-4-9-9-4 20-7z" />
+                    </svg>
+                  ) : (
+                    (editingMessageId ? t("save") : t("send"))
+                  )}
                 </button>
               </div>
             </div>

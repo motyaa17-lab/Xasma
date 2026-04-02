@@ -1725,6 +1725,7 @@ body {
   gap: 10px;
   align-items: flex-end;
   width: 100%;
+  flex-wrap: nowrap;
 }
 
 .composerFileInput {
@@ -1998,6 +1999,7 @@ body {
   outline: none;
   min-height: 44px;
   max-height: 120px;
+  min-width: 0;
 }
 
 .sendBtn {
@@ -2008,6 +2010,9 @@ body {
   color: white;
   font-weight: 700;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .sendBtn:disabled {
@@ -2021,11 +2026,22 @@ body {
   flex: 0 0 auto;
   width: 44px;
   height: 44px;
+  overflow: hidden;
 }
 
 .composerActionBtn {
   position: absolute;
   inset: 0;
+}
+
+.sendIcon {
+  width: 20px;
+  height: 20px;
+}
+
+.appShell--mobile .sendBtn {
+  padding: 0;
+  font-size: 0;
 }
 
 .composerActionBtn.isHidden {
