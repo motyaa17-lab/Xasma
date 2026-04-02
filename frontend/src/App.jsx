@@ -26,6 +26,7 @@ import {
   syncAppRootHeight,
   syncMobileChatVisualViewport,
 } from "./syncViewport.js";
+import { tryShowIncomingMessageNotification } from "./messageNotifications.js";
 
 export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem("token") || "");
@@ -41,9 +42,10 @@ export default function App() {
         chatTheme: ["ocean", "midnight", "slate"].includes(parsed.chatTheme)
           ? parsed.chatTheme
           : "ocean",
+        messageNotificationsEnabled: Boolean(parsed.messageNotificationsEnabled),
       };
     } catch {
-      return { lang: "en", chatTheme: "ocean" };
+      return { lang: "en", chatTheme: "ocean", messageNotificationsEnabled: false };
     }
   });
 
@@ -62,6 +64,8 @@ export default function App() {
   const readEmitTimerRef = useRef(null);
   const chatsRefreshAfterStatusTimerRef = useRef(null);
   const mobileInboxSidebarRef = useRef(null);
+  const settingsRef = useRef(settings);
+  const openChatFromNotificationRef = useRef(() => {});
 
   const socketEndpoint = useMemo(() => getSocketEndpoint(), []);
   const isMobile = useIsMobile(900);
@@ -101,6 +105,10 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem("settings", JSON.stringify(settings));
+  }, [settings]);
+
+  useEffect(() => {
+    settingsRef.current = settings;
   }, [settings]);
 
   useEffect(() => {
@@ -203,6 +211,15 @@ export default function App() {
           // ignore
         }
       }, 250);
+
+      const lang = settingsRef.current?.lang === "ru" ? "ru" : "en";
+      tryShowIncomingMessageNotification(msg, {
+        meId: me?.id,
+        openChatId: selectedChatIdRef.current,
+        settings: settingsRef.current,
+        t: (key) => tr(lang, key),
+        onOpenChat: (cid) => openChatFromNotificationRef.current(cid),
+      });
     });
 
     socket.on("user:avatar", ({ userId, avatar }) => {
@@ -382,6 +399,12 @@ export default function App() {
       socketRef.current.emit("chat:read", { chatId, upToMessageId: lastId });
     }
   }
+
+  openChatFromNotificationRef.current = (chatId) => {
+    if (!chatId) return;
+    if (isMobile) setMobileTab("chats");
+    void selectChat(chatId);
+  };
 
   async function startChat(withUserId) {
     const chatId = await createChat(withUserId);

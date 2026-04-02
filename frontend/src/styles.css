@@ -470,6 +470,32 @@ body.body--mobileConversationOpen {
   margin-bottom: 10px;
 }
 
+.settingsNotifyRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.settingsNotifyLabel {
+  font-weight: 600;
+  font-size: 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+.settingsNotifyHint,
+.settingsNotifyWarn {
+  margin-top: 10px;
+  margin-bottom: 0;
+  line-height: 1.4;
+}
+
+.settingsNotifyWarn {
+  color: rgba(252, 211, 77, 0.92);
+}
+
 .pillRow {
   display: flex;
   gap: 10px;

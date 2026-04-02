@@ -1,6 +1,64 @@
 import React, { useEffect, useRef, useState } from "react";
 import { adminListUsers, adminSetUserBanned, adminSetUserRole } from "../api.js";
 
+function MessageNotificationsSettings({ settings, onChangeSettings, t }) {
+  const supported = typeof window !== "undefined" && "Notification" in window;
+  const perm = supported ? Notification.permission : "unsupported";
+  const enabled = Boolean(settings?.messageNotificationsEnabled);
+  const [working, setWorking] = useState(false);
+
+  async function onToggle() {
+    if (!supported || working) return;
+    setWorking(true);
+    try {
+      if (enabled) {
+        onChangeSettings?.({ messageNotificationsEnabled: false });
+        return;
+      }
+      if (perm === "denied") return;
+      let nextPerm = perm;
+      if (nextPerm === "default") {
+        nextPerm = await Notification.requestPermission();
+      }
+      if (nextPerm === "granted") {
+        onChangeSettings?.({ messageNotificationsEnabled: true });
+      }
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  return (
+    <div className="settingsSection">
+      <div className="settingsTitle">{t("notifySettingsTitle")}</div>
+      {!supported ? (
+        <p className="muted small">{t("notifyUnsupported")}</p>
+      ) : (
+        <>
+          <div className="settingsNotifyRow">
+            <span className="settingsNotifyLabel">{t("notifyEnableLabel")}</span>
+            <button
+              type="button"
+              className={enabled ? "pillBtn active" : "pillBtn"}
+              onClick={onToggle}
+              disabled={working || (!enabled && perm === "denied")}
+              aria-pressed={enabled}
+            >
+              {perm === "denied" && !enabled
+                ? t("notifyBlockedButton")
+                : enabled
+                  ? t("notifyDisableButton")
+                  : t("notifyEnableButton")}
+            </button>
+          </div>
+          <p className="muted small settingsNotifyHint">{t("notifyEnableHint")}</p>
+          {perm === "denied" ? <p className="muted small settingsNotifyWarn">{t("notifyDeniedInBrowser")}</p> : null}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function UserMenu({
   me,
   onLogout,
@@ -223,6 +281,8 @@ export default function UserMenu({
                     </button>
                   </div>
                 </div>
+
+                <MessageNotificationsSettings settings={settings} onChangeSettings={onChangeSettings} t={t} />
 
                 <div className="settingsSection">
                   <div className="settingsTitle">{t("chatBackground")}</div>
@@ -493,6 +553,8 @@ export default function UserMenu({
                   </button>
                 </div>
               </div>
+
+              <MessageNotificationsSettings settings={settings} onChangeSettings={onChangeSettings} t={t} />
 
               <div className="settingsSection">
                 <div className="settingsTitle">{t("chatBackground")}</div>
