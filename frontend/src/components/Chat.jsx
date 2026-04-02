@@ -1161,6 +1161,10 @@ export default function Chat({
                           alt=""
                           className="msgImage"
                           loading="lazy"
+                          onError={(e) => {
+                            // If backend URL is wrong/missing, keep the bubble usable (link stays).
+                            e.currentTarget.style.display = "none";
+                          }}
                         />
                       </a>
                     ) : null}

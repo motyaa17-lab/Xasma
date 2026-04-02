@@ -218,12 +218,35 @@ async function emitToChatMemberSockets(chatId, event, payload) {
   recipients.forEach((sid) => io.to(sid).emit(event, payload));
 }
 
-/** Accept only paths we issued from POST /api/upload* (prevents arbitrary URLs in DB). */
-function validateMessageMediaUrl(url) {
+function getPublicBase(req) {
+  const envBase = String(process.env.PUBLIC_BASE_URL || "").trim().replace(/\/$/, "");
+  if (envBase) return envBase;
+  const proto = req.headers["x-forwarded-proto"]
+    ? String(req.headers["x-forwarded-proto"]).split(",")[0].trim()
+    : req.protocol;
+  return `${proto}://${req.get("host")}`;
+}
+
+/** Accept only uploads we issued (prevents arbitrary URLs in DB). */
+function validateMessageMediaUrl(req, url) {
   if (!url || typeof url !== "string") return null;
   const t = url.trim();
-  if (!/^\/uploads\/[a-zA-Z0-9._-]+$/.test(t)) return null;
-  return t;
+
+  // Allow a raw uploads path.
+  if (/^\/uploads\/[a-zA-Z0-9._-]+$/.test(t)) return t;
+
+  // Allow an absolute URL, but only to our own /uploads/*; normalize to path.
+  try {
+    const u = new URL(t);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    const publicBase = getPublicBase(req);
+    const pub = new URL(publicBase);
+    if (u.host !== pub.host) return null;
+    if (!/^\/uploads\/[a-zA-Z0-9._-]+$/.test(u.pathname)) return null;
+    return u.pathname;
+  } catch {
+    return null;
+  }
 }
 
 function messageRowToApi(mr, reactions = []) {
@@ -282,9 +305,10 @@ async function insertSystemMessageAndBroadcast(chatId, actorUserId, systemKind, 
 
 async function insertChatMessageAndBroadcast(chatId, senderId, bodyText, imageUrl, audioUrl, videoUrl) {
   const text = String(bodyText || "").trim();
-  const img = validateMessageMediaUrl(imageUrl);
-  const aud = validateMessageMediaUrl(audioUrl);
-  const vid = validateMessageMediaUrl(videoUrl);
+  // Note: req not available here; validated at request boundary.
+  const img = imageUrl;
+  const aud = audioUrl;
+  const vid = videoUrl;
   if (!text && !img && !aud && !vid) return null;
 
   const inserted = await query(
@@ -779,7 +803,8 @@ app.post(
   },
   (req, res) => {
     if (!req.file) return res.status(400).json({ error: "No image file" });
-    return res.json({ url: `/uploads/${req.file.filename}` });
+    const base = getPublicBase(req);
+    return res.json({ url: `${base}/uploads/${req.file.filename}` });
   }
 );
 
@@ -794,7 +819,8 @@ app.post(
   },
   (req, res) => {
     if (!req.file) return res.status(400).json({ error: "No audio file" });
-    return res.json({ url: `/uploads/${req.file.filename}` });
+    const base = getPublicBase(req);
+    return res.json({ url: `${base}/uploads/${req.file.filename}` });
   }
 );
 
@@ -809,7 +835,8 @@ app.post(
   },
   (req, res) => {
     if (!req.file) return res.status(400).json({ error: "No video file" });
-    return res.json({ url: `/uploads/${req.file.filename}` });
+    const base = getPublicBase(req);
+    return res.json({ url: `${base}/uploads/${req.file.filename}` });
   }
 );
 
@@ -819,9 +846,9 @@ app.post("/api/chats/:chatId/messages", authRequired, (req, res) => {
   const rawImg = typeof req.body?.imageUrl === "string" ? req.body.imageUrl.trim() : "";
   const rawAud = typeof req.body?.audioUrl === "string" ? req.body.audioUrl.trim() : "";
   const rawVid = typeof req.body?.videoUrl === "string" ? req.body.videoUrl.trim() : "";
-  const img = validateMessageMediaUrl(rawImg);
-  const aud = validateMessageMediaUrl(rawAud);
-  const vid = validateMessageMediaUrl(rawVid);
+  const img = validateMessageMediaUrl(req, rawImg);
+  const aud = validateMessageMediaUrl(req, rawAud);
+  const vid = validateMessageMediaUrl(req, rawVid);
   if (rawImg && !img) return res.status(400).json({ error: "Invalid imageUrl" });
   if (rawAud && !aud) return res.status(400).json({ error: "Invalid audioUrl" });
   if (rawVid && !vid) return res.status(400).json({ error: "Invalid videoUrl" });
