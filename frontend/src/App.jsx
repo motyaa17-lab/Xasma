@@ -570,38 +570,40 @@ export default function App() {
         ) : null}
       </div>
 
-      <nav className="mobileBottomNav" aria-label={t("mobileNavLabel")}>
-        <button
-          type="button"
-          className={`mobileNavItem${mobileTab === "chats" ? " mobileNavItem--active" : ""}`}
-          onClick={() => goMobileTab("chats")}
-        >
-          <span className="mobileNavIcon" aria-hidden>
-            💬
-          </span>
-          <span className="mobileNavLabel">{t("navChats")}</span>
-        </button>
-        <button
-          type="button"
-          className={`mobileNavItem${mobileTab === "calls" ? " mobileNavItem--active" : ""}`}
-          onClick={() => goMobileTab("calls")}
-        >
-          <span className="mobileNavIcon" aria-hidden>
-            📞
-          </span>
-          <span className="mobileNavLabel">{t("navCalls")}</span>
-        </button>
-        <button
-          type="button"
-          className={`mobileNavItem${mobileTab === "settings" ? " mobileNavItem--active" : ""}`}
-          onClick={() => goMobileTab("settings")}
-        >
-          <span className="mobileNavIcon" aria-hidden>
-            ⚙
-          </span>
-          <span className="mobileNavLabel">{t("navSettings")}</span>
-        </button>
-      </nav>
+      {mobileTab === "chats" && selectedChatId ? null : (
+        <nav className="mobileBottomNav" aria-label={t("mobileNavLabel")}>
+          <button
+            type="button"
+            className={`mobileNavItem${mobileTab === "chats" ? " mobileNavItem--active" : ""}`}
+            onClick={() => goMobileTab("chats")}
+          >
+            <span className="mobileNavIcon" aria-hidden>
+              💬
+            </span>
+            <span className="mobileNavLabel">{t("navChats")}</span>
+          </button>
+          <button
+            type="button"
+            className={`mobileNavItem${mobileTab === "calls" ? " mobileNavItem--active" : ""}`}
+            onClick={() => goMobileTab("calls")}
+          >
+            <span className="mobileNavIcon" aria-hidden>
+              📞
+            </span>
+            <span className="mobileNavLabel">{t("navCalls")}</span>
+          </button>
+          <button
+            type="button"
+            className={`mobileNavItem${mobileTab === "settings" ? " mobileNavItem--active" : ""}`}
+            onClick={() => goMobileTab("settings")}
+          >
+            <span className="mobileNavIcon" aria-hidden>
+              ⚙
+            </span>
+            <span className="mobileNavLabel">{t("navSettings")}</span>
+          </button>
+        </nav>
+      )}
     </div>
   );
 

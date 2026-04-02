@@ -2412,7 +2412,7 @@ body {
 }
 
 .appShell--mobile .composer {
-  padding: 10px 12px 12px;
+  padding: 10px 10px 12px;
   gap: 8px;
 }
 
@@ -2420,12 +2420,12 @@ body {
 .appShell--mobile .voiceMicBtn,
 .appShell--mobile .videoCamBtn,
 .appShell--mobile .sendBtn {
-  min-width: 44px;
-  min-height: 44px;
+  min-width: 42px;
+  min-height: 42px;
 }
 
 .appShell--mobile .composerMain {
-  gap: 8px;
+  gap: 6px;
 }
 
 .appShell--mobile .composerInput {

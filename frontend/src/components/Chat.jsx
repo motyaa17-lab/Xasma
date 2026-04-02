@@ -73,10 +73,46 @@ export default function Chat({
   const typingStartTimerRef = useRef(null);
   const typingStopTimerRef = useRef(null);
   const typingActiveRef = useRef(false);
+  const swipeBackRef = useRef({ active: false, startX: 0, startY: 0, handled: false });
 
   const isGroup = chat?.type === "group";
   const isMobileChat = Boolean(onMobileBack);
   const showVideoNoteOverlay = isMobileChat && (videoArming || videoRecording || Boolean(videoNoteDraft));
+  function onChatTouchStart(e) {
+    if (!isMobileChat || !onMobileBack) return;
+    if (showVideoNoteOverlay) return;
+    const t0 = e.touches?.[0];
+    if (!t0) return;
+    // iOS-style: only edge swipe from the left.
+    if (t0.clientX > 22) return;
+    swipeBackRef.current = { active: true, startX: t0.clientX, startY: t0.clientY, handled: false };
+  }
+
+  function onChatTouchMove(e) {
+    if (!isMobileChat || !onMobileBack) return;
+    const s = swipeBackRef.current;
+    if (!s.active || s.handled) return;
+    const t0 = e.touches?.[0];
+    if (!t0) return;
+    const dx = t0.clientX - s.startX;
+    const dy = t0.clientY - s.startY;
+    // Avoid interfering with vertical scrolling.
+    if (Math.abs(dy) > 14 && Math.abs(dy) > Math.abs(dx)) {
+      swipeBackRef.current.active = false;
+      return;
+    }
+    // Trigger on a clear horizontal swipe.
+    if (dx > 64 && Math.abs(dx) > Math.abs(dy) * 1.6) {
+      swipeBackRef.current.handled = true;
+      swipeBackRef.current.active = false;
+      e.preventDefault?.();
+      onMobileBack();
+    }
+  }
+
+  function onChatTouchEnd() {
+    swipeBackRef.current.active = false;
+  }
 
   function clearVideoNoteDraft() {
     setVideoNoteDraft((prev) => {
@@ -942,7 +978,13 @@ export default function Chat({
   }
 
   return (
-    <main className={chatTheme ? `chatMain chatTheme-${chatTheme}` : "chatMain"}>
+    <main
+      className={chatTheme ? `chatMain chatTheme-${chatTheme}` : "chatMain"}
+      onTouchStart={onChatTouchStart}
+      onTouchMove={onChatTouchMove}
+      onTouchEnd={onChatTouchEnd}
+      onTouchCancel={onChatTouchEnd}
+    >
       {!chatId ? (
         <div className="emptyState">
           <div className="emptyTitle">{t("selectChatTitle")}</div>
