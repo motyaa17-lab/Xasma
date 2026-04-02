@@ -278,10 +278,14 @@ export default function Chat({
       setChatOpening(false);
       return;
     }
+    if (isMobileChat) {
+      setChatOpening(false);
+      return;
+    }
     setChatOpening(true);
-    const t = window.setTimeout(() => setChatOpening(false), 300);
+    const t = window.setTimeout(() => setChatOpening(false), 420);
     return () => window.clearTimeout(t);
-  }, [chatId]);
+  }, [chatId, isMobileChat]);
 
   useEffect(() => {
     if (!chatId) {
@@ -1144,7 +1148,8 @@ export default function Chat({
   const chatMainClass = [
     "chatMain",
     chatTheme && `chatTheme-${chatTheme}`,
-    chatId && chatOpening ? "chatMain--opening" : "",
+    /* Desktop: full chat enter. Mobile: shell slide is on .mobileChatShell (avoids double motion). */
+    chatId && chatOpening && !isMobileChat ? "chatMain--opening" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -1357,7 +1362,11 @@ export default function Chat({
                 <div
                   key={m.id}
                   className={`bubbleRow${m.senderId === meId ? " me" : ""}${
-                    enteringMessageIds.has(String(m.id)) ? " bubbleRow--enter" : ""
+                    enteringMessageIds.has(String(m.id))
+                      ? m.senderId === meId
+                        ? " bubbleRow--enter bubbleRow--enterOwn"
+                        : " bubbleRow--enter"
+                      : ""
                   }`}
                 >
                   <div className="msgAvatar" title={m.sender?.username || ""}>

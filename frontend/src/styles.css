@@ -10,6 +10,15 @@
   /* Mobile open-chat shell (visualViewport); updated in JS when conversation is open */
   --vv-offset-top: 0px;
   --vv-height: 100dvh;
+  /* Telegram-like motion (transform + opacity only) */
+  --ease-tg-out: cubic-bezier(0.25, 0.82, 0.22, 1);
+  --ease-tg-snappy: cubic-bezier(0.2, 0.88, 0.28, 1);
+  --ease-tg-pop: cubic-bezier(0.34, 1.2, 0.42, 1);
+  --dur-chat-shell: 0.38s;
+  --dur-msg-in: 0.28s;
+  --dur-msg-own: 0.24s;
+  --dur-menu: 0.24s;
+  --dur-tap: 0.14s;
 }
 
 * {
@@ -739,10 +748,19 @@ body.body--mobileConversationOpen {
   font-weight: 800;
   cursor: pointer;
   line-height: 1;
+  transition:
+    transform var(--dur-tap) var(--ease-tg-snappy),
+    background 0.14s ease,
+    border-color 0.14s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .chatHeaderInfoBtn:hover {
   background: rgba(37, 99, 235, 0.22);
+}
+
+.chatHeaderInfoBtn:active {
+  transform: scale(0.92);
 }
 
 .groupInfoModal {
@@ -993,18 +1011,19 @@ body.body--mobileConversationOpen {
   font-weight: 800;
 }
 
-/* ----- Chat motion (transform + opacity; OK on mobile Safari) ----- */
+/* ----- Chat motion (transform + opacity; GPU-friendly; OK on mobile Safari) ----- */
 @keyframes chatShellIn {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translate3d(0, 22px, 0) scale(0.98);
   }
   to {
     opacity: 1;
-    transform: none;
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
+/* Scroll container: opacity only (no transform — avoids iOS scroll quirks) */
 @keyframes chatMessagesShellIn {
   from {
     opacity: 0;
@@ -1017,33 +1036,45 @@ body.body--mobileConversationOpen {
 @keyframes bubbleMessageIn {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(0.97);
+    transform: translate3d(0, 18px, 0) scale(0.93);
   }
   to {
     opacity: 1;
-    transform: none;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+/* Outgoing: quick slide from the right + fade (Telegram-ish) */
+@keyframes bubbleMessageInOwn {
+  from {
+    opacity: 0;
+    transform: translate3d(22px, 12px, 0) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
 @keyframes systemMessageIn {
   from {
     opacity: 0;
-    transform: translateY(6px) scale(0.98);
+    transform: translate3d(0, 12px, 0) scale(0.96);
   }
   to {
     opacity: 1;
-    transform: none;
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
 @keyframes msgMenuDropdownIn {
   from {
     opacity: 0;
-    transform: scale(0.94) translateY(-6px);
+    transform: scale(0.86) translate3d(6px, -10px, 0);
   }
   to {
     opacity: 1;
-    transform: scale(1) translateY(0);
+    transform: scale(1) translate3d(0, 0, 0);
   }
 }
 
@@ -1051,7 +1082,19 @@ body.body--mobileConversationOpen {
   0% {
     transform: scale(1);
   }
-  55% {
+  45% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes reactionPillPop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
     transform: scale(1.12);
   }
   100% {
@@ -1059,24 +1102,52 @@ body.body--mobileConversationOpen {
   }
 }
 
+/* Mobile: tab / inbox / settings enter (pane has no fixed descendants) */
+@keyframes mobilePaneStackIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 26px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* Mobile: open chat — slide from right (transform on fixed shell, keyboard-safe) */
+@keyframes mobileChatShellIn {
+  from {
+    opacity: 0;
+    transform: translate3d(100%, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
 .chatMain--opening .chatHeader {
-  animation: chatShellIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: chatShellIn var(--dur-chat-shell) var(--ease-tg-out) both;
 }
 
 .chatMain--opening .messages {
-  animation: chatMessagesShellIn 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: chatMessagesShellIn calc(var(--dur-chat-shell) * 0.85) var(--ease-tg-out) 0.05s both;
 }
 
 .chatMain--opening .composer {
-  animation: chatShellIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) 0.04s both;
+  animation: chatShellIn var(--dur-chat-shell) var(--ease-tg-out) 0.07s both;
 }
 
 .bubbleRow--enter {
-  animation: bubbleMessageIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: bubbleMessageIn var(--dur-msg-in) var(--ease-tg-out) both;
+}
+
+.bubbleRow.me.bubbleRow--enterOwn {
+  animation: bubbleMessageInOwn var(--dur-msg-own) var(--ease-tg-snappy) both;
 }
 
 .systemMessageRow--enter {
-  animation: systemMessageIn 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: systemMessageIn 0.26s var(--ease-tg-out) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1084,12 +1155,16 @@ body.body--mobileConversationOpen {
   .chatMain--opening .messages,
   .chatMain--opening .composer,
   .bubbleRow--enter,
+  .bubbleRow.me.bubbleRow--enterOwn,
   .systemMessageRow--enter,
-  .msgMenuDropdown {
+  .msgMenuDropdown,
+  .appShell--mobile .mobilePane:not(.mobilePane--conversation),
+  .appShell--mobile .mobileChatShell {
     animation: none !important;
   }
 
-  .msgMenuReactionBtn:active {
+  .msgMenuReactionBtn:active,
+  .reactionPill:not(:disabled):active {
     animation: none !important;
   }
 
@@ -1098,8 +1173,11 @@ body.body--mobileConversationOpen {
   .voiceMicBtn,
   .videoCamBtn,
   .msgMenuBtn,
+  .msgMenuItem,
   .reactionPill,
-  .composerActionBtn {
+  .composerActionBtn,
+  .mobileNavItem,
+  .mobileChatBackBtn {
     transition-duration: 0.01ms !important;
   }
 }
@@ -1206,15 +1284,12 @@ body.body--mobileConversationOpen {
   cursor: pointer;
   font-size: 12px;
   font-weight: 800;
-  transition:
-    transform 0.18s cubic-bezier(0.34, 1.35, 0.64, 1),
-    border-color 0.15s ease,
-    background 0.15s ease;
+  transition: border-color 0.16s ease, background 0.16s ease;
   -webkit-tap-highlight-color: transparent;
 }
 
 .reactionPill:not(:disabled):active {
-  transform: scale(0.94);
+  animation: reactionPillPop 0.4s var(--ease-tg-pop);
 }
 
 .reactionPill.active {
@@ -1245,7 +1320,10 @@ body.body--mobileConversationOpen {
   line-height: 1;
   padding: 2px 4px;
   border-radius: 6px;
-  transition: transform 0.15s ease, background 0.12s ease, color 0.12s ease;
+  transition:
+    transform var(--dur-tap) var(--ease-tg-snappy),
+    background 0.14s ease,
+    color 0.14s ease;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -1255,7 +1333,7 @@ body.body--mobileConversationOpen {
 }
 
 .msgMenuBtn:active {
-  transform: scale(0.92);
+  transform: scale(0.86);
 }
 
 .msgMenuDropdown {
@@ -1272,7 +1350,7 @@ body.body--mobileConversationOpen {
   z-index: 30;
   padding-bottom: 2px;
   transform-origin: top right;
-  animation: msgMenuDropdownIn 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: msgMenuDropdownIn var(--dur-menu) var(--ease-tg-out) both;
 }
 
 .msgMenuReactions {
@@ -1308,7 +1386,7 @@ body.body--mobileConversationOpen {
 }
 
 .msgMenuReactionBtn:active {
-  animation: msgReactionPick 0.34s cubic-bezier(0.34, 1.45, 0.64, 1);
+  animation: msgReactionPick 0.38s var(--ease-tg-pop);
 }
 
 .msgMenuDivider {
@@ -1327,12 +1405,20 @@ body.body--mobileConversationOpen {
   cursor: pointer;
   font-size: 14px;
   font-weight: 600;
+  transition:
+    transform var(--dur-tap) var(--ease-tg-snappy),
+    background 0.14s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .msgMenuItem:hover,
 .msgMenuItem:focus-visible {
   background: rgba(37, 99, 235, 0.15);
   outline: none;
+}
+
+.msgMenuItem:active {
+  transform: scale(0.98);
 }
 
 .msgMenuItem--danger {
@@ -1898,11 +1984,14 @@ body.body--mobileConversationOpen {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.12s ease, background 0.12s ease;
+  transition:
+    transform var(--dur-tap) var(--ease-tg-snappy),
+    border-color 0.14s ease,
+    background 0.14s ease;
 }
 
 .attachPhotoBtn:not(:disabled):active {
-  transform: scale(0.95);
+  transform: scale(0.9);
 }
 
 .attachPhotoBtn:disabled {
@@ -1955,7 +2044,7 @@ body.body--mobileConversationOpen {
 }
 
 .voiceMicBtn:not(:disabled):not(.voiceMicBtn--pressing):not(.voiceMicBtn--recording):active {
-  transform: scale(0.95);
+  transform: scale(0.9);
 }
 
 .voiceMicBtn--recording:disabled {
@@ -2026,7 +2115,7 @@ body.body--mobileConversationOpen {
 }
 
 .videoCamBtn:not(:disabled):not(.videoCamBtn--pressing):active {
-  transform: scale(0.95);
+  transform: scale(0.9);
 }
 
 .videoCamBtn:disabled {
@@ -2170,11 +2259,14 @@ body.body--mobileConversationOpen {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.12s ease, background 0.12s ease;
+  transition:
+    transform var(--dur-tap) var(--ease-tg-snappy),
+    opacity 0.12s ease,
+    background 0.14s ease;
 }
 
 .sendBtn:not(:disabled):active {
-  transform: scale(0.95);
+  transform: scale(0.9);
 }
 
 .sendBtn:disabled {
@@ -2213,11 +2305,11 @@ body.body--mobileConversationOpen {
 }
 
 .composerActionBtn {
-  transition: opacity 0.12s ease, transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: opacity 0.12s ease, transform var(--dur-tap) var(--ease-tg-snappy);
 }
 
 .composerActionSlot .composerActionBtn.sendBtn:not(:disabled):not(.isHidden):active {
-  transform: scale(0.95);
+  transform: scale(0.9);
 }
 
 .sidebarChatsRow {
@@ -2363,6 +2455,10 @@ body.body--mobileConversationOpen {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.appShell--mobile .mobilePane:not(.mobilePane--conversation) {
+  animation: mobilePaneStackIn 0.4s var(--ease-tg-out) both;
 }
 
 .mobilePane--inbox {
@@ -2652,6 +2748,10 @@ body.body--mobileConversationOpen {
   background: var(--bg);
 }
 
+.appShell--mobile .mobileChatShell {
+  animation: mobileChatShellIn 0.36s var(--ease-tg-out) both;
+}
+
 .mobileChatShell .chatMain {
   position: relative;
   flex: 1;
@@ -2939,10 +3039,16 @@ body.body--mobileConversationOpen {
   justify-content: center;
   font-size: 18px;
   line-height: 1;
+  transition:
+    transform var(--dur-tap) var(--ease-tg-snappy),
+    background 0.14s ease,
+    border-color 0.14s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .mobileChatBackBtn:active {
-  background: rgba(37, 99, 235, 0.2);
+  transform: scale(0.9);
+  background: rgba(37, 99, 235, 0.22);
 }
 
 .mobileChatBackGlyph {
@@ -2979,6 +3085,15 @@ body.body--mobileConversationOpen {
   font-size: 11px;
   font-weight: 700;
   cursor: pointer;
+  transition:
+    transform var(--dur-tap) var(--ease-tg-snappy),
+    color 0.16s ease,
+    background 0.16s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobileNavItem:active {
+  transform: scale(0.92);
 }
 
 .mobileNavItem--active {
