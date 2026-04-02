@@ -287,6 +287,8 @@ const Sidebar = forwardRef(function Sidebar(
               : t("noMessages");
             const showActivity =
               Boolean(c.last?.senderId && me?.id && Number(c.last.senderId) !== Number(me.id));
+            const unreadN = Math.max(0, Number(c.unreadCount) || 0);
+            const unreadLabel = unreadN > 0 ? (unreadN > 99 ? "99+" : String(unreadN)) : null;
             return (
               <button key={c.id} type="button" className="mobileChatRow" onClick={() => onSelectChat(c.id)}>
                 <div className={online ? "mobileChatRowAvatar presence online" : "mobileChatRowAvatar presence"}>
@@ -300,7 +302,17 @@ const Sidebar = forwardRef(function Sidebar(
                 </div>
                 <div className="mobileChatRowMain">
                   <div className="mobileChatRowTop">
-                    <span className="mobileChatRowName">{label}</span>
+                    <div className="mobileChatRowTopLead">
+                      <span className="mobileChatRowName">{label}</span>
+                      {unreadLabel ? (
+                        <span
+                          className="chatUnreadBadge"
+                          aria-label={t("unreadBadgeAria").replace("{count}", unreadLabel)}
+                        >
+                          {unreadLabel}
+                        </span>
+                      ) : null}
+                    </div>
                     {c.last?.createdAt ? (
                       <time className="mobileChatRowTime" dateTime={c.last.createdAt}>
                         {formatListTime(c.last.createdAt, lang)}
@@ -309,7 +321,9 @@ const Sidebar = forwardRef(function Sidebar(
                   </div>
                   <div className="mobileChatRowBottom">
                     <span className="mobileChatRowPreview muted">{preview}</span>
-                    {showActivity ? <span className="mobileChatRowUnread" title={t("newActivity")} /> : null}
+                    {showActivity && !unreadLabel ? (
+                      <span className="mobileChatRowUnread" title={t("newActivity")} />
+                    ) : null}
                     {!isGroup ? (
                       <span
                         className={online ? "mobileChatRowPresence online" : "mobileChatRowPresence"}
@@ -382,6 +396,8 @@ const Sidebar = forwardRef(function Sidebar(
             const other = c.other;
             const label = isGroup ? c.title || t("groupChat") : other?.username || "";
             const online = !isGroup && Boolean(other?.isOnline);
+            const unreadN = Math.max(0, Number(c.unreadCount) || 0);
+            const unreadLabel = unreadN > 0 ? (unreadN > 99 ? "99+" : String(unreadN)) : null;
             return (
               <button
                 key={c.id}
@@ -402,6 +418,14 @@ const Sidebar = forwardRef(function Sidebar(
                   <div className="chatOther">
                     <div className="chatOtherNameRow">
                       <div className="chatOtherName">{label}</div>
+                      {unreadLabel ? (
+                        <span
+                          className="chatUnreadBadge"
+                          aria-label={t("unreadBadgeAria").replace("{count}", unreadLabel)}
+                        >
+                          {unreadLabel}
+                        </span>
+                      ) : null}
                       {!isGroup ? (
                         <div
                           className={online ? "presenceDot online" : "presenceDot"}

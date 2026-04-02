@@ -60,6 +60,7 @@ export default function App() {
   const chatsPresenceRefreshTimer = useRef(null);
   const lastReadSentRef = useRef({}); // chatId -> messageId
   const readEmitTimerRef = useRef(null);
+  const chatsRefreshAfterStatusTimerRef = useRef(null);
   const mobileInboxSidebarRef = useRef(null);
 
   const socketEndpoint = useMemo(() => getSocketEndpoint(), []);
@@ -282,6 +283,16 @@ export default function App() {
           };
         })
       );
+      if (chatsRefreshAfterStatusTimerRef.current) clearTimeout(chatsRefreshAfterStatusTimerRef.current);
+      chatsRefreshAfterStatusTimerRef.current = setTimeout(async () => {
+        chatsRefreshAfterStatusTimerRef.current = null;
+        try {
+          const list = await getChats();
+          setChats(list);
+        } catch {
+          // ignore
+        }
+      }, 220);
     });
 
     socket.on("message:edited", ({ chatId, message }) => {
@@ -334,6 +345,10 @@ export default function App() {
     });
 
     return () => {
+      if (chatsRefreshAfterStatusTimerRef.current) {
+        clearTimeout(chatsRefreshAfterStatusTimerRef.current);
+        chatsRefreshAfterStatusTimerRef.current = null;
+      }
       socket.off("chat:message");
       socket.off("user:avatar");
       socket.off("user:presence");
@@ -356,6 +371,9 @@ export default function App() {
 
   async function selectChat(chatId) {
     setSelectedChatId(chatId);
+    setChats((prev) =>
+      prev.map((c) => (Number(c.id) === Number(chatId) ? { ...c, unreadCount: 0 } : c))
+    );
     setMessages([]);
     const list = await getMessages(chatId, 50);
     setMessages(list);

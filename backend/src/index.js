@@ -555,7 +555,15 @@ app.get("/api/chats", authRequired, (req, res) => {
           FROM chat_members cm2
           JOIN users u2 ON u2.id = cm2.user_id
           WHERE cm2.chat_id = c.id AND u2.is_online = TRUE
-        ) AS online_member_count
+        ) AS online_member_count,
+        (
+          SELECT COUNT(*)::int
+          FROM messages mu
+          WHERE mu.chat_id = c.id
+            AND mu.sender_id != $1
+            AND mu.read_at IS NULL
+            AND COALESCE(mu.message_type, 'text') = 'text'
+        ) AS unread_count
       FROM chat_members mym
       JOIN chats c ON c.id = mym.chat_id
       LEFT JOIN users other
@@ -612,6 +620,7 @@ app.get("/api/chats", authRequired, (req, res) => {
           last: c.last_text
             ? { text: c.last_text, createdAt: c.last_created_at, senderId: Number(c.last_sender_id) }
             : null,
+          unreadCount: Number(c.unread_count) || 0,
         };
       }),
     });
