@@ -163,6 +163,12 @@ export const translations = {
 
     language: "Language",
     chatBackground: "Chat background",
+    settingsSupport: "Support",
+    settingsSupportAuthors: "Support the authors",
+    settingsSupportHint: "Thank you. Support options will be added soon.",
+    settingsCurrentBackground: "Current background",
+    settingsEmpty: "Empty",
+    settingsFilled: "Filled",
 
     online: "Online",
     lastSeen: "Last seen",
@@ -341,6 +347,12 @@ export const translations = {
 
     language: "Язык",
     chatBackground: "Фон чата",
+    settingsSupport: "Поддержка",
+    settingsSupportAuthors: "Поддержать авторов",
+    settingsSupportHint: "Спасибо. Способы поддержки появятся позже.",
+    settingsCurrentBackground: "Текущий фон",
+    settingsEmpty: "Пусто",
+    settingsFilled: "Заполнено",
 
     online: "В сети",
     lastSeen: "Был(а)",

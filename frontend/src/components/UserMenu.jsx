@@ -176,80 +176,163 @@ export default function UserMenu({
   const modalCardClass = variant === "mobilePage" ? "modalCard--mobileFriendly" : "";
 
   if (variant === "mobilePage") {
+    const chevron = "›";
+
+    const statusLine = (() => {
+      if (!me) return "";
+      const kind = String(me.statusKind || "");
+      const text = String(me.statusText || "").trim();
+      if (kind === "online") return t("statusOnline");
+      if (kind === "dnd") return t("statusDnd");
+      if (kind === "away") return t("statusAway");
+      if (kind === "custom" && text) return text;
+      if (me?.isOnline) return t("online");
+      if (me?.lastSeenAt) return t("lastSeenAt").replace("{time}", formatLastSeen(me.lastSeenAt, settings?.lang));
+      return t("lastSeen");
+    })();
+
+    function SettingsRow({ label, right, danger, onClick, disabled }) {
+      return (
+        <button
+          type="button"
+          className={danger ? "settingsRow settingsRow--danger" : "settingsRow"}
+          onClick={onClick}
+          disabled={disabled}
+        >
+          <span className="settingsRowLeft">{label}</span>
+          <span className="settingsRowRight">
+            {right ? <span className="settingsRowValue">{right}</span> : null}
+            <span className="settingsRowChevron" aria-hidden>
+              {chevron}
+            </span>
+          </span>
+        </button>
+      );
+    }
+
+    function SettingsChoiceRow({ label, selected, onClick }) {
+      return (
+        <button type="button" className="settingsRow" onClick={onClick}>
+          <span className="settingsRowLeft">{label}</span>
+          <span className="settingsRowRight">
+            {selected ? <span className="settingsRowCheck" aria-hidden>✓</span> : <span className="settingsRowSpacer" />}
+          </span>
+        </button>
+      );
+    }
+
     return (
-      <div className="userMenu userMenu--mobilePage" ref={rootRef}>
-        <div className="userMenuMobileHero">
-          <div className="userMenuMobileAvatar">
+      <div className="settingsScreen settingsScreen--mobile" ref={rootRef}>
+        <button type="button" className="settingsTopProfile" onClick={() => setPanel("profile")}>
+          <span className="settingsTopAvatar">
             {me?.avatar ? <img src={me.avatar} alt="" /> : <span>{initials(me?.username)}</span>}
+          </span>
+          <span className="settingsTopMain">
+            <span className="settingsTopName">{me?.username}</span>
+            <span className="settingsTopStatus">{statusLine}</span>
+          </span>
+          <span className="settingsTopChevron" aria-hidden>
+            {chevron}
+          </span>
+        </button>
+
+        <div className="settingsList">
+          <div className="settingsSectionHeader">{t("profile")}</div>
+          <div className="settingsSection">
+            <SettingsRow label={t("myProfile")} onClick={() => setPanel("profile")} />
           </div>
-          <div className="userMenuMobileName">{me?.username}</div>
-          <div className="userMenuMobileMeta muted small">
-            {me?.isOnline ? t("online") : me?.lastSeenAt ? t("lastSeen") : ""}
+
+          <div className="settingsSectionHeader">{t("language")}</div>
+          <div className="settingsSection">
+            <SettingsRow
+              label={t("language")}
+              right={settings?.lang === "ru" ? "Русский" : "English"}
+              onClick={() => setPanel("language")}
+            />
           </div>
-        </div>
-        <div className="userMenuMobileList" role="menu">
-          <button
-            type="button"
-            className="userMenuMobileItem"
-            role="menuitem"
-            onClick={() => setPanel("settings")}
-          >
-            {t("settings")}
-          </button>
+
+          <div className="settingsSectionHeader">{t("notifySettingsTitle")}</div>
+          <div className="settingsSection">
+            <SettingsRow label={t("notifyEnableLabel")} onClick={() => setPanel("notifications")} />
+          </div>
+
+          <div className="settingsSectionHeader">{t("chatBackground")}</div>
+          <div className="settingsSection">
+            <SettingsRow
+              label={t("settingsCurrentBackground")}
+              right={t(settings?.chatTheme || "ocean")}
+              onClick={() => setPanel("chatBackground")}
+            />
+          </div>
+
           {me?.role === "admin" ? (
-            <button
-              type="button"
-              className="userMenuMobileItem"
-              role="menuitem"
-              onClick={() => {
-                setPanel("admin");
-                loadAdminUsers();
-              }}
-            >
-              Admin
-            </button>
+            <>
+              <div className="settingsSectionHeader">Admin</div>
+              <div className="settingsSection">
+                <SettingsRow
+                  label="Admin"
+                  onClick={() => {
+                    setPanel("admin");
+                    loadAdminUsers();
+                  }}
+                />
+              </div>
+            </>
           ) : null}
-          <button type="button" className="userMenuMobileItem userMenuMobileItem--danger" role="menuitem" onClick={onLogout}>
-            {t("logout")}
-          </button>
+
+          <div className="settingsSectionHeader">{t("settingsSupport")}</div>
+          <div className="settingsSection">
+            <SettingsRow label={t("settingsSupportAuthors")} onClick={() => setPanel("support")} />
+          </div>
+
+          <div className="settingsSectionHeader">{t("logout")}</div>
+          <div className="settingsSection">
+            <SettingsRow label={t("logout")} danger onClick={onLogout} />
+          </div>
         </div>
 
         {panel ? (
           <Modal
             title={
-              panel === "profile" ? t("myProfile") : panel === "settings" ? t("settings") : "Admin"
+              panel === "profile"
+                ? t("myProfile")
+                : panel === "language"
+                  ? t("language")
+                  : panel === "notifications"
+                    ? t("notifySettingsTitle")
+                    : panel === "chatBackground"
+                      ? t("chatBackground")
+                      : panel === "support"
+                        ? t("settingsSupport")
+                        : "Admin"
             }
             onClose={() => setPanel(null)}
             t={t}
             cardClassName={modalCardClass}
           >
-            {/* same panel bodies as below — duplicate structure minimal by extracting */}
             {panel === "profile" ? (
-              <div>
+              <div className="settingsModalList">
                 {avatarError ? <div className="authError">{avatarError}</div> : null}
-                <div className="profilePanel">
-                  <div className="profileAvatar">
-                    {avatarPreview ? (
-                      <img src={avatarPreview} alt="" />
+                <div className="settingsProfileHeader">
+                  <div className="settingsProfileAvatar">
+                    {avatarPreview || me?.avatar ? (
+                      <img src={avatarPreview || me.avatar} alt="" />
                     ) : (
-                      <span>{initials(me.username)}</span>
+                      <span>{initials(me?.username)}</span>
                     )}
                   </div>
-
-                  <div className="profileInfo">
-                    <div className="profileLabel">{t("username")}</div>
-                    <div className="profileValue">{me.username}</div>
-                    <div className="profileHint muted small">
-                      {me?.isOnline
-                        ? t("online")
-                        : me?.lastSeenAt
-                          ? t("lastSeenAt").replace("{time}", formatLastSeen(me.lastSeenAt, settings?.lang))
-                          : t("lastSeen")}
-                    </div>
+                  <div className="settingsProfileMain">
+                    <div className="settingsProfileName">{me?.username}</div>
+                    <div className="settingsProfileStatus muted small">{statusLine}</div>
                   </div>
                 </div>
 
-                <div className="profileActions">
+                <div className="settingsSection">
+                  <SettingsRow
+                    label={t("changeAvatar")}
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={avatarBusy}
+                  />
                   <input
                     ref={fileInputRef}
                     className="fileInput"
@@ -257,17 +340,8 @@ export default function UserMenu({
                     accept="image/*"
                     onChange={(e) => pickAvatarFile(e.target.files?.[0])}
                   />
-                  <button
-                    className="primaryBtn"
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={avatarBusy}
-                  >
-                    {avatarBusy ? t("saving") : t("changeAvatar")}
-                  </button>
-                  <button
-                    className="ghostBtn"
-                    type="button"
+                  <SettingsRow
+                    label={t("remove")}
                     onClick={() => {
                       setAvatarPreview("");
                       setAvatarBusy(true);
@@ -277,57 +351,32 @@ export default function UserMenu({
                         .finally(() => setAvatarBusy(false));
                     }}
                     disabled={avatarBusy}
-                  >
-                    {t("remove")}
-                  </button>
-                  <div className="muted small profileLimitHint">{t("maxAvatarHint")}</div>
+                  />
                 </div>
 
                 <div className="settingsSection">
-                  <div className="settingsTitle">{t("statusLabel")}</div>
-                  <div className="pillRow">
-                    {[
-                      { id: "online", label: t("statusOnline") },
-                      { id: "dnd", label: t("statusDnd") },
-                      { id: "away", label: t("statusAway") },
-                      { id: "custom", label: t("statusCustom") },
-                      { id: "", label: t("lastSeen") },
-                    ].map((o) => (
-                      <button
-                        key={o.id || "default"}
-                        type="button"
-                        className={profileStatusKind === o.id ? "pillBtn active" : "pillBtn"}
-                        onClick={() => setProfileStatusKind(o.id)}
-                      >
-                        {o.label}
-                      </button>
-                    ))}
-                  </div>
-                  {profileStatusKind === "custom" ? (
-                    <input
-                      className="searchInput"
-                      value={profileStatusText}
-                      onChange={(e) => setProfileStatusText(e.target.value)}
-                      placeholder={t("statusCustom")}
-                      maxLength={140}
-                    />
-                  ) : null}
-                </div>
-
-                <div className="settingsSection">
-                  <div className="settingsTitle">{t("aboutLabel")}</div>
-                  <textarea
-                    className="searchInput"
-                    value={profileAbout}
-                    onChange={(e) => setProfileAbout(e.target.value)}
-                    placeholder={t("aboutLabel")}
-                    rows={4}
-                    maxLength={600}
+                  <SettingsRow
+                    label={t("statusLabel")}
+                    right={(() => {
+                      const k = String(profileStatusKind || "");
+                      const st = String(profileStatusText || "").trim();
+                      if (k === "online") return t("statusOnline");
+                      if (k === "dnd") return t("statusDnd");
+                      if (k === "away") return t("statusAway");
+                      if (k === "custom" && st) return st;
+                      return t("lastSeen");
+                    })()}
+                    onClick={() => setPanel("statusPick")}
+                  />
+                  <SettingsRow
+                    label={t("aboutLabel")}
+                    right={String(profileAbout || "").trim() ? t("settingsFilled") : t("settingsEmpty")}
+                    onClick={() => setPanel("aboutEdit")}
                   />
                 </div>
 
                 {profileSaveError ? <div className="authError">{profileSaveError}</div> : null}
-                <div className="profileActions">
+                <div className="settingsFooter">
                   <button
                     className="primaryBtn"
                     type="button"
@@ -338,56 +387,138 @@ export default function UserMenu({
                   </button>
                 </div>
               </div>
-            ) : panel === "settings" ? (
-              <div className="settingsPanel">
+            ) : panel === "statusPick" ? (
+              <div className="settingsModalList">
                 <div className="settingsSection">
-                  <div className="settingsTitle">{t("profile")}</div>
-                  <button type="button" className="userMenuMobileItem" onClick={() => setPanel("profile")}>
-                    {t("myProfile")}
+                  {[
+                    { id: "online", label: t("statusOnline") },
+                    { id: "dnd", label: t("statusDnd") },
+                    { id: "away", label: t("statusAway") },
+                    { id: "custom", label: t("statusCustom") },
+                    { id: "", label: t("lastSeen") },
+                  ].map((o) => (
+                    <SettingsChoiceRow
+                      key={o.id || "default"}
+                      label={o.label}
+                      selected={String(profileStatusKind || "") === String(o.id || "")}
+                      onClick={() => {
+                        setProfileStatusKind(o.id);
+                        if (o.id !== "custom") setProfileStatusText("");
+                        if (o.id === "custom") {
+                          setPanel("statusCustomEdit");
+                        } else {
+                          setPanel("profile");
+                        }
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : panel === "statusCustomEdit" ? (
+              <div className="settingsModalList">
+                <div className="settingsSectionHeader">{t("statusCustom")}</div>
+                <div className="settingsSection settingsSection--padded">
+                  <input
+                    className="settingsTextInput"
+                    value={profileStatusText}
+                    onChange={(e) => setProfileStatusText(e.target.value)}
+                    placeholder={t("statusCustom")}
+                    maxLength={140}
+                  />
+                </div>
+                <div className="settingsFooter">
+                  <button className="primaryBtn" type="button" onClick={() => setPanel("profile")}>
+                    {t("save")}
                   </button>
                 </div>
-                <div className="settingsSection">
-                  <div className="settingsTitle">{t("language")}</div>
-                  <div className="pillRow">
-                    <button
-                      type="button"
-                      className={settings?.lang === "en" ? "pillBtn active" : "pillBtn"}
-                      onClick={() => onChangeSettings?.({ lang: "en" })}
-                    >
-                      English
-                    </button>
-                    <button
-                      type="button"
-                      className={settings?.lang === "ru" ? "pillBtn active" : "pillBtn"}
-                      onClick={() => onChangeSettings?.({ lang: "ru" })}
-                    >
-                      Русский
-                    </button>
-                  </div>
+              </div>
+            ) : panel === "aboutEdit" ? (
+              <div className="settingsModalList">
+                <div className="settingsSectionHeader">{t("aboutLabel")}</div>
+                <div className="settingsSection settingsSection--padded">
+                  <textarea
+                    className="settingsTextArea"
+                    value={profileAbout}
+                    onChange={(e) => setProfileAbout(e.target.value)}
+                    placeholder={t("aboutLabel")}
+                    rows={5}
+                    maxLength={600}
+                  />
                 </div>
-
-                <MessageNotificationsSettings settings={settings} onChangeSettings={onChangeSettings} t={t} />
-
+                <div className="settingsFooter">
+                  <button className="primaryBtn" type="button" onClick={() => setPanel("profile")}>
+                    {t("save")}
+                  </button>
+                </div>
+              </div>
+            ) : panel === "language" ? (
+              <div className="settingsModalList">
                 <div className="settingsSection">
-                  <div className="settingsTitle">{t("chatBackground")}</div>
-                  <div className="themeGrid">
-                    {[
-                      { id: "ocean", label: t("ocean") },
-                      { id: "midnight", label: t("midnight") },
-                      { id: "slate", label: t("slate") },
-                    ].map((theme) => (
-                      <button
-                        key={theme.id}
-                        type="button"
-                        className={settings?.chatTheme === theme.id ? "themeCard active" : "themeCard"}
-                        onClick={() => onChangeSettings?.({ chatTheme: theme.id })}
-                        title={theme.label}
-                      >
-                        <div className={`themePreview theme-${theme.id}`} />
-                        <div className="themeLabel">{theme.label}</div>
-                      </button>
-                    ))}
-                  </div>
+                  <SettingsChoiceRow
+                    label="English"
+                    selected={settings?.lang === "en"}
+                    onClick={() => {
+                      onChangeSettings?.({ lang: "en" });
+                      setPanel(null);
+                    }}
+                  />
+                  <SettingsChoiceRow
+                    label="Русский"
+                    selected={settings?.lang === "ru"}
+                    onClick={() => {
+                      onChangeSettings?.({ lang: "ru" });
+                      setPanel(null);
+                    }}
+                  />
+                </div>
+              </div>
+            ) : panel === "notifications" ? (
+              <div className="settingsModalList">
+                <div className="settingsSection settingsSection--padded">
+                  <div className="muted small">{t("notifyEnableHint")}</div>
+                </div>
+                <div className="settingsSection">
+                  <SettingsChoiceRow
+                    label={t("notifyEnableButton")}
+                    selected={!!settings?.messageNotificationsEnabled}
+                    onClick={() => onChangeSettings?.({ messageNotificationsEnabled: true })}
+                  />
+                  <SettingsChoiceRow
+                    label={t("notifyDisableButton")}
+                    selected={!settings?.messageNotificationsEnabled}
+                    onClick={() => onChangeSettings?.({ messageNotificationsEnabled: false })}
+                  />
+                </div>
+              </div>
+            ) : panel === "chatBackground" ? (
+              <div className="settingsModalList">
+                <div className="settingsSection">
+                  {[
+                    { id: "ocean", label: t("ocean") },
+                    { id: "midnight", label: t("midnight") },
+                    { id: "slate", label: t("slate") },
+                  ].map((theme) => (
+                    <SettingsChoiceRow
+                      key={theme.id}
+                      label={theme.label}
+                      selected={settings?.chatTheme === theme.id}
+                      onClick={() => {
+                        onChangeSettings?.({ chatTheme: theme.id });
+                        setPanel(null);
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : panel === "support" ? (
+              <div className="settingsModalList">
+                <div className="settingsSection settingsSection--padded">
+                  <div className="muted small">{t("settingsSupportHint")}</div>
+                </div>
+                <div className="settingsFooter">
+                  <button className="primaryBtn" type="button" onClick={() => setPanel(null)}>
+                    {t("close")}
+                  </button>
                 </div>
               </div>
             ) : (
