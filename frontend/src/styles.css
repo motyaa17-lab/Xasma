@@ -1880,6 +1880,28 @@ body.body--mobileConversationOpen {
   color: rgba(229, 231, 235, 0.35);
 }
 
+.systemMessageRow--officialBroadcast .systemMessageInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.systemMessageOfficialLabel {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(96, 165, 250, 0.95);
+}
+
+.systemMessageOfficialBody {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(229, 231, 235, 0.72);
+  white-space: pre-wrap;
+}
+
 .bubbleText {
   white-space: pre-wrap;
   word-wrap: break-word;

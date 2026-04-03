@@ -2000,10 +2000,19 @@ export default function Chat({
                 <div
                   key={m.id}
                   className={`systemMessageRow${
-                    enteringMessageIds.has(String(m.id)) ? " systemMessageRow--enter" : ""
-                  }`}
+                    m.systemKind === "official_broadcast" ? " systemMessageRow--officialBroadcast" : ""
+                  }${enteringMessageIds.has(String(m.id)) ? " systemMessageRow--enter" : ""}`}
                 >
-                  <div className="systemMessageInner">{formatSystemLine(m, t)}</div>
+                  <div className="systemMessageInner">
+                    {m.systemKind === "official_broadcast" ? (
+                      <>
+                        <span className="systemMessageOfficialLabel">{t("appTitle")}</span>
+                        <span className="systemMessageOfficialBody">{formatSystemLine(m, t)}</span>
+                      </>
+                    ) : (
+                      formatSystemLine(m, t)
+                    )}
+                  </div>
                   <div className="systemMessageTime">{formatTime(m.createdAt)}</div>
                 </div>
               ) : (
@@ -2854,6 +2863,8 @@ function formatSystemLine(m, t) {
   const actor = String(p.actorUsername || m.sender?.username || "?");
   const target = String(p.targetUsername || "?");
   switch (m.systemKind) {
+    case "official_broadcast":
+      return String(m.text || "").trim() || "—";
     case "group_created":
       return t("systemGroupCreated").replace("{actor}", actor);
     case "member_added":

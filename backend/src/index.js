@@ -395,14 +395,16 @@ async function fetchMessageById(messageId) {
   return messageRowToApi(messageRow.rows[0], []);
 }
 
-async function insertSystemMessageAndBroadcast(chatId, actorUserId, systemKind, payload) {
+async function insertSystemMessageAndBroadcast(chatId, actorUserId, systemKind, payload, bodyText = null) {
+  const textStored =
+    bodyText != null && String(bodyText).trim() !== "" ? String(bodyText).trim() : "";
   const inserted = await query(
     `
     INSERT INTO messages (chat_id, sender_id, text, message_type, system_kind, system_payload)
-    VALUES ($1, $2, '', 'system', $3, $4::jsonb)
+    VALUES ($1, $2, $3, 'system', $4, $5::jsonb)
     RETURNING id
   `,
-    [chatId, actorUserId, systemKind, JSON.stringify(payload || {})]
+    [chatId, actorUserId, textStored, systemKind, JSON.stringify(payload || {})]
   );
   const insertedId = Number(inserted.rows[0].id);
   const message = await fetchMessageById(insertedId);
@@ -767,6 +769,7 @@ app.get("/api/chats", authRequired, (req, res) => {
           CASE
             WHEN COALESCE(m.message_type, 'text') = 'system' THEN
               CASE COALESCE(m.system_kind, '')
+                WHEN 'official_broadcast' THEN LEFT(TRIM(COALESCE(m.text, '')), 200)
                 WHEN 'group_created' THEN '[Group created]'
                 WHEN 'member_added' THEN '[Member added]'
                 WHEN 'member_removed' THEN '[Member removed]'
@@ -1466,7 +1469,11 @@ app.delete("/api/admin/messages/:messageId", authRequired, requireAdmin, (req, r
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });
 
-/** Broadcast a text announcement to every user's official "Xasma" system chat. */
+/**
+ * Broadcast a system-line announcement to every user's official "Xasma" chat.
+ * Inserts message_type = system, system_kind = official_broadcast, sender_id = internal Xasma bot
+ * (API exposes sender as "Xasma"). Emits chat:message per chat for realtime clients.
+ */
 app.post("/api/admin/broadcast-official", authRequired, requireAdmin, (req, res) => {
   const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
   if (!text) return res.status(400).json({ error: "text is required" });
@@ -1475,13 +1482,16 @@ app.post("/api/admin/broadcast-official", authRequired, requireAdmin, (req, res)
   (async () => {
     const bot = getOfficialAnnounceUserId();
     if (!bot) return res.status(500).json({ error: "Official system user not initialized" });
-    const rows = await query(`SELECT id FROM chats WHERE type = 'official'`);
+    const usersR = await query(`SELECT id FROM users WHERE id != $1`, [bot]);
     let messageCount = 0;
-    for (const row of rows.rows) {
-      const m = await insertChatMessageAndBroadcast(Number(row.id), bot, text, null, null, null, null);
+    for (const ur of usersR.rows) {
+      const uid = Number(ur.id);
+      const chatId = await ensureOfficialChatForUser(uid);
+      if (!chatId) continue;
+      const m = await insertSystemMessageAndBroadcast(chatId, bot, "official_broadcast", {}, text);
       if (m) messageCount += 1;
     }
-    return res.json({ ok: true, chatCount: rows.rows.length, messageCount });
+    return res.json({ ok: true, userCount: usersR.rows.length, messageCount });
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });
 
