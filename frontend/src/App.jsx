@@ -5,6 +5,7 @@ import Auth from "./components/Auth.jsx";
 import Sidebar from "./components/Sidebar.jsx";
 import Chat from "./components/Chat.jsx";
 import UserMenu from "./components/UserMenu.jsx";
+import DownloadInstallPanel from "./components/DownloadInstallPanel.jsx";
 import { useIsMobile } from "./hooks/useIsMobile.js";
 import { t as tr } from "./i18n.js";
 import {
@@ -56,6 +57,7 @@ export default function App() {
   const [socketReady, setSocketReady] = useState(false);
   const [typingUntil, setTypingUntil] = useState({}); // chatId -> ms timestamp
   const [presenceTick, setPresenceTick] = useState(0);
+  const [downloadPanelOpen, setDownloadPanelOpen] = useState(false);
 
   const socketRef = useRef(null);
   const selectedChatIdRef = useRef(null);
@@ -599,7 +601,12 @@ export default function App() {
             {socketReady ? t("realtimeOn") : t("realtimeReconnecting")}
           </div>
         </div>
-        <UserMenu {...userMenuProps} variant="dropdown" />
+        <div className="topBarActions">
+          <button type="button" className="downloadTopBtn" onClick={() => setDownloadPanelOpen(true)}>
+            Скачать
+          </button>
+          <UserMenu {...userMenuProps} variant="dropdown" />
+        </div>
       </div>
 
       <div className="appBody">
@@ -622,6 +629,15 @@ export default function App() {
                 </div>
               </div>
               <div className="mobileMainHeaderActions">
+                <button
+                  type="button"
+                  className="mobileHeaderInstallBtn"
+                  onClick={() => setDownloadPanelOpen(true)}
+                  aria-label="Скачать"
+                  title="Скачать"
+                >
+                  Скачать
+                </button>
                 {sidebarProps.onCreateGroup ? (
                   <button
                     type="button"
@@ -719,6 +735,11 @@ export default function App() {
           desktopShell
         )}
       </div>
+      <DownloadInstallPanel
+        open={downloadPanelOpen}
+        onClose={() => setDownloadPanelOpen(false)}
+        androidApkUrl={import.meta.env.VITE_ANDROID_APK_URL || ""}
+      />
     </AppRuntimeErrorBoundary>
   );
 }
