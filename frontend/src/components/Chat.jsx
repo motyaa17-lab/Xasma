@@ -242,6 +242,7 @@ export default function Chat({
   const [mobileMenuPlacement, setMobileMenuPlacement] = useState(null);
   const [longPressFlashMessageId, setLongPressFlashMessageId] = useState(null);
   const longPressFlashTimerRef = useRef(null);
+  const longPressClickBlockUntilRef = useRef(0);
   const longPressTimerRef = useRef(null);
   const longPressTrackRef = useRef(null);
 
@@ -364,9 +365,9 @@ export default function Chat({
     (e, messageId, showMessageMenu) => {
       if (!isMobileChat || !showMessageMenu || showVideoNoteOverlay) return;
       if (e.touches.length !== 1) return;
-      const raw = e.target;
-      const el = raw instanceof Element ? raw : raw?.parentElement;
-      if (!(el instanceof Element) || el.closest(BUBBLE_PRESS_IGNORE)) return;
+      // Important: arm long-press on the bubble itself even if the touch starts on
+      // interactive voice controls (play button, waveform, audio element).
+      // We'll suppress the post-long-press "click" to avoid triggering playback.
       clearBubbleLongPress();
       const t = e.touches[0];
       longPressTrackRef.current = { x: t.clientX, y: t.clientY };
@@ -375,6 +376,7 @@ export default function Chat({
         longPressTrackRef.current = null;
         triggerMobileMessageMenuFeedback(messageId);
         triggerMobileLongPressFlash(messageId);
+        longPressClickBlockUntilRef.current = Date.now() + 900;
         setMenuMessageId(messageId);
       }, MOBILE_LONG_PRESS_MS);
     },
@@ -607,6 +609,7 @@ export default function Chat({
       longPressFlashTimerRef.current = null;
     }
     setLongPressFlashMessageId(null);
+    longPressClickBlockUntilRef.current = 0;
     setText("");
     setGroupInfoOpen(false);
     setPendingImageUrl(null);
@@ -1902,6 +1905,16 @@ export default function Chat({
                     onTouchMove={isMobileChat ? onMobileBubbleTouchMove : undefined}
                     onTouchEnd={isMobileChat ? onMobileBubbleTouchEnd : undefined}
                     onTouchCancel={isMobileChat ? onMobileBubbleTouchCancel : undefined}
+                    onClickCapture={
+                      isMobileChat
+                        ? (e) => {
+                            if (Date.now() < longPressClickBlockUntilRef.current) {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }
+                          }
+                        : undefined
+                    }
                     onContextMenu={
                       isMobileChat && showMessageMenu ? (e) => e.preventDefault() : undefined
                     }
