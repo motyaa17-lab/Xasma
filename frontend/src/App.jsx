@@ -19,6 +19,7 @@ import {
   toggleReaction,
   updateMessage,
   updateMyAvatar,
+  updateMyProfile,
 } from "./api.js";
 import { getSocketEndpoint } from "./api.js";
 import {
@@ -505,6 +506,15 @@ export default function App() {
     setMe(updated);
   }
 
+  async function changeMyProfile(next) {
+    const statusKind = typeof next?.statusKind === "string" ? next.statusKind : "";
+    const statusText = typeof next?.statusText === "string" ? next.statusText : "";
+    const about = typeof next?.about === "string" ? next.about : "";
+    setMe((prev) => (prev ? { ...prev, statusKind, statusText, about } : prev));
+    const updated = await updateMyProfile({ statusKind, statusText, about });
+    setMe(updated);
+  }
+
   function goMobileTab(tab) {
     setMobileTab(tab);
     setSelectedChatId(null);
@@ -528,6 +538,7 @@ export default function App() {
     me,
     onLogout: logout,
     onChangeAvatar: changeMyAvatar,
+    onChangeProfile: changeMyProfile,
     settings,
     onChangeSettings: (next) => setSettings((prev) => ({ ...prev, ...next })),
     t,

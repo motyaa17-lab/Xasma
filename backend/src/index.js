@@ -422,7 +422,7 @@ app.post("/api/login", async (req, res) => {
 app.get("/api/me", authRequired, (req, res) => {
   const uid = Number(req.user.id);
   return query(
-    `SELECT id, username, avatar_url, role, banned, is_online, last_seen_at FROM users WHERE id = $1`,
+    `SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about FROM users WHERE id = $1`,
     [uid]
   ).then((r) => {
     const user = r.rows[0];
@@ -436,9 +436,53 @@ app.get("/api/me", authRequired, (req, res) => {
       banned: Boolean(user.banned),
       isOnline: Boolean(user.is_online),
       lastSeenAt: user.last_seen_at,
+      statusKind: user.status_kind || "",
+      statusText: user.status_text || "",
+      about: user.about || "",
     },
   });
   });
+});
+
+app.put("/api/me/profile", authRequired, (req, res) => {
+  const statusKindRaw = typeof req.body?.statusKind === "string" ? req.body.statusKind.trim() : "";
+  const statusTextRaw = typeof req.body?.statusText === "string" ? req.body.statusText.trim() : "";
+  const aboutRaw = typeof req.body?.about === "string" ? req.body.about.trim() : "";
+
+  const allowedKinds = new Set(["", "online", "dnd", "away", "custom"]);
+  const statusKind = allowedKinds.has(statusKindRaw) ? statusKindRaw : "";
+  const statusText = statusTextRaw.length > 140 ? statusTextRaw.slice(0, 140) : statusTextRaw;
+  const about = aboutRaw.length > 600 ? aboutRaw.slice(0, 600) : aboutRaw;
+
+  (async () => {
+    const uid = Number(req.user.id);
+    await query(`UPDATE users SET status_kind = $1, status_text = $2, about = $3 WHERE id = $4`, [
+      statusKind || null,
+      statusText || null,
+      about || null,
+      uid,
+    ]);
+    const r = await query(
+      `SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about FROM users WHERE id = $1`,
+      [uid]
+    );
+    const user = r.rows[0];
+    if (!user) return res.status(404).json({ error: "User not found" });
+    return res.json({
+      user: {
+        id: Number(user.id),
+        username: user.username,
+        avatar: user.avatar_url,
+        role: user.role,
+        banned: Boolean(user.banned),
+        isOnline: Boolean(user.is_online),
+        lastSeenAt: user.last_seen_at,
+        statusKind: user.status_kind || "",
+        statusText: user.status_text || "",
+        about: user.about || "",
+      },
+    });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
 });
 
 function emitToUser(userId, event, payload) {
@@ -505,7 +549,7 @@ app.get("/api/users", authRequired, (req, res) => {
     const uid = Number(req.user.id);
     const users = await query(
       `
-      SELECT id, username, avatar_url, is_online, last_seen_at
+      SELECT id, username, avatar_url, is_online, last_seen_at, status_kind, status_text
       FROM users
       WHERE id != $1
         AND username ILIKE $2
@@ -521,7 +565,36 @@ app.get("/api/users", authRequired, (req, res) => {
         avatar: u.avatar_url,
         isOnline: Boolean(u.is_online),
         lastSeenAt: u.last_seen_at,
+        statusKind: u.status_kind || "",
+        statusText: u.status_text || "",
       })),
+    });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
+app.get("/api/users/:userId", authRequired, (req, res) => {
+  const uid = Number(req.params.userId);
+  if (!uid) return res.status(400).json({ error: "Invalid user id" });
+  (async () => {
+    const r = await query(
+      `SELECT id, username, avatar_url, is_online, last_seen_at, status_kind, status_text, about
+       FROM users
+       WHERE id = $1`,
+      [uid]
+    );
+    const u = r.rows[0];
+    if (!u) return res.status(404).json({ error: "User not found" });
+    return res.json({
+      user: {
+        id: Number(u.id),
+        username: u.username,
+        avatar: u.avatar_url || "",
+        isOnline: Boolean(u.is_online),
+        lastSeenAt: u.last_seen_at,
+        statusKind: u.status_kind || "",
+        statusText: u.status_text || "",
+        about: u.about || "",
+      },
     });
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });

@@ -70,9 +70,27 @@ export async function updateMyAvatar(avatar) {
   return data.user;
 }
 
+export async function updateMyProfile({ statusKind, statusText, about } = {}) {
+  const data = await apiFetch("/api/me/profile", {
+    method: "PUT",
+    body: {
+      statusKind: typeof statusKind === "string" ? statusKind : "",
+      statusText: typeof statusText === "string" ? statusText : "",
+      about: typeof about === "string" ? about : "",
+    },
+  });
+  return data.user;
+}
+
 export async function searchUsers(q) {
   const data = await apiFetch(`/api/users?q=${encodeURIComponent(q)}`);
   return data.users;
+}
+
+export async function getUserById(userId) {
+  const uid = Number(userId);
+  const data = await apiFetch(`/api/users/${uid}`);
+  return data.user;
 }
 
 export async function getChats() {

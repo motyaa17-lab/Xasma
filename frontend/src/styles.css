@@ -341,6 +341,30 @@ body.body--mobileConversationOpen {
   align-items: center;
 }
 
+.profilePanel--stack {
+  align-items: flex-start;
+}
+
+.profileAvatar--lg {
+  width: 84px;
+  height: 84px;
+}
+
+.profileMain {
+  min-width: 0;
+}
+
+.profileAbout {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(11, 18, 32, 0.35);
+  color: rgba(226, 232, 240, 0.95);
+  line-height: 1.35;
+  white-space: pre-wrap;
+}
+
 .profileAvatar {
   width: 64px;
   height: 64px;
@@ -1364,6 +1388,13 @@ body.body--mobileConversationOpen {
   justify-content: center;
   overflow: hidden;
   flex: 0 0 auto;
+}
+
+.avatarTapBtn {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
 }
 
 .msgAvatar img {

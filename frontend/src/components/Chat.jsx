@@ -5,6 +5,7 @@ import { uploadChatImage, uploadChatAudio, uploadChatVideo, getApiBase } from ".
 import GroupInfoModal from "./GroupInfoModal.jsx";
 import VoiceMessagePlayer from "./VoiceMessagePlayer.jsx";
 import CircleVideoMessage from "./CircleVideoMessage.jsx";
+import UserProfileModal from "./UserProfileModal.jsx";
 
 const MAX_VIDEO_NOTE_SEC = 60;
 const QUICK_REACTION_EMOJIS = ["❤️", "👍", "😂", "😮", "😢", "🔥"];
@@ -204,6 +205,7 @@ export default function Chat({
   const [uploadError, setUploadError] = useState("");
   const [videoNoteDraft, setVideoNoteDraft] = useState(null); // { blob, mimeHint, url }
   const [sendAckActive, setSendAckActive] = useState(false);
+  const [profileUserId, setProfileUserId] = useState(null);
   const listRef = useRef(null);
   const nearBottomRef = useRef(true);
   const scrollAfterSendRef = useRef(false);
@@ -1669,6 +1671,12 @@ export default function Chat({
       onTouchEnd={onChatTouchEnd}
       onTouchCancel={onChatTouchEnd}
     >
+      <UserProfileModal
+        open={Boolean(profileUserId)}
+        userId={profileUserId}
+        onClose={() => setProfileUserId(null)}
+        t={t}
+      />
       {!chatId ? (
         <div className="emptyState">
           <div className="emptyTitle">{t("selectChatTitle")}</div>
@@ -1794,13 +1802,18 @@ export default function Chat({
                 </button>
               ) : (
                 <div className="chatHeaderLeft">
-                  <div className="avatarSm">
+                  <button
+                    type="button"
+                    className="avatarSm avatarTapBtn"
+                    onClick={() => chat?.other?.id && setProfileUserId(Number(chat.other.id))}
+                    aria-label={t("profile")}
+                  >
                     {chat?.other?.avatar ? (
                       <img src={chat.other.avatar} alt="" />
                     ) : (
                       <span>{initials(chat?.other?.username || "")}</span>
                     )}
-                  </div>
+                  </button>
                   <div className="chatHeaderInfo">
                     <div className="chatHeaderName">{chat?.other?.username || ""}</div>
                     <div className="chatHeaderStatus">
@@ -1877,13 +1890,23 @@ export default function Chat({
                       : ""
                   }`}
                 >
-                  <div className="msgAvatar" title={m.sender?.username || ""}>
+                  <button
+                    type="button"
+                    className="msgAvatar avatarTapBtn"
+                    title={m.sender?.username || ""}
+                    onClick={() => {
+                      const uid = Number(m.senderId);
+                      if (!uid || uid === Number(meId)) return;
+                      setProfileUserId(uid);
+                    }}
+                    aria-label={t("profile")}
+                  >
                     {getAvatarSrc(m, meId, meAvatar) ? (
                       <img src={getAvatarSrc(m, meId, meAvatar)} alt="" />
                     ) : (
                       <span>{initials(getDisplayName(m, meId, meUsername))}</span>
                     )}
-                  </div>
+                  </button>
                   <div
                     className={
                       (m.senderId === meId

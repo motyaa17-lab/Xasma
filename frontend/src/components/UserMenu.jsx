@@ -63,6 +63,7 @@ export default function UserMenu({
   me,
   onLogout,
   onChangeAvatar,
+  onChangeProfile,
   settings,
   onChangeSettings,
   t,
@@ -75,6 +76,11 @@ export default function UserMenu({
   const [avatarPreview, setAvatarPreview] = useState("");
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [avatarError, setAvatarError] = useState("");
+  const [profileStatusKind, setProfileStatusKind] = useState("");
+  const [profileStatusText, setProfileStatusText] = useState("");
+  const [profileAbout, setProfileAbout] = useState("");
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileSaveError, setProfileSaveError] = useState("");
   const [adminUsers, setAdminUsers] = useState([]);
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminError, setAdminError] = useState("");
@@ -109,6 +115,31 @@ export default function UserMenu({
     setAvatarPreview(me?.avatar || "");
     setAvatarError("");
   }, [panel, me?.avatar]);
+
+  useEffect(() => {
+    if (panel !== "profile") return;
+    setProfileStatusKind(String(me?.statusKind || ""));
+    setProfileStatusText(String(me?.statusText || ""));
+    setProfileAbout(String(me?.about || ""));
+    setProfileSaveError("");
+  }, [panel, me?.statusKind, me?.statusText, me?.about]);
+
+  async function saveProfile() {
+    if (!onChangeProfile) return;
+    setProfileSaving(true);
+    setProfileSaveError("");
+    try {
+      await onChangeProfile({
+        statusKind: profileStatusKind,
+        statusText: profileStatusKind === "custom" ? profileStatusText : "",
+        about: profileAbout,
+      });
+    } catch (e) {
+      setProfileSaveError(e.message || "Failed");
+    } finally {
+      setProfileSaving(false);
+    }
+  }
 
   async function loadAdminUsers() {
     setAdminLoading(true);
@@ -157,14 +188,6 @@ export default function UserMenu({
           </div>
         </div>
         <div className="userMenuMobileList" role="menu">
-          <button
-            type="button"
-            className="userMenuMobileItem"
-            role="menuitem"
-            onClick={() => setPanel("profile")}
-          >
-            {t("myProfile")}
-          </button>
           <button
             type="button"
             className="userMenuMobileItem"
@@ -259,9 +282,70 @@ export default function UserMenu({
                   </button>
                   <div className="muted small profileLimitHint">{t("maxAvatarHint")}</div>
                 </div>
+
+                <div className="settingsSection">
+                  <div className="settingsTitle">{t("statusLabel")}</div>
+                  <div className="pillRow">
+                    {[
+                      { id: "online", label: t("statusOnline") },
+                      { id: "dnd", label: t("statusDnd") },
+                      { id: "away", label: t("statusAway") },
+                      { id: "custom", label: t("statusCustom") },
+                      { id: "", label: t("lastSeen") },
+                    ].map((o) => (
+                      <button
+                        key={o.id || "default"}
+                        type="button"
+                        className={profileStatusKind === o.id ? "pillBtn active" : "pillBtn"}
+                        onClick={() => setProfileStatusKind(o.id)}
+                      >
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
+                  {profileStatusKind === "custom" ? (
+                    <input
+                      className="searchInput"
+                      value={profileStatusText}
+                      onChange={(e) => setProfileStatusText(e.target.value)}
+                      placeholder={t("statusCustom")}
+                      maxLength={140}
+                    />
+                  ) : null}
+                </div>
+
+                <div className="settingsSection">
+                  <div className="settingsTitle">{t("aboutLabel")}</div>
+                  <textarea
+                    className="searchInput"
+                    value={profileAbout}
+                    onChange={(e) => setProfileAbout(e.target.value)}
+                    placeholder={t("aboutLabel")}
+                    rows={4}
+                    maxLength={600}
+                  />
+                </div>
+
+                {profileSaveError ? <div className="authError">{profileSaveError}</div> : null}
+                <div className="profileActions">
+                  <button
+                    className="primaryBtn"
+                    type="button"
+                    onClick={saveProfile}
+                    disabled={profileSaving || !onChangeProfile}
+                  >
+                    {profileSaving ? t("saving") : t("save")}
+                  </button>
+                </div>
               </div>
             ) : panel === "settings" ? (
               <div className="settingsPanel">
+                <div className="settingsSection">
+                  <div className="settingsTitle">{t("profile")}</div>
+                  <button type="button" className="userMenuMobileItem" onClick={() => setPanel("profile")}>
+                    {t("myProfile")}
+                  </button>
+                </div>
                 <div className="settingsSection">
                   <div className="settingsTitle">{t("language")}</div>
                   <div className="pillRow">
@@ -421,17 +505,6 @@ export default function UserMenu({
             role="menuitem"
             onClick={() => {
               setOpen(false);
-              setPanel("profile");
-            }}
-          >
-            {t("myProfile")}
-          </button>
-          <button
-            className="dropdownItem"
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              setOpen(false);
               setPanel("settings");
             }}
           >
@@ -531,9 +604,70 @@ export default function UserMenu({
                   {t("maxAvatarHint")}
                 </div>
               </div>
+
+              <div className="settingsSection">
+                <div className="settingsTitle">{t("statusLabel")}</div>
+                <div className="pillRow">
+                  {[
+                    { id: "online", label: t("statusOnline") },
+                    { id: "dnd", label: t("statusDnd") },
+                    { id: "away", label: t("statusAway") },
+                    { id: "custom", label: t("statusCustom") },
+                    { id: "", label: t("lastSeen") },
+                  ].map((o) => (
+                    <button
+                      key={o.id || "default"}
+                      type="button"
+                      className={profileStatusKind === o.id ? "pillBtn active" : "pillBtn"}
+                      onClick={() => setProfileStatusKind(o.id)}
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+                {profileStatusKind === "custom" ? (
+                  <input
+                    className="searchInput"
+                    value={profileStatusText}
+                    onChange={(e) => setProfileStatusText(e.target.value)}
+                    placeholder={t("statusCustom")}
+                    maxLength={140}
+                  />
+                ) : null}
+              </div>
+
+              <div className="settingsSection">
+                <div className="settingsTitle">{t("aboutLabel")}</div>
+                <textarea
+                  className="searchInput"
+                  value={profileAbout}
+                  onChange={(e) => setProfileAbout(e.target.value)}
+                  placeholder={t("aboutLabel")}
+                  rows={4}
+                  maxLength={600}
+                />
+              </div>
+
+              {profileSaveError ? <div className="authError">{profileSaveError}</div> : null}
+              <div className="profileActions">
+                <button
+                  className="primaryBtn"
+                  type="button"
+                  onClick={saveProfile}
+                  disabled={profileSaving || !onChangeProfile}
+                >
+                  {profileSaving ? t("saving") : t("save")}
+                </button>
+              </div>
             </div>
           ) : panel === "settings" ? (
             <div className="settingsPanel">
+              <div className="settingsSection">
+                <div className="settingsTitle">{t("profile")}</div>
+                <button type="button" className="dropdownItem" onClick={() => setPanel("profile")}>
+                  {t("myProfile")}
+                </button>
+              </div>
               <div className="settingsSection">
                 <div className="settingsTitle">{t("language")}</div>
                 <div className="pillRow">

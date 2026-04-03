@@ -24,6 +24,9 @@ async function initDb() {
       username TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
       avatar_url TEXT,
+      status_kind TEXT,
+      status_text TEXT,
+      about TEXT,
       role TEXT NOT NULL DEFAULT 'user',
       banned BOOLEAN NOT NULL DEFAULT FALSE,
       is_online BOOLEAN NOT NULL DEFAULT FALSE,
@@ -75,6 +78,9 @@ async function initDb() {
   // Migrations for existing DBs (safe/idempotent).
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user'`);
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS banned BOOLEAN NOT NULL DEFAULT FALSE`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status_kind TEXT`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status_text TEXT`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS about TEXT`);
 
   // Group chats: type, title, creator; direct chats keep ordered user1_id/user2_id.
   await query(`ALTER TABLE chats ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'direct'`);
