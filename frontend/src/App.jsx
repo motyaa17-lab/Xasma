@@ -597,7 +597,10 @@ export default function App() {
     <div className="appShell appShell--desktop">
       <div className="topBar">
         <div className="topBarLeft">
-          <div className="appTitle">{t("appTitle")}</div>
+          <div className="appTitleRow">
+            <span className="appTitle">{t("appTitle")}</span>
+            <span className="appBetaBadge">BETA</span>
+          </div>
           <div className="statusTag">
             {socketReady ? t("realtimeOn") : t("realtimeReconnecting")}
           </div>
@@ -628,7 +631,10 @@ export default function App() {
           <div className="mobilePane mobilePane--inbox">
             <header className="mobileMainHeader">
               <div className="mobileMainHeaderText">
-                <div className="mobileBrandTitle">{t("appTitle")}</div>
+                <div className="mobileBrandRow">
+                  <span className="mobileBrandTitle">{t("appTitle")}</span>
+                  <span className="appBetaBadge">BETA</span>
+                </div>
                 <div className={`mobileSocketPill${socketReady ? " mobileSocketPill--on" : ""}`}>
                   {socketReady ? t("realtimeOn") : t("realtimeReconnecting")}
                 </div>

@@ -232,9 +232,31 @@ body.body--mobileConversationOpen {
   transform: scale(0.98);
 }
 
+.appTitleRow {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 0;
+}
+
 .appTitle {
   font-size: 18px;
   font-weight: 700;
+}
+
+.appBetaBadge {
+  margin-left: 7px;
+  padding: 2px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.04);
+  flex-shrink: 0;
+  align-self: center;
 }
 
 .statusTag {
@@ -3274,6 +3296,13 @@ body.body--mobileConversationOpen {
   margin-top: -2px;
 }
 
+.mobileBrandRow {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .mobileBrandTitle {
   font-size: 19px;
   font-weight: 800;
@@ -3282,6 +3311,7 @@ body.body--mobileConversationOpen {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  min-width: 0;
 }
 
 .mobileSocketPill {
