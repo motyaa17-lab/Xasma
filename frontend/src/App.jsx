@@ -5,6 +5,7 @@ import Auth from "./components/Auth.jsx";
 import Sidebar from "./components/Sidebar.jsx";
 import Chat from "./components/Chat.jsx";
 import UserMenu from "./components/UserMenu.jsx";
+import InstallDownloadPanel from "./components/InstallDownloadPanel.jsx";
 import { useIsMobile } from "./hooks/useIsMobile.js";
 import { t as tr } from "./i18n.js";
 import {
@@ -71,6 +72,7 @@ export default function App() {
   const socketEndpoint = useMemo(() => getSocketEndpoint(), []);
   const isMobile = useIsMobile(900);
   const [mobileTab, setMobileTab] = useState("chats");
+  const [installDownloadOpen, setInstallDownloadOpen] = useState(false);
   const mobileConversationOpen = Boolean(isMobile && mobileTab === "chats" && selectedChatId);
 
   useEffect(() => {
@@ -500,6 +502,7 @@ export default function App() {
     localStorage.removeItem("token");
     setToken("");
     setMe(null);
+    setInstallDownloadOpen(false);
   }
 
   async function changeMyAvatar(dataUrl) {
@@ -599,7 +602,16 @@ export default function App() {
             {socketReady ? t("realtimeOn") : t("realtimeReconnecting")}
           </div>
         </div>
-        <UserMenu {...userMenuProps} variant="dropdown" />
+        <div className="topBarRight">
+          <button
+            type="button"
+            className="topBarDownloadBtn"
+            onClick={() => setInstallDownloadOpen(true)}
+          >
+            {t("downloadButton")}
+          </button>
+          <UserMenu {...userMenuProps} variant="dropdown" />
+        </div>
       </div>
 
       <div className="appBody">
@@ -622,6 +634,13 @@ export default function App() {
                 </div>
               </div>
               <div className="mobileMainHeaderActions">
+                <button
+                  type="button"
+                  className="mobileDownloadBtn"
+                  onClick={() => setInstallDownloadOpen(true)}
+                >
+                  {t("downloadButton")}
+                </button>
                 {sidebarProps.onCreateGroup ? (
                   <button
                     type="button"
@@ -719,6 +738,7 @@ export default function App() {
           desktopShell
         )}
       </div>
+      <InstallDownloadPanel open={installDownloadOpen} onClose={() => setInstallDownloadOpen(false)} t={t} />
     </AppRuntimeErrorBoundary>
   );
 }
