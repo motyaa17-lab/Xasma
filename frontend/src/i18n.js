@@ -188,6 +188,9 @@ export const translations = {
     settingsSupport: "Support",
     settingsSupportAuthors: "Support the authors",
     settingsSupportHint: "Thank you. Support options will be added soon.",
+    donateSupportBody:
+      "Xasma keeps improving thanks to supporters like you. If you would like to help the project, tap the button below.",
+    donateSupportCta: "Open donation page",
     settingsCurrentBackground: "Current background",
     settingsEmpty: "Empty",
     settingsFilled: "Filled",
@@ -394,6 +397,9 @@ export const translations = {
     settingsSupport: "Поддержка",
     settingsSupportAuthors: "Поддержать авторов",
     settingsSupportHint: "Спасибо. Способы поддержки появятся позже.",
+    donateSupportBody:
+      "Разработка Xasma продолжается благодаря вашей поддержке. Если хотите помочь проекту — нажмите кнопку ниже.",
+    donateSupportCta: "Перейти к донату",
     settingsCurrentBackground: "Текущий фон",
     settingsEmpty: "Пусто",
     settingsFilled: "Заполнено",

@@ -3121,6 +3121,42 @@ body.body--mobileConversationOpen {
   color: rgba(226, 232, 240, 0.9);
 }
 
+/* Settings → support / donation (DonationAlerts) */
+.donateSupportModal {
+  padding: 4px 2px 8px;
+}
+
+.donateSupportModal--desktop {
+  padding: 2px 0 8px;
+}
+
+.donateSupportIntro {
+  margin: 0 0 18px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(226, 232, 240, 0.88);
+}
+
+.donateSupportMainBtn {
+  width: 100%;
+  justify-content: center;
+  padding: 12px 16px;
+  font-size: 15px;
+  font-weight: 700;
+  border-radius: 12px;
+}
+
+.donateSupportFooter {
+  margin-top: 14px;
+  display: flex;
+  justify-content: center;
+}
+
+.donateSupportCloseBtn {
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
 .iconCloseBtn {
   border: none;
   background: transparent;

@@ -1,5 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { adminListUsers, adminSetUserBanned, adminSetUserRole } from "../api.js";
+import { DONATION_ALERTS_URL } from "../config/donation.js";
+
+function openDonationPage() {
+  if (typeof window === "undefined") return;
+  window.open(DONATION_ALERTS_URL, "_blank", "noopener,noreferrer");
+}
 
 function MessageNotificationsSettings({ settings, onChangeSettings, t }) {
   const supported = typeof window !== "undefined" && "Notification" in window;
@@ -303,7 +309,7 @@ export default function UserMenu({
                     : panel === "chatBackground"
                       ? t("chatBackground")
                       : panel === "support"
-                        ? t("settingsSupport")
+                        ? t("settingsSupportAuthors")
                         : "Admin"
             }
             onClose={() => setPanel(null)}
@@ -511,12 +517,13 @@ export default function UserMenu({
                 </div>
               </div>
             ) : panel === "support" ? (
-              <div className="settingsModalList">
-                <div className="settingsSection settingsSection--padded">
-                  <div className="muted small">{t("settingsSupportHint")}</div>
-                </div>
-                <div className="settingsFooter">
-                  <button className="primaryBtn" type="button" onClick={() => setPanel(null)}>
+              <div className="settingsModalList donateSupportModal">
+                <p className="donateSupportIntro">{t("donateSupportBody")}</p>
+                <button type="button" className="primaryBtn donateSupportMainBtn" onClick={openDonationPage}>
+                  {t("donateSupportCta")}
+                </button>
+                <div className="donateSupportFooter">
+                  <button type="button" className="ghostBtn donateSupportCloseBtn" onClick={() => setPanel(null)}>
                     {t("close")}
                   </button>
                 </div>
@@ -674,7 +681,13 @@ export default function UserMenu({
       {panel ? (
         <Modal
           title={
-            panel === "profile" ? t("myProfile") : panel === "settings" ? t("settings") : "Admin"
+            panel === "profile"
+              ? t("myProfile")
+              : panel === "settings"
+                ? t("settings")
+                : panel === "support"
+                  ? t("settingsSupportAuthors")
+                  : "Admin"
           }
           onClose={() => setPanel(null)}
           t={t}
@@ -844,6 +857,20 @@ export default function UserMenu({
                   ))}
                 </div>
               </div>
+
+              <div className="settingsSection">
+                <div className="settingsTitle">{t("settingsSupport")}</div>
+                <button type="button" className="dropdownItem" onClick={() => setPanel("support")}>
+                  {t("settingsSupportAuthors")}
+                </button>
+              </div>
+            </div>
+          ) : panel === "support" ? (
+            <div className="donateSupportModal donateSupportModal--desktop">
+              <p className="donateSupportIntro">{t("donateSupportBody")}</p>
+              <button type="button" className="primaryBtn donateSupportMainBtn" onClick={openDonationPage}>
+                {t("donateSupportCta")}
+              </button>
             </div>
           ) : (
             <div className="adminPanel">
