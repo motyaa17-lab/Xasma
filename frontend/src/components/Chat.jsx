@@ -188,6 +188,11 @@ export default function Chat({
   lang,
   onMobileBack,
 }) {
+  const safeMessages = useMemo(() => {
+    if (!Array.isArray(messages)) return [];
+    return messages.filter((m) => m && typeof m === "object");
+  }, [messages]);
+
   const [text, setText] = useState("");
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [menuMessageId, setMenuMessageId] = useState(null);
@@ -920,8 +925,8 @@ export default function Chat({
     if (chatId !== lastAnimChatIdRef.current) {
       lastAnimChatIdRef.current = chatId;
       setEnteringMessageIds(new Set());
-      if (messages.length > 0) {
-        lastMessageIdsRef.current = new Set(messages.map((m) => String(m.id)));
+      if (safeMessages.length > 0) {
+        lastMessageIdsRef.current = new Set(safeMessages.map((m) => String(m.id)));
         skipMessageEnterRef.current = false;
       } else {
         lastMessageIdsRef.current = new Set();
@@ -930,7 +935,7 @@ export default function Chat({
       return;
     }
 
-    const nextIds = new Set(messages.map((m) => String(m.id)));
+    const nextIds = new Set(safeMessages.map((m) => String(m.id)));
     if (skipMessageEnterRef.current) {
       lastMessageIdsRef.current = nextIds;
       skipMessageEnterRef.current = false;
@@ -947,7 +952,7 @@ export default function Chat({
     setEnteringMessageIds(new Set(added));
     const t = window.setTimeout(() => setEnteringMessageIds(new Set()), 260);
     return () => window.clearTimeout(t);
-  }, [chatId, messages]);
+  }, [chatId, safeMessages]);
 
   function clearPendingImage() {
     setPendingImageUrl(null);
@@ -1976,7 +1981,7 @@ export default function Chat({
           ) : null}
 
           <div className="messages" ref={listRef}>
-            {messages.map((m) =>
+            {safeMessages.map((m) =>
               m.type === "system" ? (
                 <div
                   key={m.id}

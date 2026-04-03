@@ -711,13 +711,15 @@ export default function App() {
   );
 
   return (
-    <div className={`appRoot${mobileConversationOpen ? " appRoot--mobileConversationOpen" : ""}`}>
-      {isMobile ? (
-        <MobileLayoutErrorBoundary fallback={desktopShell}>{mobileShell}</MobileLayoutErrorBoundary>
-      ) : (
-        desktopShell
-      )}
-    </div>
+    <AppRuntimeErrorBoundary>
+      <div className={`appRoot${mobileConversationOpen ? " appRoot--mobileConversationOpen" : ""}`}>
+        {isMobile ? (
+          <MobileLayoutErrorBoundary fallback={desktopShell}>{mobileShell}</MobileLayoutErrorBoundary>
+        ) : (
+          desktopShell
+        )}
+      </div>
+    </AppRuntimeErrorBoundary>
   );
 }
 
@@ -744,6 +746,55 @@ class MobileLayoutErrorBoundary extends Component {
   render() {
     if (this.state.error && this.props.fallback != null) {
       return this.props.fallback;
+    }
+    return this.props.children;
+  }
+}
+
+/** Shows a crash screen with the exact runtime error text (avoids silent blank app). */
+class AppRuntimeErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error, info) {
+    // eslint-disable-next-line no-console
+    console.error("[Xasma] AppRuntimeErrorBoundary", error, info?.componentStack);
+  }
+
+  render() {
+    if (this.state.error) {
+      const e = this.state.error;
+      const msg = e?.message ? String(e.message) : String(e);
+      const stack = e?.stack ? String(e.stack) : "";
+      return (
+        <div className="appRoot appRoot--auth" style={{ padding: 16 }}>
+          <div className="authCard" style={{ maxWidth: 720 }}>
+            <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 8 }}>App crashed</div>
+            <div className="authError" style={{ marginBottom: 10 }}>
+              {msg}
+            </div>
+            <pre
+              style={{
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                fontSize: 12,
+                opacity: 0.9,
+                maxHeight: "55vh",
+                overflow: "auto",
+                margin: 0,
+              }}
+            >
+              {stack}
+            </pre>
+          </div>
+        </div>
+      );
     }
     return this.props.children;
   }
