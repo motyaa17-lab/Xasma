@@ -193,6 +193,10 @@ export default function Chat({
     return messages.filter((m) => m && typeof m === "object");
   }, [messages]);
 
+  // NOTE: Must be declared before any hooks that reference it in deps to avoid TDZ crashes in production builds.
+  const isGroup = chat?.type === "group";
+  const isMobileChat = Boolean(onMobileBack);
+
   const [text, setText] = useState("");
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [menuMessageId, setMenuMessageId] = useState(null);
@@ -397,8 +401,6 @@ export default function Chat({
     e.currentTarget.classList.remove("bubble--pressed");
   }, []);
 
-  const isGroup = chat?.type === "group";
-  const isMobileChat = Boolean(onMobileBack);
   const showVideoNoteOverlay = isMobileChat && (videoArming || videoRecording || Boolean(videoNoteDraft));
 
   const mobileMenuTarget = useMemo(() => {
