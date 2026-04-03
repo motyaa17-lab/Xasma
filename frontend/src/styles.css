@@ -644,6 +644,28 @@ body.body--mobileConversationOpen {
   background: rgba(11, 18, 32, 0.4);
 }
 
+.chatAvatarWrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.avatarPresenceDot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.7);
+  border: 2px solid rgba(11, 18, 32, 0.9);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.avatarPresenceDot.avatarPresenceDot--on {
+  background: rgba(34, 197, 94, 0.95);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.14), 0 2px 8px rgba(0, 0, 0, 0.22);
+}
+
 .chatListItem:hover .chatItemTop {
   border-color: rgba(37, 99, 235, 0.35);
 }
@@ -653,6 +675,7 @@ body.body--mobileConversationOpen {
   flex-direction: column;
   gap: 3px;
   min-width: 0;
+  flex: 1;
 }
 
 .chatOtherName {
@@ -668,6 +691,30 @@ body.body--mobileConversationOpen {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.chatItemRight {
+  flex: 0 0 auto;
+  min-width: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+}
+
+.chatItemTime {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(148, 163, 184, 0.85);
+  font-variant-numeric: tabular-nums;
+}
+
+.chatItemBadgeRow {
+  min-height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .chatUnreadBadge {
@@ -2992,6 +3039,17 @@ body.body--mobileConversationOpen {
   font-size: 14px;
 }
 
+.mobileChatRowAvatarWrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.mobileChatRowAvatarWrap .avatarPresenceDot {
+  right: -1px;
+  bottom: -1px;
+  border-color: rgba(15, 23, 42, 0.9);
+}
+
 .mobileChatRowAvatar img {
   width: 100%;
   height: 100%;
@@ -3019,25 +3077,23 @@ body.body--mobileConversationOpen {
   gap: 10px;
 }
 
-.mobileChatRowTopLead {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  flex: 1;
-}
-
-.mobileChatRowTopLead .mobileChatRowName {
-  flex: 1;
-  min-width: 0;
-}
-
 .mobileChatRowName {
   font-weight: 700;
   font-size: 15px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.mobileChatRowRight {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  min-width: 44px;
 }
 
 .appShell--mobile .mobileChatRowTop .chatUnreadBadge {

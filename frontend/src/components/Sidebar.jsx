@@ -291,7 +291,8 @@ const Sidebar = forwardRef(function Sidebar(
             const unreadLabel = unreadN > 0 ? (unreadN > 99 ? "99+" : String(unreadN)) : null;
             return (
               <button key={c.id} type="button" className="mobileChatRow" onClick={() => onSelectChat(c.id)}>
-                <div className={online ? "mobileChatRowAvatar presence online" : "mobileChatRowAvatar presence"}>
+                <div className="mobileChatRowAvatarWrap">
+                  <div className={online ? "mobileChatRowAvatar presence online" : "mobileChatRowAvatar presence"}>
                   {isGroup && c.avatar ? (
                     <img src={c.avatar} alt="" />
                   ) : !isGroup && other?.avatar ? (
@@ -299,37 +300,32 @@ const Sidebar = forwardRef(function Sidebar(
                   ) : (
                     <span>{initials(isGroup ? label : other?.username || "")}</span>
                   )}
+                  </div>
+                  {!isGroup ? (
+                    <span
+                      className={online ? "avatarPresenceDot avatarPresenceDot--on" : "avatarPresenceDot"}
+                      aria-hidden
+                    />
+                  ) : null}
                 </div>
                 <div className="mobileChatRowMain">
                   <div className="mobileChatRowTop">
-                    <div className="mobileChatRowTopLead">
-                      <span className="mobileChatRowName">{label}</span>
-                      {unreadLabel ? (
-                        <span
-                          className="chatUnreadBadge"
-                          aria-label={t("unreadBadgeAria").replace("{count}", unreadLabel)}
-                        >
-                          {unreadLabel}
-                        </span>
-                      ) : null}
+                    <span className="mobileChatRowName">{label}</span>
+                    <div className="mobileChatRowRight" aria-label={unreadLabel ? t("unreadBadgeAria").replace("{count}", unreadLabel) : undefined}>
+                      {c.last?.createdAt ? (
+                        <time className="mobileChatRowTime" dateTime={c.last.createdAt}>
+                          {formatListTime(c.last.createdAt, lang)}
+                        </time>
+                      ) : (
+                        <span className="mobileChatRowTime" aria-hidden />
+                      )}
+                      {unreadLabel ? <span className="chatUnreadBadge">{unreadLabel}</span> : null}
                     </div>
-                    {c.last?.createdAt ? (
-                      <time className="mobileChatRowTime" dateTime={c.last.createdAt}>
-                        {formatListTime(c.last.createdAt, lang)}
-                      </time>
-                    ) : null}
                   </div>
                   <div className="mobileChatRowBottom">
                     <span className="mobileChatRowPreview muted">{preview}</span>
                     {showActivity && !unreadLabel ? (
                       <span className="mobileChatRowUnread" title={t("newActivity")} />
-                    ) : null}
-                    {!isGroup ? (
-                      <span
-                        className={online ? "mobileChatRowPresence online" : "mobileChatRowPresence"}
-                        title={presenceText(other, t, lang)}
-                        aria-hidden
-                      />
                     ) : null}
                   </div>
                 </div>
@@ -398,6 +394,7 @@ const Sidebar = forwardRef(function Sidebar(
             const online = !isGroup && Boolean(other?.isOnline);
             const unreadN = Math.max(0, Number(c.unreadCount) || 0);
             const unreadLabel = unreadN > 0 ? (unreadN > 99 ? "99+" : String(unreadN)) : null;
+            const timeLabel = c.last?.createdAt ? formatListTime(c.last.createdAt, lang) : "";
             return (
               <button
                 key={c.id}
@@ -406,39 +403,46 @@ const Sidebar = forwardRef(function Sidebar(
                 type="button"
               >
                 <div className="chatItemTop">
-                  <div className={!isGroup && online ? "avatarSm presence online" : "avatarSm presence"}>
-                    {isGroup && c.avatar ? (
-                      <img src={c.avatar} alt="" />
-                    ) : !isGroup && other?.avatar ? (
-                      <img src={other.avatar} alt="" />
-                    ) : (
-                      <span>{initials(isGroup ? label : other?.username || "")}</span>
-                    )}
+                  <div className="chatAvatarWrap">
+                    <div className={!isGroup && online ? "avatarSm presence online" : "avatarSm presence"}>
+                      {isGroup && c.avatar ? (
+                        <img src={c.avatar} alt="" />
+                      ) : !isGroup && other?.avatar ? (
+                        <img src={other.avatar} alt="" />
+                      ) : (
+                        <span>{initials(isGroup ? label : other?.username || "")}</span>
+                      )}
+                    </div>
+                    {!isGroup ? (
+                      <span
+                        className={online ? "avatarPresenceDot avatarPresenceDot--on" : "avatarPresenceDot"}
+                        title={presenceText(other, t, lang)}
+                        aria-hidden
+                      />
+                    ) : null}
                   </div>
                   <div className="chatOther">
                     <div className="chatOtherNameRow">
                       <div className="chatOtherName">{label}</div>
-                      {unreadLabel ? (
-                        <span
-                          className="chatUnreadBadge"
-                          aria-label={t("unreadBadgeAria").replace("{count}", unreadLabel)}
-                        >
-                          {unreadLabel}
-                        </span>
-                      ) : null}
-                      {!isGroup ? (
-                        <div
-                          className={online ? "presenceDot online" : "presenceDot"}
-                          title={presenceText(other, t, lang)}
-                        />
-                      ) : (
-                        <div className="presenceDot placeholder" aria-hidden />
-                      )}
                     </div>
                     {c.last ? (
                       <div className="chatLast">{c.last.text}</div>
                     ) : (
                       <div className="chatLast muted">{t("noMessages")}</div>
+                    )}
+                  </div>
+                  <div className="chatItemRight">
+                    <div className="chatItemTime" aria-hidden={!timeLabel}>
+                      {timeLabel}
+                    </div>
+                    {unreadLabel ? (
+                      <div className="chatItemBadgeRow">
+                        <span className="chatUnreadBadge" aria-label={t("unreadBadgeAria").replace("{count}", unreadLabel)}>
+                          {unreadLabel}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="chatItemBadgeRow" aria-hidden />
                     )}
                   </div>
                 </div>
