@@ -1811,6 +1811,7 @@ export default function Chat({
                   const showMessageMenu =
                     (m.senderId === meId && (!isBanned || isAdmin)) ||
                     (m.senderId !== meId && (isAdmin || !isBanned));
+                  const showMenuButton = showMessageMenu && !isMobileChat;
                   const canQuickReact = !isBanned;
                   const canEditOwn = m.senderId === meId && !isBanned;
                   const canAdminDelete = Boolean(isAdmin);
@@ -1837,7 +1838,7 @@ export default function Chat({
                   <div
                     className={
                       m.senderId === meId
-                        ? `bubble me bubbleOwn bubbleWithActions${bubbleMediaBare}`
+                        ? `bubble me${showMenuButton ? " bubbleOwn" : ""} bubbleWithActions${bubbleMediaBare}`
                         : `bubble bubbleWithActions${bubbleMediaBare}`
                     }
                     ref={isMobileChat && menuMessageId === m.id ? menuAnchorRef : undefined}
@@ -1859,7 +1860,7 @@ export default function Chat({
                       isMobileChat && showMessageMenu ? (e) => e.preventDefault() : undefined
                     }
                   >
-                    {showMessageMenu ? (
+                    {showMenuButton ? (
                       <div className="msgMenu">
                         <button
                           type="button"
