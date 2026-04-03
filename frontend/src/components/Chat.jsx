@@ -21,6 +21,7 @@ const MOBILE_LONG_PRESS_MOVE_CANCEL_PX = 14;
 const MOBILE_LONG_PRESS_MOVE_CANCEL_PX2 = MOBILE_LONG_PRESS_MOVE_CANCEL_PX * MOBILE_LONG_PRESS_MOVE_CANCEL_PX;
 
 // Swipe-to-reply (Telegram-like)
+const ENABLE_SWIPE_TO_REPLY = false;
 const SWIPE_REPLY_ARM_X_PX = 10;
 const SWIPE_REPLY_CANCEL_Y_PX = 14;
 const SWIPE_REPLY_TRIGGER_PX = 56;
@@ -282,6 +283,7 @@ export default function Chat({
 
   const onMobileBubbleSwipeTouchStart = useCallback(
     (e, message) => {
+      if (!ENABLE_SWIPE_TO_REPLY) return;
       if (!isMobileChat) return;
       if (!message?.id) return;
       if (e.touches.length !== 1) return;
@@ -295,6 +297,7 @@ export default function Chat({
 
   const onMobileBubbleSwipeTouchMove = useCallback(
     (e) => {
+      if (!ENABLE_SWIPE_TO_REPLY) return;
       if (!isMobileChat) return;
       const s = swipeStateRef.current;
       if (!s) return;
@@ -329,6 +332,7 @@ export default function Chat({
 
   const finishSwipe = useCallback(
     (trigger) => {
+      if (!ENABLE_SWIPE_TO_REPLY) return;
       const s = swipeStateRef.current;
       swipeStateRef.current = null;
       if (swipeAnimRafRef.current) cancelAnimationFrame(swipeAnimRafRef.current);
@@ -2034,7 +2038,11 @@ export default function Chat({
                         ? `bubble me${showMenuButton ? " bubbleOwn" : ""} bubbleWithActions${bubbleMediaBare}`
                         : `bubble bubbleWithActions${bubbleMediaBare}`) + (longPressFlashMessageId === m.id ? " bubble--lpFlash" : "")
                     }
-                    style={isMobileChat && swipeMessageId === m.id ? { transform: `translate3d(${swipeDx}px, 0, 0)` } : undefined}
+                    style={
+                      ENABLE_SWIPE_TO_REPLY && isMobileChat && swipeMessageId === m.id
+                        ? { transform: `translate3d(${swipeDx}px, 0, 0)` }
+                        : undefined
+                    }
                     ref={isMobileChat && menuMessageId === m.id ? menuAnchorRef : undefined}
                     onPointerDown={onBubblePointerDown}
                     onPointerUp={onBubblePointerUp}
@@ -2044,7 +2052,7 @@ export default function Chat({
                       isMobileChat
                         ? (e) => {
                             onMobileBubbleTouchStart(e, m.id, showMessageMenu);
-                            onMobileBubbleSwipeTouchStart(e, m);
+                            if (ENABLE_SWIPE_TO_REPLY) onMobileBubbleSwipeTouchStart(e, m);
                           }
                         : undefined
                     }
@@ -2052,7 +2060,7 @@ export default function Chat({
                       isMobileChat
                         ? (e) => {
                             onMobileBubbleTouchMove(e);
-                            onMobileBubbleSwipeTouchMove(e);
+                            if (ENABLE_SWIPE_TO_REPLY) onMobileBubbleSwipeTouchMove(e);
                           }
                         : undefined
                     }
@@ -2060,7 +2068,7 @@ export default function Chat({
                       isMobileChat
                         ? () => {
                             onMobileBubbleTouchEnd();
-                            onMobileBubbleSwipeTouchEnd();
+                            if (ENABLE_SWIPE_TO_REPLY) onMobileBubbleSwipeTouchEnd();
                           }
                         : undefined
                     }
@@ -2068,7 +2076,7 @@ export default function Chat({
                       isMobileChat
                         ? () => {
                             onMobileBubbleTouchCancel();
-                            onMobileBubbleSwipeTouchCancel();
+                            if (ENABLE_SWIPE_TO_REPLY) onMobileBubbleSwipeTouchCancel();
                           }
                         : undefined
                     }
@@ -2089,7 +2097,7 @@ export default function Chat({
                       isMobileChat && showMessageMenu ? (e) => e.preventDefault() : undefined
                     }
                   >
-                    {isMobileChat ? (
+                    {ENABLE_SWIPE_TO_REPLY && isMobileChat ? (
                       <span
                         className={swipeMessageId === m.id && swipeDx > 8 ? "swipeReplyIcon swipeReplyIcon--on" : "swipeReplyIcon"}
                         aria-hidden
@@ -2260,7 +2268,7 @@ export default function Chat({
             {imageUploading ? <div className="uploadProgressHint">{t("uploadImageProgress")}</div> : null}
             {voiceUploading ? <div className="uploadProgressHint">{t("voiceSending")}</div> : null}
             {videoNoteUploading ? <div className="uploadProgressHint">{t("videoNoteUploading")}</div> : null}
-            {replyToMessage ? (
+            {ENABLE_SWIPE_TO_REPLY && replyToMessage ? (
               <div className="replyComposerBar" role="group" aria-label={t("replyTo")}>
                 <div className="replyComposerMain">
                   <div className="replyComposerLabel">{t("replyTo")}</div>
