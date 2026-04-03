@@ -240,6 +240,8 @@ export default function Chat({
   const composerRef = useRef(null);
   const chatHeaderRef = useRef(null);
   const [mobileMenuPlacement, setMobileMenuPlacement] = useState(null);
+  const [longPressFlashMessageId, setLongPressFlashMessageId] = useState(null);
+  const longPressFlashTimerRef = useRef(null);
   const longPressTimerRef = useRef(null);
   const longPressTrackRef = useRef(null);
 
@@ -310,14 +312,52 @@ export default function Chat({
     longPressTrackRef.current = null;
   }, []);
 
-  const triggerMobileMessageMenuHaptic = useCallback(() => {
+  const triggerMobileMessageMenuFeedback = useCallback((messageId) => {
     try {
       if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
-        navigator.vibrate(12);
+        navigator.vibrate(10);
+        return;
       }
     } catch {
       /* ignore */
     }
+    // Optional micro-sound fallback (very subtle), only when vibration is unavailable.
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      const ctx = new AC();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = "sine";
+      o.frequency.value = 880;
+      const now = ctx.currentTime;
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(0.03, now + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+      o.connect(g);
+      g.connect(ctx.destination);
+      o.start(now);
+      o.stop(now + 0.06);
+      o.onended = () => {
+        try {
+          ctx.close?.();
+        } catch {
+          /* ignore */
+        }
+      };
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const triggerMobileLongPressFlash = useCallback((messageId) => {
+    if (!messageId) return;
+    setLongPressFlashMessageId(messageId);
+    if (longPressFlashTimerRef.current) window.clearTimeout(longPressFlashTimerRef.current);
+    longPressFlashTimerRef.current = window.setTimeout(() => {
+      longPressFlashTimerRef.current = null;
+      setLongPressFlashMessageId(null);
+    }, 180);
   }, []);
 
   const onMobileBubbleTouchStart = useCallback(
@@ -333,11 +373,12 @@ export default function Chat({
       longPressTimerRef.current = window.setTimeout(() => {
         longPressTimerRef.current = null;
         longPressTrackRef.current = null;
-        triggerMobileMessageMenuHaptic();
+        triggerMobileMessageMenuFeedback(messageId);
+        triggerMobileLongPressFlash(messageId);
         setMenuMessageId(messageId);
       }, MOBILE_LONG_PRESS_MS);
     },
-    [isMobileChat, showVideoNoteOverlay, clearBubbleLongPress, triggerMobileMessageMenuHaptic]
+    [isMobileChat, showVideoNoteOverlay, clearBubbleLongPress, triggerMobileMessageMenuFeedback, triggerMobileLongPressFlash]
   );
 
   const onMobileBubbleTouchMove = useCallback(
@@ -561,6 +602,11 @@ export default function Chat({
       longPressTimerRef.current = null;
     }
     longPressTrackRef.current = null;
+    if (longPressFlashTimerRef.current != null) {
+      window.clearTimeout(longPressFlashTimerRef.current);
+      longPressFlashTimerRef.current = null;
+    }
+    setLongPressFlashMessageId(null);
     setText("");
     setGroupInfoOpen(false);
     setPendingImageUrl(null);
@@ -1837,9 +1883,9 @@ export default function Chat({
                   </div>
                   <div
                     className={
-                      m.senderId === meId
+                      (m.senderId === meId
                         ? `bubble me${showMenuButton ? " bubbleOwn" : ""} bubbleWithActions${bubbleMediaBare}`
-                        : `bubble bubbleWithActions${bubbleMediaBare}`
+                        : `bubble bubbleWithActions${bubbleMediaBare}`) + (longPressFlashMessageId === m.id ? " bubble--lpFlash" : "")
                     }
                     ref={isMobileChat && menuMessageId === m.id ? menuAnchorRef : undefined}
                     onPointerDown={onBubblePointerDown}
