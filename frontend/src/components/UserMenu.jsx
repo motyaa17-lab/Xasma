@@ -1,10 +1,40 @@
 import React, { useEffect, useRef, useState } from "react";
-import { adminListUsers, adminSetUserBanned, adminSetUserRole } from "../api.js";
+import {
+  adminBroadcastOfficial,
+  adminListUsers,
+  adminSetUserBanned,
+  adminSetUserRole,
+} from "../api.js";
 import { DONATION_ALERTS_URL } from "../config/donation.js";
 
 function openDonationPage() {
   if (typeof window === "undefined") return;
   window.open(DONATION_ALERTS_URL, "_blank", "noopener,noreferrer");
+}
+
+function AdminOfficialBroadcast({ t, text, setText, busy, onSend }) {
+  return (
+    <div className="adminBroadcastBox">
+      <div className="settingsTitle">{t("adminBroadcastTitle")}</div>
+      <p className="muted small adminBroadcastHint">{t("adminBroadcastHint")}</p>
+      <textarea
+        className="adminBroadcastTextarea"
+        rows={4}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder={t("adminBroadcastPlaceholder")}
+        maxLength={4000}
+      />
+      <button
+        type="button"
+        className="primaryBtn adminBroadcastSubmit"
+        disabled={busy || !String(text || "").trim()}
+        onClick={onSend}
+      >
+        {busy ? t("adminBroadcastSending") : t("adminBroadcastSend")}
+      </button>
+    </div>
+  );
 }
 
 function MessageNotificationsSettings({ settings, onChangeSettings, t }) {
@@ -91,6 +121,8 @@ export default function UserMenu({
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminError, setAdminError] = useState("");
   const [adminNotice, setAdminNotice] = useState("");
+  const [adminBroadcastText, setAdminBroadcastText] = useState("");
+  const [adminBroadcastBusy, setAdminBroadcastBusy] = useState(false);
 
   useEffect(() => {
     function onDocMouseDown(e) {
@@ -158,6 +190,24 @@ export default function UserMenu({
       setAdminError(e.message || "Request failed");
     } finally {
       setAdminLoading(false);
+    }
+  }
+
+  async function sendOfficialBroadcast() {
+    const body = String(adminBroadcastText || "").trim();
+    if (!body) return;
+    setAdminError("");
+    setAdminNotice("");
+    setAdminBroadcastBusy(true);
+    try {
+      const res = await adminBroadcastOfficial(body);
+      const n = Number(res.messageCount) || 0;
+      setAdminNotice(t("adminBroadcastSent").replace("{n}", String(n)));
+      setAdminBroadcastText("");
+    } catch (e) {
+      setAdminError(e.message || t("adminBroadcastFail"));
+    } finally {
+      setAdminBroadcastBusy(false);
     }
   }
 
@@ -538,6 +588,14 @@ export default function UserMenu({
                   </button>
                 </div>
 
+                <AdminOfficialBroadcast
+                  t={t}
+                  text={adminBroadcastText}
+                  setText={setAdminBroadcastText}
+                  busy={adminBroadcastBusy}
+                  onSend={sendOfficialBroadcast}
+                />
+
                 {adminLoading ? (
                   <div className="muted">Loading...</div>
                 ) : (
@@ -881,6 +939,14 @@ export default function UserMenu({
                   Refresh
                 </button>
               </div>
+
+              <AdminOfficialBroadcast
+                t={t}
+                text={adminBroadcastText}
+                setText={setAdminBroadcastText}
+                busy={adminBroadcastBusy}
+                onSend={sendOfficialBroadcast}
+              />
 
               {adminLoading ? (
                 <div className="muted">Loading...</div>

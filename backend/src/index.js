@@ -163,9 +163,55 @@ function normalizeChatUsers(a, b) {
   return a < b ? [a, b] : [b, a];
 }
 
+/** Internal account used only as sender_id for official Xasma announcements (not for login). */
+const OFFICIAL_SYSTEM_USERNAME = "xasma_official";
+let officialAnnounceUserId = null;
+
+function getOfficialAnnounceUserId() {
+  return officialAnnounceUserId;
+}
+
+async function ensureOfficialAnnounceUser() {
+  const existing = await query(`SELECT id FROM users WHERE username = $1`, [OFFICIAL_SYSTEM_USERNAME]);
+  if (existing.rows[0]) return Number(existing.rows[0].id);
+  const hash = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10);
+  const ins = await query(
+    `INSERT INTO users (username, password_hash, avatar_url, role, banned) VALUES ($1, $2, NULL, 'user', FALSE) RETURNING id`,
+    [OFFICIAL_SYSTEM_USERNAME, hash]
+  );
+  return Number(ins.rows[0].id);
+}
+
+async function ensureOfficialChatForUser(userId) {
+  const uid = Number(userId);
+  if (!uid) return null;
+  const existing = await query(
+    `SELECT id FROM chats WHERE type = 'official' AND official_for_user_id = $1`,
+    [uid]
+  );
+  if (existing.rows[0]) return Number(existing.rows[0].id);
+  const ins = await query(
+    `INSERT INTO chats (type, title, user1_id, user2_id, created_by, official_for_user_id, avatar_url)
+     VALUES ('official', 'Xasma', NULL, NULL, NULL, $1, NULL) RETURNING id`,
+    [uid]
+  );
+  const chatId = Number(ins.rows[0].id);
+  await query(`INSERT INTO chat_members (chat_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [chatId, uid]);
+  return chatId;
+}
+
+async function backfillOfficialChatsForAllUsers() {
+  const botId = getOfficialAnnounceUserId();
+  if (!botId) return;
+  const r = await query(`SELECT id FROM users WHERE id != $1`, [botId]);
+  for (const row of r.rows) {
+    await ensureOfficialChatForUser(Number(row.id));
+  }
+}
+
 async function getChatById(chatId) {
   const r = await query(
-    `SELECT id, type, title, created_by, user1_id, user2_id, avatar_url FROM chats WHERE id = $1`,
+    `SELECT id, type, title, created_by, user1_id, user2_id, avatar_url, official_for_user_id FROM chats WHERE id = $1`,
     [chatId]
   );
   return r.rows[0] || null;
@@ -285,17 +331,25 @@ function messageRowToApi(mr, reactions = []) {
   if (!mr) return null;
   const msgType = mr.message_type || "text";
   const payload = mr.system_payload;
+  const botId = getOfficialAnnounceUserId();
+  const sid = Number(mr.sender_id);
+  const fromOfficial = botId && sid === botId;
+  const sender = fromOfficial
+    ? { id: sid, username: "Xasma", avatar: "" }
+    : { id: sid, username: mr.username, avatar: mr.avatar_url };
+  const replyFromOfficial =
+    botId && mr.reply_to_sender_id != null && Number(mr.reply_to_sender_id) === botId;
   return {
     id: Number(mr.id),
     chatId: Number(mr.chat_id),
-    senderId: Number(mr.sender_id),
+    senderId: sid,
     text: mr.text,
     replyToMessageId: mr.reply_to_message_id != null ? Number(mr.reply_to_message_id) : null,
     deliveredAt: mr.delivered_at,
     readAt: mr.read_at,
     editedAt: mr.edited_at,
     createdAt: mr.created_at,
-    sender: { id: Number(mr.sender_id), username: mr.username, avatar: mr.avatar_url },
+    sender,
     type: msgType,
     systemKind: mr.system_kind || null,
     systemPayload: payload && typeof payload === "object" ? payload : null,
@@ -307,7 +361,7 @@ function messageRowToApi(mr, reactions = []) {
         ? {
             id: Number(mr.reply_to_message_id),
             senderId: mr.reply_to_sender_id != null ? Number(mr.reply_to_sender_id) : null,
-            senderUsername: mr.reply_to_sender_username || "",
+            senderUsername: replyFromOfficial ? "Xasma" : mr.reply_to_sender_username || "",
             text: mr.reply_to_text || "",
             imageUrl: mr.reply_to_image_url || null,
             audioUrl: mr.reply_to_audio_url || null,
@@ -357,6 +411,12 @@ async function insertSystemMessageAndBroadcast(chatId, actorUserId, systemKind, 
 }
 
 async function insertChatMessageAndBroadcast(chatId, senderId, bodyText, imageUrl, audioUrl, videoUrl, replyToMessageId) {
+  const chat = await getChatById(chatId);
+  if (chat?.type === "official") {
+    const bot = getOfficialAnnounceUserId();
+    if (!bot || Number(senderId) !== Number(bot)) return null;
+  }
+
   const text = String(bodyText || "").trim();
   // Note: req not available here; validated at request boundary.
   const img = imageUrl;
@@ -395,17 +455,27 @@ app.post("/api/register", async (req, res) => {
   const { username, password, avatar } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: "username and password are required" });
 
+  const uname = username.trim();
+  if (uname.toLowerCase() === OFFICIAL_SYSTEM_USERNAME) {
+    return res.status(400).json({ error: "This username is reserved" });
+  }
+
   const avatar_url = typeof avatar === "string" && avatar.trim() ? avatar.trim() : null;
 
-  const existing = await query(`SELECT id FROM users WHERE username = $1`, [username.trim()]);
+  const existing = await query(`SELECT id FROM users WHERE username = $1`, [uname]);
   if (existing.rows[0]) return res.status(409).json({ error: "Username already exists" });
 
   const password_hash = await bcrypt.hash(password, 10);
   const inserted = await query(
     `INSERT INTO users (username, password_hash, avatar_url) VALUES ($1, $2, $3) RETURNING id, username, avatar_url, role, banned`,
-    [username.trim(), password_hash, avatar_url]
+    [uname, password_hash, avatar_url]
   );
   const user = inserted.rows[0];
+  try {
+    await ensureOfficialChatForUser(Number(user.id));
+  } catch {
+    /* non-fatal */
+  }
   const token = signToken(user);
   return res.json({
     token,
@@ -433,6 +503,12 @@ app.post("/api/login", async (req, res) => {
 
   const ok = await bcrypt.compare(password, user.password_hash);
   if (!ok) return res.status(401).json({ error: "Invalid credentials" });
+
+  try {
+    await ensureOfficialChatForUser(Number(user.id));
+  } catch {
+    /* non-fatal */
+  }
 
   const token = signToken(user);
   return res.json({
@@ -580,11 +656,12 @@ app.get("/api/users", authRequired, (req, res) => {
       SELECT id, username, avatar_url, is_online, last_seen_at, status_kind, status_text
       FROM users
       WHERE id != $1
+        AND username != $4
         AND username ILIKE $2
       ORDER BY username ASC
       LIMIT $3
     `,
-      [uid, `%${q}%`, limit]
+      [uid, `%${q}%`, limit, OFFICIAL_SYSTEM_USERNAME]
     );
     return res.json({
       users: users.rows.map((u) => ({
@@ -604,6 +681,21 @@ app.get("/api/users/:userId", authRequired, (req, res) => {
   const uid = Number(req.params.userId);
   if (!uid) return res.status(400).json({ error: "Invalid user id" });
   (async () => {
+    const botId = getOfficialAnnounceUserId();
+    if (botId && uid === botId) {
+      return res.json({
+        user: {
+          id: botId,
+          username: "Xasma",
+          avatar: "",
+          isOnline: false,
+          lastSeenAt: null,
+          statusKind: "",
+          statusText: "",
+          about: "",
+        },
+      });
+    }
     const r = await query(
       `SELECT id, username, avatar_url, is_online, last_seen_at, status_kind, status_text, about
        FROM users
@@ -693,31 +785,45 @@ app.get("/api/chats", authRequired, (req, res) => {
         LIMIT 1
       ) lm ON true
       WHERE mym.user_id = $1
-      ORDER BY lm.created_at DESC NULLS LAST, c.id DESC
+      ORDER BY
+        CASE WHEN c.type = 'official' THEN 0 WHEN c.type = 'group' THEN 1 ELSE 2 END ASC,
+        lm.created_at DESC NULLS LAST,
+        c.id DESC
     `,
       [uid]
     );
 
+    const botId = getOfficialAnnounceUserId();
+
     return res.json({
       chats: chats.rows.map((c) => {
         const isGroup = c.chat_type === "group";
+        const isOfficial = c.chat_type === "official";
         return {
           id: Number(c.chat_id),
-          type: isGroup ? "group" : "direct",
-          title: isGroup ? c.chat_title : null,
+          type: isGroup ? "group" : isOfficial ? "official" : "direct",
+          title: isGroup ? c.chat_title : isOfficial ? c.chat_title || "Xasma" : null,
           createdBy: c.chat_created_by != null ? Number(c.chat_created_by) : null,
           memberCount: isGroup ? Number(c.member_count) : undefined,
           onlineMemberCount: isGroup ? Number(c.online_member_count) : undefined,
           avatar: isGroup ? c.chat_avatar_url || "" : undefined,
           other: isGroup
             ? null
-            : {
-                id: Number(c.other_id),
-                username: c.other_username,
-                avatar: c.other_avatar_url,
-                isOnline: Boolean(c.other_is_online),
-                lastSeenAt: c.other_last_seen_at,
-              },
+            : isOfficial
+              ? {
+                  id: botId || 0,
+                  username: "Xasma",
+                  avatar: "",
+                  isOnline: false,
+                  lastSeenAt: null,
+                }
+              : {
+                  id: Number(c.other_id),
+                  username: c.other_username,
+                  avatar: c.other_avatar_url,
+                  isOnline: Boolean(c.other_is_online),
+                  lastSeenAt: c.other_last_seen_at,
+                },
           last: c.last_text
             ? { text: c.last_text, createdAt: c.last_created_at, senderId: Number(c.last_sender_id) }
             : null,
@@ -735,6 +841,8 @@ app.post("/api/chats", authRequired, (req, res) => {
   if (otherId === req.user.id) return res.status(400).json({ error: "Cannot chat with yourself" });
 
   (async () => {
+    const botId = getOfficialAnnounceUserId();
+    if (botId && otherId === botId) return res.status(400).json({ error: "Invalid user" });
     const other = await query(`SELECT id FROM users WHERE id = $1`, [otherId]);
     if (!other.rows[0]) return res.status(404).json({ error: "User not found" });
     const chatId = await getOrCreateChat(Number(req.user.id), otherId);
@@ -1011,6 +1119,7 @@ app.post("/api/chats/:chatId/messages", authRequired, (req, res) => {
     const uid = Number(req.user.id);
     const chat = await getChatById(chatId);
     if (!chat) return res.status(404).json({ error: "Chat not found" });
+    if (chat.type === "official") return res.status(403).json({ error: "Cannot send messages in this chat" });
     if (!(await isUserChatMember(chatId, uid))) return res.status(403).json({ error: "Not a member of this chat" });
 
     const message = await insertChatMessageAndBroadcast(chatId, uid, bodyText, img, aud, vid, replyToMessageId);
@@ -1246,8 +1355,10 @@ app.get("/api/admin/users", authRequired, requireAdmin, (req, res) => {
       `
       SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, created_at
       FROM users
+      WHERE username != $1
       ORDER BY created_at DESC, id DESC
-    `
+    `,
+      [OFFICIAL_SYSTEM_USERNAME]
     );
     return res.json({
       users: r.rows.map((u) => ({
@@ -1268,6 +1379,9 @@ app.patch("/api/admin/users/:userId/role", authRequired, requireAdmin, (req, res
   const userId = Number(req.params.userId);
   const role = typeof req.body?.role === "string" ? req.body.role : "";
   if (!userId) return res.status(400).json({ error: "Invalid user id" });
+  if (getOfficialAnnounceUserId() && userId === getOfficialAnnounceUserId()) {
+    return res.status(400).json({ error: "Not allowed" });
+  }
   if (role !== "user" && role !== "admin") return res.status(400).json({ error: "Invalid role" });
 
   (async () => {
@@ -1299,6 +1413,9 @@ app.patch("/api/admin/users/:userId/ban", authRequired, requireAdmin, (req, res)
   const userId = Number(req.params.userId);
   const banned = Boolean(req.body?.banned);
   if (!userId) return res.status(400).json({ error: "Invalid user id" });
+  if (getOfficialAnnounceUserId() && userId === getOfficialAnnounceUserId()) {
+    return res.status(400).json({ error: "Not allowed" });
+  }
 
   (async () => {
     const r = await query(
@@ -1346,6 +1463,25 @@ app.delete("/api/admin/messages/:messageId", authRequired, requireAdmin, (req, r
     await emitToChatMemberSockets(chatId, "message:deleted", { chatId, messageId });
 
     return res.json({ ok: true });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
+/** Broadcast a text announcement to every user's official "Xasma" system chat. */
+app.post("/api/admin/broadcast-official", authRequired, requireAdmin, (req, res) => {
+  const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+  if (!text) return res.status(400).json({ error: "text is required" });
+  if (text.length > 4000) return res.status(400).json({ error: "Message too long" });
+
+  (async () => {
+    const bot = getOfficialAnnounceUserId();
+    if (!bot) return res.status(500).json({ error: "Official system user not initialized" });
+    const rows = await query(`SELECT id FROM chats WHERE type = 'official'`);
+    let messageCount = 0;
+    for (const row of rows.rows) {
+      const m = await insertChatMessageAndBroadcast(Number(row.id), bot, text, null, null, null, null);
+      if (m) messageCount += 1;
+    }
+    return res.json({ ok: true, chatCount: rows.rows.length, messageCount });
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });
 
@@ -1421,6 +1557,7 @@ io.on("connection", (socket) => {
 
     const chat = await getChatById(cid);
     if (!chat) return;
+    if (chat.type === "official") return;
     if (!(await isUserChatMember(cid, Number(userId)))) return;
 
     try {
@@ -1504,6 +1641,7 @@ io.on("connection", (socket) => {
     (async () => {
       const chat = await getChatById(cid);
       if (!chat) return;
+      if (chat.type === "official") return;
       if (!(await isUserChatMember(cid, Number(userId)))) return;
       const members = await getChatMemberUserIds(cid);
       for (const mid of members) {
@@ -1517,6 +1655,8 @@ io.on("connection", (socket) => {
 
 async function main() {
   await initDb();
+  officialAnnounceUserId = await ensureOfficialAnnounceUser();
+  await backfillOfficialChatsForAllUsers();
   server.listen(PORT, () => {
     // eslint-disable-next-line no-console
     console.log(`Backend listening on http://localhost:${PORT}`);

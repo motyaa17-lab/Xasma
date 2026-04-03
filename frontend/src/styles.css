@@ -2755,6 +2755,12 @@ body.body--mobileConversationOpen {
   margin-bottom: 10px;
 }
 
+.banBanner--compact {
+  margin-bottom: 8px;
+  text-align: center;
+  font-size: 13px;
+}
+
 /* Stacked field + ghost hint: border/background on shell so placeholder can fade without layout shift */
 .composerMain .composerInputShell {
   flex: 1;
@@ -3177,6 +3183,81 @@ body.body--mobileConversationOpen {
 .donateSupportCloseBtn {
   padding: 8px 16px;
   font-size: 14px;
+}
+
+.officialChatListBadge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  vertical-align: middle;
+  color: rgba(147, 197, 253, 0.95);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  background: rgba(37, 99, 235, 0.14);
+}
+
+.mobileChatRow--official .mobileChatRowName {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chatListItem--official .chatOtherName {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.officialChatComposerPlaceholder {
+  flex-shrink: 0;
+  padding: 14px 16px;
+  padding-bottom: max(14px, env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(11, 18, 32, 0.92);
+}
+
+.officialChatReadOnlyInner {
+  max-width: 520px;
+  margin: 0 auto;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(148, 163, 184, 0.95);
+}
+
+.adminBroadcastBox {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.adminBroadcastHint {
+  margin: 0 0 10px;
+}
+
+.adminBroadcastTextarea {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(15, 23, 42, 0.65);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.4;
+  resize: vertical;
+  min-height: 88px;
+}
+
+.adminBroadcastSubmit {
+  width: 100%;
+  justify-content: center;
 }
 
 .iconCloseBtn {

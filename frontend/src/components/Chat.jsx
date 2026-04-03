@@ -195,6 +195,7 @@ export default function Chat({
 
   // NOTE: Must be declared before any hooks that reference it in deps to avoid TDZ crashes in production builds.
   const isGroup = chat?.type === "group";
+  const isOfficial = chat?.type === "official";
   const isMobileChat = Boolean(onMobileBack);
 
   const [text, setText] = useState("");
@@ -401,7 +402,8 @@ export default function Chat({
     e.currentTarget.classList.remove("bubble--pressed");
   }, []);
 
-  const showVideoNoteOverlay = isMobileChat && (videoArming || videoRecording || Boolean(videoNoteDraft));
+  const showVideoNoteOverlay =
+    isMobileChat && !isOfficial && (videoArming || videoRecording || Boolean(videoNoteDraft));
 
   const mobileMenuTarget = useMemo(() => {
     if (menuMessageId == null) return null;
@@ -1932,6 +1934,16 @@ export default function Chat({
                     <div className="chatHeaderStatus">{otherTyping ? t("typing") : t("groupChat")}</div>
                   </div>
                 </button>
+              ) : isOfficial ? (
+                <div className="chatHeaderLeft">
+                  <div className="avatarSm" aria-hidden>
+                    <span>{initials(chat?.title || t("appTitle"))}</span>
+                  </div>
+                  <div className="chatHeaderInfo">
+                    <div className="chatHeaderName">{chat?.title || t("appTitle")}</div>
+                    <div className="chatHeaderStatus muted">{t("officialChatSubtitle")}</div>
+                  </div>
+                </div>
               ) : (
                 <div className="chatHeaderLeft">
                   <button
@@ -2254,10 +2266,10 @@ export default function Chat({
           </div>
 
           <div
-            className={`typingIndicator${otherTyping && chatId ? " typingIndicator--on" : ""}`}
+            className={`typingIndicator${otherTyping && chatId && !isOfficial ? " typingIndicator--on" : ""}`}
             role="status"
             aria-live="polite"
-            aria-hidden={!otherTyping || !chatId}
+            aria-hidden={!otherTyping || !chatId || isOfficial}
           >
             <div className="typingIndicatorInner">
               <span className="typingIndicatorDots" aria-hidden="true">
@@ -2269,6 +2281,12 @@ export default function Chat({
             </div>
           </div>
 
+          {isOfficial ? (
+            <div className="officialChatComposerPlaceholder" ref={composerRef}>
+              {isBanned ? <div className="banBanner banBanner--compact">{t("authBanned")}</div> : null}
+              <div className="officialChatReadOnlyInner">{t("officialChatReadOnly")}</div>
+            </div>
+          ) : (
           <div className="composer" ref={composerRef}>
             {isBanned ? <div className="banBanner">{t("authBanned")}</div> : null}
             {uploadError ? <div className="uploadErrBanner">{uploadError}</div> : null}
@@ -2579,7 +2597,9 @@ export default function Chat({
             </div>
             {/* Telegram-style recording bar is shown above; keep this area clean. */}
           </div>
+          )}
             {isMobileChat &&
+            !isOfficial &&
             menuMessageId != null &&
             mobileMenuTarget &&
             mobileMenuFlags &&

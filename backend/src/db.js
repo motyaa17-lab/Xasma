@@ -125,6 +125,14 @@ async function initDb() {
   await query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS audio_url TEXT`);
   await query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS video_url TEXT`);
 
+  // One official "Xasma" system chat per user (not a shared group).
+  await query(`ALTER TABLE chats ADD COLUMN IF NOT EXISTS official_for_user_id BIGINT REFERENCES users(id) ON DELETE CASCADE`);
+  await query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS chats_official_for_user_uidx
+    ON chats (official_for_user_id)
+    WHERE type = 'official'
+  `);
+
   // Ensure initial admin (safe if user doesn't exist).
   await query(`UPDATE users SET role = 'admin' WHERE username = 'Xasma'`);
 }

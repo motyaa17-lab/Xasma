@@ -273,3 +273,10 @@ export async function adminDeleteMessage(messageId) {
   });
 }
 
+export async function adminBroadcastOfficial(text) {
+  return apiFetch("/api/admin/broadcast-official", {
+    method: "POST",
+    body: { text: String(text || "").trim() },
+  });
+}
+

@@ -36,7 +36,9 @@ const Sidebar = forwardRef(function Sidebar(
     if (!q) return chats;
     return chats.filter((c) => {
       const isGroup = c.type === "group";
-      const label = (isGroup ? c.title : c.other?.username) || "";
+      const isOfficial = c.type === "official";
+      const label =
+        (isGroup ? c.title : isOfficial ? c.title || c.other?.username : c.other?.username) || "";
       return label.toLowerCase().includes(q);
     });
   }, [chats, query, mobileLayout]);
@@ -279,9 +281,14 @@ const Sidebar = forwardRef(function Sidebar(
 
           {mobileChatsToShow.map((c) => {
             const isGroup = c.type === "group";
+            const isOfficial = c.type === "official";
             const other = c.other;
-            const label = isGroup ? c.title || t("groupChat") : other?.username || "";
-            const online = !isGroup && Boolean(other?.isOnline);
+            const label = isGroup
+              ? c.title || t("groupChat")
+              : isOfficial
+                ? c.title || t("appTitle")
+                : other?.username || "";
+            const online = !isGroup && !isOfficial && Boolean(other?.isOnline);
             const preview = c.last?.text
               ? String(c.last.text).replace(/\s+/g, " ").trim()
               : t("noMessages");
@@ -290,7 +297,12 @@ const Sidebar = forwardRef(function Sidebar(
             const unreadN = Math.max(0, Number(c.unreadCount) || 0);
             const unreadLabel = unreadN > 0 ? (unreadN > 99 ? "99+" : String(unreadN)) : null;
             return (
-              <button key={c.id} type="button" className="mobileChatRow" onClick={() => onSelectChat(c.id)}>
+              <button
+                key={c.id}
+                type="button"
+                className={isOfficial ? "mobileChatRow mobileChatRow--official" : "mobileChatRow"}
+                onClick={() => onSelectChat(c.id)}
+              >
                 <div className="mobileChatRowAvatarWrap">
                   <div className={online ? "mobileChatRowAvatar presence online" : "mobileChatRowAvatar presence"}>
                   {isGroup && c.avatar ? (
@@ -298,10 +310,10 @@ const Sidebar = forwardRef(function Sidebar(
                   ) : !isGroup && other?.avatar ? (
                     <img src={other.avatar} alt="" />
                   ) : (
-                    <span>{initials(isGroup ? label : other?.username || "")}</span>
+                    <span>{initials(isGroup || isOfficial ? label : other?.username || "")}</span>
                   )}
                   </div>
-                  {!isGroup ? (
+                  {!isGroup && !isOfficial ? (
                     <span
                       className={online ? "avatarPresenceDot avatarPresenceDot--on" : "avatarPresenceDot"}
                       aria-hidden
@@ -310,7 +322,12 @@ const Sidebar = forwardRef(function Sidebar(
                 </div>
                 <div className="mobileChatRowMain">
                   <div className="mobileChatRowTop">
-                    <span className="mobileChatRowName">{label}</span>
+                    <span className="mobileChatRowName">
+                      {label}
+                      {isOfficial ? (
+                        <span className="officialChatListBadge">{t("officialChatBadge")}</span>
+                      ) : null}
+                    </span>
                     <div className="mobileChatRowRight" aria-label={unreadLabel ? t("unreadBadgeAria").replace("{count}", unreadLabel) : undefined}>
                       {c.last?.createdAt ? (
                         <time className="mobileChatRowTime" dateTime={c.last.createdAt}>
@@ -389,16 +406,21 @@ const Sidebar = forwardRef(function Sidebar(
         <div className="chatList">
           {chats.map((c) => {
             const isGroup = c.type === "group";
+            const isOfficial = c.type === "official";
             const other = c.other;
-            const label = isGroup ? c.title || t("groupChat") : other?.username || "";
-            const online = !isGroup && Boolean(other?.isOnline);
+            const label = isGroup
+              ? c.title || t("groupChat")
+              : isOfficial
+                ? c.title || t("appTitle")
+                : other?.username || "";
+            const online = !isGroup && !isOfficial && Boolean(other?.isOnline);
             const unreadN = Math.max(0, Number(c.unreadCount) || 0);
             const unreadLabel = unreadN > 0 ? (unreadN > 99 ? "99+" : String(unreadN)) : null;
             const timeLabel = c.last?.createdAt ? formatListTime(c.last.createdAt, lang) : "";
             return (
               <button
                 key={c.id}
-                className="chatListItem"
+                className={isOfficial ? "chatListItem chatListItem--official" : "chatListItem"}
                 onClick={() => onSelectChat(c.id)}
                 type="button"
               >
@@ -410,10 +432,10 @@ const Sidebar = forwardRef(function Sidebar(
                       ) : !isGroup && other?.avatar ? (
                         <img src={other.avatar} alt="" />
                       ) : (
-                        <span>{initials(isGroup ? label : other?.username || "")}</span>
+                        <span>{initials(isGroup || isOfficial ? label : other?.username || "")}</span>
                       )}
                     </div>
-                    {!isGroup ? (
+                    {!isGroup && !isOfficial ? (
                       <span
                         className={online ? "avatarPresenceDot avatarPresenceDot--on" : "avatarPresenceDot"}
                         title={presenceText(other, t, lang)}
@@ -423,7 +445,12 @@ const Sidebar = forwardRef(function Sidebar(
                   </div>
                   <div className="chatOther">
                     <div className="chatOtherNameRow">
-                      <div className="chatOtherName">{label}</div>
+                      <div className="chatOtherName">
+                        {label}
+                        {isOfficial ? (
+                          <span className="officialChatListBadge">{t("officialChatBadge")}</span>
+                        ) : null}
+                      </div>
                     </div>
                     {c.last ? (
                       <div className="chatLast">{c.last.text}</div>
