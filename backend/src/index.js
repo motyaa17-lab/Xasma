@@ -290,6 +290,7 @@ function messageRowToApi(mr, reactions = []) {
     chatId: Number(mr.chat_id),
     senderId: Number(mr.sender_id),
     text: mr.text,
+    replyToMessageId: mr.reply_to_message_id != null ? Number(mr.reply_to_message_id) : null,
     deliveredAt: mr.delivered_at,
     readAt: mr.read_at,
     editedAt: mr.edited_at,
@@ -301,6 +302,18 @@ function messageRowToApi(mr, reactions = []) {
     imageUrl: mr.image_url || null,
     audioUrl: mr.audio_url || null,
     videoUrl: mr.video_url || null,
+    replyTo:
+      mr.reply_to_message_id != null
+        ? {
+            id: Number(mr.reply_to_message_id),
+            senderId: mr.reply_to_sender_id != null ? Number(mr.reply_to_sender_id) : null,
+            senderUsername: mr.reply_to_sender_username || "",
+            text: mr.reply_to_text || "",
+            imageUrl: mr.reply_to_image_url || null,
+            audioUrl: mr.reply_to_audio_url || null,
+            videoUrl: mr.reply_to_video_url || null,
+          }
+        : null,
     reactions,
   };
 }
@@ -308,11 +321,19 @@ function messageRowToApi(mr, reactions = []) {
 async function fetchMessageById(messageId) {
   const messageRow = await query(
     `
-      SELECT m.id, m.chat_id, m.sender_id, m.text, m.delivered_at, m.read_at, m.edited_at, m.created_at,
+      SELECT m.id, m.chat_id, m.sender_id, m.text, m.reply_to_message_id, m.delivered_at, m.read_at, m.edited_at, m.created_at,
              m.message_type, m.system_kind, m.system_payload, m.image_url, m.audio_url, m.video_url,
-             u.username, u.avatar_url
+             u.username, u.avatar_url,
+             rm.sender_id AS reply_to_sender_id,
+             ru.username AS reply_to_sender_username,
+             rm.text AS reply_to_text,
+             rm.image_url AS reply_to_image_url,
+             rm.audio_url AS reply_to_audio_url,
+             rm.video_url AS reply_to_video_url
       FROM messages m
       JOIN users u ON u.id = m.sender_id
+      LEFT JOIN messages rm ON rm.id = m.reply_to_message_id
+      LEFT JOIN users ru ON ru.id = rm.sender_id
       WHERE m.id = $1
     `,
     [messageId]
@@ -335,7 +356,7 @@ async function insertSystemMessageAndBroadcast(chatId, actorUserId, systemKind, 
   return message;
 }
 
-async function insertChatMessageAndBroadcast(chatId, senderId, bodyText, imageUrl, audioUrl, videoUrl) {
+async function insertChatMessageAndBroadcast(chatId, senderId, bodyText, imageUrl, audioUrl, videoUrl, replyToMessageId) {
   const text = String(bodyText || "").trim();
   // Note: req not available here; validated at request boundary.
   const img = imageUrl;
@@ -343,9 +364,16 @@ async function insertChatMessageAndBroadcast(chatId, senderId, bodyText, imageUr
   const vid = videoUrl;
   if (!text && !img && !aud && !vid) return null;
 
+  const replyTo = Number(replyToMessageId) || null;
+  if (replyTo) {
+    const ok = await query(`SELECT 1 FROM messages WHERE id = $1 AND chat_id = $2`, [replyTo, chatId]);
+    if (!ok.rows[0]) return null;
+  }
+
   const inserted = await query(
-    `INSERT INTO messages (chat_id, sender_id, text, message_type, image_url, audio_url, video_url) VALUES ($1, $2, $3, 'text', $4, $5, $6) RETURNING id`,
-    [chatId, senderId, text, img, aud, vid]
+    `INSERT INTO messages (chat_id, sender_id, text, message_type, image_url, audio_url, video_url, reply_to_message_id)
+     VALUES ($1, $2, $3, 'text', $4, $5, $6, $7) RETURNING id`,
+    [chatId, senderId, text, img, aud, vid, replyTo]
   );
   const insertedId = Number(inserted.rows[0].id);
   const message = await fetchMessageById(insertedId);
@@ -967,6 +995,7 @@ app.post("/api/chats/:chatId/messages", authRequired, (req, res) => {
   const rawImg = typeof req.body?.imageUrl === "string" ? req.body.imageUrl.trim() : "";
   const rawAud = typeof req.body?.audioUrl === "string" ? req.body.audioUrl.trim() : "";
   const rawVid = typeof req.body?.videoUrl === "string" ? req.body.videoUrl.trim() : "";
+  const replyToMessageId = req.body?.replyToMessageId;
   const img = validateMessageMediaUrl(req, rawImg);
   const aud = validateMessageMediaUrl(req, rawAud);
   const vid = validateMessageMediaUrl(req, rawVid);
@@ -984,7 +1013,7 @@ app.post("/api/chats/:chatId/messages", authRequired, (req, res) => {
     if (!chat) return res.status(404).json({ error: "Chat not found" });
     if (!(await isUserChatMember(chatId, uid))) return res.status(403).json({ error: "Not a member of this chat" });
 
-    const message = await insertChatMessageAndBroadcast(chatId, uid, bodyText, img, aud, vid);
+    const message = await insertChatMessageAndBroadcast(chatId, uid, bodyText, img, aud, vid, replyToMessageId);
     if (!message) return res.status(400).json({ error: "Invalid message" });
     return res.json({ message });
   })().catch(() => res.status(500).json({ error: "Server error" }));
@@ -1011,6 +1040,7 @@ app.get("/api/chats/:chatId/messages", authRequired, (req, res) => {
       m.chat_id,
       m.sender_id,
       m.text,
+      m.reply_to_message_id,
       m.delivered_at,
       m.read_at,
       m.edited_at,
@@ -1022,9 +1052,17 @@ app.get("/api/chats/:chatId/messages", authRequired, (req, res) => {
       m.audio_url,
       m.video_url,
       u.username,
-      u.avatar_url
+      u.avatar_url,
+      rm.sender_id AS reply_to_sender_id,
+      ru.username AS reply_to_sender_username,
+      rm.text AS reply_to_text,
+      rm.image_url AS reply_to_image_url,
+      rm.audio_url AS reply_to_audio_url,
+      rm.video_url AS reply_to_video_url
     FROM messages m
     JOIN users u ON u.id = m.sender_id
+    LEFT JOIN messages rm ON rm.id = m.reply_to_message_id
+    LEFT JOIN users ru ON ru.id = rm.sender_id
     WHERE m.chat_id = $1
     ORDER BY m.created_at ASC, m.id ASC
     LIMIT $2
@@ -1365,7 +1403,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("chat:send", async ({ chatId, text, imageUrl, audioUrl, videoUrl } = {}) => {
+  socket.on("chat:send", async ({ chatId, text, imageUrl, audioUrl, videoUrl, replyToMessageId } = {}) => {
     const cid = Number(chatId);
     const bodyText = String(text || "").trim();
     const rawImg = typeof imageUrl === "string" ? imageUrl.trim() : "";
@@ -1386,7 +1424,7 @@ io.on("connection", (socket) => {
     if (!(await isUserChatMember(cid, Number(userId)))) return;
 
     try {
-      await insertChatMessageAndBroadcast(cid, Number(userId), bodyText, img, aud, vid);
+      await insertChatMessageAndBroadcast(cid, Number(userId), bodyText, img, aud, vid, replyToMessageId);
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error("[Xasma] chat:send failed", e);

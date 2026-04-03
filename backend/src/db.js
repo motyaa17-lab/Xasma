@@ -55,6 +55,7 @@ async function initDb() {
       chat_id BIGINT NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
       sender_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       text TEXT NOT NULL,
+      reply_to_message_id BIGINT,
       delivered_at TIMESTAMPTZ,
       read_at TIMESTAMPTZ,
       edited_at TIMESTAMPTZ,
@@ -81,6 +82,9 @@ async function initDb() {
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status_kind TEXT`);
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status_text TEXT`);
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS about TEXT`);
+
+  await query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to_message_id BIGINT`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_messages_reply_to ON messages(reply_to_message_id)`);
 
   // Group chats: type, title, creator; direct chats keep ordered user1_id/user2_id.
   await query(`ALTER TABLE chats ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'direct'`);

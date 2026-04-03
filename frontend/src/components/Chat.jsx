@@ -20,6 +20,12 @@ const MOBILE_LONG_PRESS_MS = 420;
 const MOBILE_LONG_PRESS_MOVE_CANCEL_PX = 14;
 const MOBILE_LONG_PRESS_MOVE_CANCEL_PX2 = MOBILE_LONG_PRESS_MOVE_CANCEL_PX * MOBILE_LONG_PRESS_MOVE_CANCEL_PX;
 
+// Swipe-to-reply (Telegram-like)
+const SWIPE_REPLY_ARM_X_PX = 10;
+const SWIPE_REPLY_CANCEL_Y_PX = 14;
+const SWIPE_REPLY_TRIGGER_PX = 56;
+const SWIPE_REPLY_MAX_PX = 82;
+
 const MessageActionMenuPanel = forwardRef(function MessageActionMenuPanel(
   {
     t,
@@ -206,6 +212,7 @@ export default function Chat({
   const [videoNoteDraft, setVideoNoteDraft] = useState(null); // { blob, mimeHint, url }
   const [sendAckActive, setSendAckActive] = useState(false);
   const [profileUserId, setProfileUserId] = useState(null);
+  const [replyToMessage, setReplyToMessage] = useState(null); // { id, senderUsername, preview }
   const listRef = useRef(null);
   const nearBottomRef = useRef(true);
   const scrollAfterSendRef = useRef(false);
@@ -247,6 +254,108 @@ export default function Chat({
   const longPressClickBlockUntilRef = useRef(0);
   const longPressTimerRef = useRef(null);
   const longPressTrackRef = useRef(null);
+  const swipeStateRef = useRef(null); // { id, sx, sy, active, dx }
+  const swipeAnimRafRef = useRef(0);
+  const swipeClickBlockUntilRef = useRef(0);
+  const [swipeMessageId, setSwipeMessageId] = useState(null);
+  const [swipeDx, setSwipeDx] = useState(0);
+
+  const getReplyPreviewForMessage = useCallback(
+    (m) => {
+      if (!m) return "";
+      if (m.imageUrl) return t("notifyPreviewPhoto");
+      if (m.audioUrl) return t("notifyPreviewVoice");
+      if (m.videoUrl) return t("notifyPreviewVideo");
+      const s = String(m.text ?? "").replace(/\s+/g, " ").trim();
+      return s.length > 80 ? `${s.slice(0, 77)}…` : s;
+    },
+    [t]
+  );
+
+  const maybeTriggerReplyHaptic = useCallback(() => {
+    try {
+      if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") navigator.vibrate(10);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const onMobileBubbleSwipeTouchStart = useCallback(
+    (e, message) => {
+      if (!isMobileChat) return;
+      if (!message?.id) return;
+      if (e.touches.length !== 1) return;
+      const t0 = e.touches[0];
+      swipeStateRef.current = { id: message.id, sx: t0.clientX, sy: t0.clientY, active: false, dx: 0, msg: message };
+      setSwipeMessageId(message.id);
+      setSwipeDx(0);
+    },
+    [isMobileChat]
+  );
+
+  const onMobileBubbleSwipeTouchMove = useCallback(
+    (e) => {
+      if (!isMobileChat) return;
+      const s = swipeStateRef.current;
+      if (!s) return;
+      const t0 = e.touches[0];
+      if (!t0) return;
+      const dx = t0.clientX - s.sx;
+      const dy = t0.clientY - s.sy;
+
+      if (!s.active) {
+        if (Math.abs(dy) > SWIPE_REPLY_CANCEL_Y_PX && Math.abs(dy) > Math.abs(dx)) {
+          swipeStateRef.current = null;
+          setSwipeMessageId(null);
+          setSwipeDx(0);
+          return;
+        }
+        if (dx > SWIPE_REPLY_ARM_X_PX && dx > Math.abs(dy) * 1.2) {
+          s.active = true;
+        } else {
+          return;
+        }
+      }
+
+      const clamped = Math.max(0, Math.min(SWIPE_REPLY_MAX_PX, dx));
+      s.dx = clamped;
+      if (swipeAnimRafRef.current) cancelAnimationFrame(swipeAnimRafRef.current);
+      swipeAnimRafRef.current = requestAnimationFrame(() => {
+        setSwipeDx(clamped);
+      });
+    },
+    [isMobileChat]
+  );
+
+  const finishSwipe = useCallback(
+    (trigger) => {
+      const s = swipeStateRef.current;
+      swipeStateRef.current = null;
+      if (swipeAnimRafRef.current) cancelAnimationFrame(swipeAnimRafRef.current);
+      swipeAnimRafRef.current = 0;
+
+      const msg = s?.msg;
+      const dx = Number(s?.dx || 0);
+      const shouldTrigger = Boolean(trigger) && dx >= SWIPE_REPLY_TRIGGER_PX && msg?.id;
+
+      setSwipeDx(0);
+      setSwipeMessageId(null);
+
+      if (shouldTrigger) {
+        maybeTriggerReplyHaptic();
+        swipeClickBlockUntilRef.current = Date.now() + 700;
+        setReplyToMessage({
+          id: msg.id,
+          senderUsername: msg.sender?.username || getDisplayName(msg, meId, meUsername),
+          preview: getReplyPreviewForMessage(msg),
+        });
+      }
+    },
+    [getReplyPreviewForMessage, maybeTriggerReplyHaptic, meId, meUsername]
+  );
+
+  const onMobileBubbleSwipeTouchEnd = useCallback(() => finishSwipe(true), [finishSwipe]);
+  const onMobileBubbleSwipeTouchCancel = useCallback(() => finishSwipe(false), [finishSwipe]);
 
   const onBubblePointerDown = useCallback((e) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
@@ -601,6 +710,7 @@ export default function Chat({
     onTyping?.(false);
     setEditingMessageId(null);
     setMenuMessageId(null);
+    setReplyToMessage(null);
     if (longPressTimerRef.current != null) {
       window.clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
@@ -612,6 +722,10 @@ export default function Chat({
     }
     setLongPressFlashMessageId(null);
     longPressClickBlockUntilRef.current = 0;
+    swipeClickBlockUntilRef.current = 0;
+    swipeStateRef.current = null;
+    setSwipeMessageId(null);
+    setSwipeDx(0);
     setText("");
     setGroupInfoOpen(false);
     setPendingImageUrl(null);
@@ -893,7 +1007,8 @@ export default function Chat({
       const url = await uploadChatVideo(file);
       playSendAck();
       requestScrollAfterSend();
-      onSend({ text: "", videoUrl: url });
+      onSend({ text: "", videoUrl: url, ...(replyToMessage?.id ? { replyToMessageId: replyToMessage.id } : {}) });
+      setReplyToMessage(null);
     } catch (err) {
       const baseMsg =
         err?.name === "ApiError" ? err.message : String(err?.message || t("videoNoteUploadError"));
@@ -1325,7 +1440,8 @@ export default function Chat({
             }
             playSendAck();
             requestScrollAfterSend();
-            onSend({ text: "", audioUrl: url });
+            onSend({ text: "", audioUrl: url, ...(replyToMessage?.id ? { replyToMessageId: replyToMessage.id } : {}) });
+            setReplyToMessage(null);
           } catch (err) {
             const msg =
               err?.name === "ApiError" ? err.message : String(err?.message || t("uploadVoiceError"));
@@ -1627,9 +1743,14 @@ export default function Chat({
     if (imageUploading || voiceRecording || voiceArming) return;
     playSendAck();
     requestScrollAfterSend();
-    onSend({ text: trimmed, imageUrl: pendingImageUrl || undefined });
+    onSend({
+      text: trimmed,
+      imageUrl: pendingImageUrl || undefined,
+      ...(replyToMessage?.id ? { replyToMessageId: replyToMessage.id } : {}),
+    });
     setText("");
     clearPendingImage();
+    setReplyToMessage(null);
   }
 
   function scheduleTyping() {
@@ -1913,6 +2034,7 @@ export default function Chat({
                         ? `bubble me${showMenuButton ? " bubbleOwn" : ""} bubbleWithActions${bubbleMediaBare}`
                         : `bubble bubbleWithActions${bubbleMediaBare}`) + (longPressFlashMessageId === m.id ? " bubble--lpFlash" : "")
                     }
+                    style={isMobileChat && swipeMessageId === m.id ? { transform: `translate3d(${swipeDx}px, 0, 0)` } : undefined}
                     ref={isMobileChat && menuMessageId === m.id ? menuAnchorRef : undefined}
                     onPointerDown={onBubblePointerDown}
                     onPointerUp={onBubblePointerUp}
@@ -1922,16 +2044,41 @@ export default function Chat({
                       isMobileChat
                         ? (e) => {
                             onMobileBubbleTouchStart(e, m.id, showMessageMenu);
+                            onMobileBubbleSwipeTouchStart(e, m);
                           }
                         : undefined
                     }
-                    onTouchMove={isMobileChat ? onMobileBubbleTouchMove : undefined}
-                    onTouchEnd={isMobileChat ? onMobileBubbleTouchEnd : undefined}
-                    onTouchCancel={isMobileChat ? onMobileBubbleTouchCancel : undefined}
+                    onTouchMove={
+                      isMobileChat
+                        ? (e) => {
+                            onMobileBubbleTouchMove(e);
+                            onMobileBubbleSwipeTouchMove(e);
+                          }
+                        : undefined
+                    }
+                    onTouchEnd={
+                      isMobileChat
+                        ? () => {
+                            onMobileBubbleTouchEnd();
+                            onMobileBubbleSwipeTouchEnd();
+                          }
+                        : undefined
+                    }
+                    onTouchCancel={
+                      isMobileChat
+                        ? () => {
+                            onMobileBubbleTouchCancel();
+                            onMobileBubbleSwipeTouchCancel();
+                          }
+                        : undefined
+                    }
                     onClickCapture={
                       isMobileChat
                         ? (e) => {
-                            if (Date.now() < longPressClickBlockUntilRef.current) {
+                            if (
+                              Date.now() < longPressClickBlockUntilRef.current ||
+                              Date.now() < swipeClickBlockUntilRef.current
+                            ) {
                               e.preventDefault();
                               e.stopPropagation();
                             }
@@ -1942,6 +2089,14 @@ export default function Chat({
                       isMobileChat && showMessageMenu ? (e) => e.preventDefault() : undefined
                     }
                   >
+                    {isMobileChat ? (
+                      <span
+                        className={swipeMessageId === m.id && swipeDx > 8 ? "swipeReplyIcon swipeReplyIcon--on" : "swipeReplyIcon"}
+                        aria-hidden
+                      >
+                        ↩︎
+                      </span>
+                    ) : null}
                     {showMenuButton ? (
                       <div className="msgMenu">
                         <button
@@ -1979,6 +2134,20 @@ export default function Chat({
                     ) : null}
                     {isGroup ? (
                       <div className="msgSenderName">{m.sender?.username || "?"}</div>
+                    ) : null}
+                    {m.replyTo ? (
+                      <div className="replyBlock" aria-label={t("replyTo")}>
+                        <div className="replyBlockSender">{m.replyTo.senderUsername || t("notifyUnknownSender")}</div>
+                        <div className="replyBlockPreview muted">
+                          {m.replyTo.imageUrl
+                            ? t("notifyPreviewPhoto")
+                            : m.replyTo.audioUrl
+                              ? t("notifyPreviewVoice")
+                              : m.replyTo.videoUrl
+                                ? t("notifyPreviewVideo")
+                                : String(m.replyTo.text || "").replace(/\s+/g, " ").trim() || t("notifyBodyFallback")}
+                        </div>
+                      </div>
                     ) : null}
                     {m.imageUrl ? (
                       <a
@@ -2091,6 +2260,25 @@ export default function Chat({
             {imageUploading ? <div className="uploadProgressHint">{t("uploadImageProgress")}</div> : null}
             {voiceUploading ? <div className="uploadProgressHint">{t("voiceSending")}</div> : null}
             {videoNoteUploading ? <div className="uploadProgressHint">{t("videoNoteUploading")}</div> : null}
+            {replyToMessage ? (
+              <div className="replyComposerBar" role="group" aria-label={t("replyTo")}>
+                <div className="replyComposerMain">
+                  <div className="replyComposerLabel">{t("replyTo")}</div>
+                  <div className="replyComposerLine">
+                    <span className="replyComposerSender">{replyToMessage.senderUsername}</span>
+                    <span className="replyComposerPreview muted">{replyToMessage.preview}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="replyComposerClose"
+                  aria-label={t("cancelReply")}
+                  onClick={() => setReplyToMessage(null)}
+                >
+                  ×
+                </button>
+              </div>
+            ) : null}
             {voiceArming || voiceRecording ? (
               <div className="recBottomBar" role="group" aria-label={t("voiceRecordingControls")}>
                 <div className="recBottomBarLeft">

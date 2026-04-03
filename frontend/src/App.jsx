@@ -434,6 +434,7 @@ export default function App() {
     const imageUrl = isObj && payload.imageUrl ? String(payload.imageUrl).trim() : "";
     const audioUrl = isObj && payload.audioUrl ? String(payload.audioUrl).trim() : "";
     const videoUrl = isObj && payload.videoUrl ? String(payload.videoUrl).trim() : "";
+    const replyToMessageId = isObj && payload.replyToMessageId ? Number(payload.replyToMessageId) : 0;
     if (!text && !imageUrl && !audioUrl && !videoUrl) return;
     if (!socketRef.current || !socketReady) return;
     if (!selectedChatId) return;
@@ -446,6 +447,7 @@ export default function App() {
       ...(imageUrl ? { imageUrl } : {}),
       ...(audioUrl ? { audioUrl } : {}),
       ...(videoUrl ? { videoUrl } : {}),
+      ...(replyToMessageId ? { replyToMessageId } : {}),
     });
   }
 

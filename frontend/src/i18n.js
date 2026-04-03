@@ -152,6 +152,8 @@ export const translations = {
     statusLabel: "Status",
     aboutLabel: "About",
     save: "Save",
+    replyTo: "Reply to",
+    cancelReply: "Cancel reply",
     logout: "Logout",
     close: "Close",
 
@@ -328,6 +330,8 @@ export const translations = {
     statusLabel: "Статус",
     aboutLabel: "О себе",
     save: "Сохранить",
+    replyTo: "Ответ",
+    cancelReply: "Отменить ответ",
     logout: "Выйти",
     close: "Закрыть",
 
