@@ -12,6 +12,7 @@ const bcrypt = require("bcrypt");
 const { Server } = require("socket.io");
 
 const { query, initDb, pool } = require("./db");
+const { scanOutgoingMessageText } = require("./messageSafety");
 
 const PORT = process.env.PORT || 4000;
 const uploadsDir = path.join(__dirname, "..", "uploads");
@@ -432,10 +433,26 @@ async function insertChatMessageAndBroadcast(chatId, senderId, bodyText, imageUr
     if (!ok.rows[0]) return null;
   }
 
+  const safety = scanOutgoingMessageText(text);
   const inserted = await query(
-    `INSERT INTO messages (chat_id, sender_id, text, message_type, image_url, audio_url, video_url, reply_to_message_id)
-     VALUES ($1, $2, $3, 'text', $4, $5, $6, $7) RETURNING id`,
-    [chatId, senderId, text, img, aud, vid, replyTo]
+    `INSERT INTO messages (
+       chat_id, sender_id, text, message_type, image_url, audio_url, video_url, reply_to_message_id,
+       flagged, risk_level, flagged_reason, flagged_at
+     )
+     VALUES ($1, $2, $3, 'text', $4, $5, $6, $7, $8, $9, $10, CASE WHEN $8 THEN now() ELSE NULL END)
+     RETURNING id`,
+    [
+      chatId,
+      senderId,
+      text,
+      img,
+      aud,
+      vid,
+      replyTo,
+      Boolean(safety),
+      safety ? safety.riskLevel : null,
+      safety ? safety.flaggedReason : null,
+    ]
   );
   const insertedId = Number(inserted.rows[0].id);
   const message = await fetchMessageById(insertedId);
@@ -1327,7 +1344,20 @@ app.put("/api/messages/:messageId", authRequired, (req, res) => {
     const cidCheck = Number(msgRow.chat_id);
     if (!(await isUserChatMember(cidCheck, uid))) return res.status(403).json({ error: "Not a member of this chat" });
 
-    await query(`UPDATE messages SET text = $1, edited_at = now() WHERE id = $2`, [bodyText, messageId]);
+    const safety = scanOutgoingMessageText(bodyText);
+    await query(
+      `
+      UPDATE messages SET
+        text = $1,
+        edited_at = now(),
+        flagged = $2,
+        risk_level = CASE WHEN $2 THEN $3 ELSE NULL END,
+        flagged_reason = CASE WHEN $2 THEN $4 ELSE NULL END,
+        flagged_at = CASE WHEN $2 THEN now() ELSE NULL END
+      WHERE id = $5
+    `,
+      [bodyText, Boolean(safety), safety?.riskLevel || null, safety?.flaggedReason || null, messageId]
+    );
 
     const messageRow = await query(
       `
@@ -1351,7 +1381,59 @@ app.put("/api/messages/:messageId", authRequired, (req, res) => {
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });
 
+function formatChatLabelForFlagged(row) {
+  const t = row.chat_type || "direct";
+  if (t === "official") return "Xasma (official)";
+  if (t === "group") return (row.chat_title && String(row.chat_title).trim()) || `Group #${row.chat_id}`;
+  const a = row.direct_u1 || "?";
+  const b = row.direct_u2 || "?";
+  return `${a} · ${b}`;
+}
+
 // Admin APIs
+app.get("/api/admin/flagged-messages", authRequired, requireAdmin, (req, res) => {
+  const limit = Math.min(parseInt(String(req.query.limit || "100"), 10), 500);
+  (async () => {
+    const r = await query(
+      `
+      SELECT
+        m.id,
+        m.chat_id,
+        m.text,
+        m.flagged_reason,
+        m.flagged_at,
+        m.created_at,
+        u.username AS sender_username,
+        c.type AS chat_type,
+        c.title AS chat_title,
+        du1.username AS direct_u1,
+        du2.username AS direct_u2
+      FROM messages m
+      JOIN users u ON u.id = m.sender_id
+      JOIN chats c ON c.id = m.chat_id
+      LEFT JOIN users du1 ON du1.id = c.user1_id
+      LEFT JOIN users du2 ON du2.id = c.user2_id
+      WHERE m.flagged = TRUE
+        AND COALESCE(m.message_type, 'text') = 'text'
+      ORDER BY COALESCE(m.flagged_at, m.created_at) DESC, m.id DESC
+      LIMIT $1
+    `,
+      [limit]
+    );
+    return res.json({
+      messages: r.rows.map((row) => ({
+        id: Number(row.id),
+        chatId: Number(row.chat_id),
+        senderUsername: row.sender_username,
+        text: row.text,
+        flaggedReason: row.flagged_reason,
+        flaggedAt: row.flagged_at,
+        chatLabel: formatChatLabelForFlagged(row),
+      })),
+    });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
 app.get("/api/admin/users", authRequired, requireAdmin, (req, res) => {
   (async () => {
     const r = await query(

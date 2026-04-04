@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   adminBroadcastOfficial,
+  adminListFlaggedMessages,
   adminListUsers,
   adminSetUserBanned,
   adminSetUserRole,
@@ -10,6 +11,47 @@ import { DONATION_ALERTS_URL } from "../config/donation.js";
 function openDonationPage() {
   if (typeof window === "undefined") return;
   window.open(DONATION_ALERTS_URL, "_blank", "noopener,noreferrer");
+}
+
+function AdminFlaggedSection({ t, items, loading, onRefresh }) {
+  return (
+    <div className="adminFlaggedBox">
+      <div className="adminFlaggedHeader">
+        <div className="settingsTitle">{t("adminFlaggedTitle")}</div>
+        <button type="button" className="ghostBtn" onClick={onRefresh} disabled={loading}>
+          {t("adminFlaggedRefresh")}
+        </button>
+      </div>
+      <p className="muted small adminFlaggedHint">{t("adminFlaggedHint")}</p>
+      {loading ? (
+        <div className="muted">{t("adminFlaggedLoading")}</div>
+      ) : !items.length ? (
+        <div className="muted">{t("adminFlaggedEmpty")}</div>
+      ) : (
+        <div className="adminFlaggedList">
+          {items.map((m) => (
+            <div key={m.id} className="adminFlaggedRow">
+              <div className="adminFlaggedMeta muted small">
+                <span className="adminFlaggedUser">{m.senderUsername}</span>
+                <span> · </span>
+                <span>{m.chatLabel}</span>
+                {m.flaggedAt ? (
+                  <>
+                    <span> · </span>
+                    <span>{new Date(m.flaggedAt).toLocaleString()}</span>
+                  </>
+                ) : null}
+              </div>
+              <div className="adminFlaggedReason">
+                <span className="adminFlaggedReasonLabel">{t("adminFlaggedReason")}:</span> {m.flaggedReason}
+              </div>
+              <div className="adminFlaggedText">{m.text}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function AdminOfficialBroadcast({ t, text, setText, busy, onSend }) {
@@ -123,6 +165,8 @@ export default function UserMenu({
   const [adminNotice, setAdminNotice] = useState("");
   const [adminBroadcastText, setAdminBroadcastText] = useState("");
   const [adminBroadcastBusy, setAdminBroadcastBusy] = useState(false);
+  const [adminFlagged, setAdminFlagged] = useState([]);
+  const [adminFlaggedLoading, setAdminFlaggedLoading] = useState(false);
 
   useEffect(() => {
     function onDocMouseDown(e) {
@@ -190,6 +234,18 @@ export default function UserMenu({
       setAdminError(e.message || "Request failed");
     } finally {
       setAdminLoading(false);
+    }
+  }
+
+  async function loadAdminFlagged() {
+    setAdminFlaggedLoading(true);
+    try {
+      const data = await adminListFlaggedMessages();
+      setAdminFlagged(Array.isArray(data.messages) ? data.messages : []);
+    } catch (e) {
+      setAdminError(e.message || "Request failed");
+    } finally {
+      setAdminFlaggedLoading(false);
     }
   }
 
@@ -330,6 +386,7 @@ export default function UserMenu({
                   onClick={() => {
                     setPanel("admin");
                     loadAdminUsers();
+                    loadAdminFlagged();
                   }}
                 />
               </div>
@@ -360,7 +417,7 @@ export default function UserMenu({
                       ? t("chatBackground")
                       : panel === "support"
                         ? t("settingsSupportAuthors")
-                        : "Admin"
+                        : t("adminPanelTitle")
             }
             onClose={() => setPanel(null)}
             t={t}
@@ -596,6 +653,13 @@ export default function UserMenu({
                   onSend={sendOfficialBroadcast}
                 />
 
+                <AdminFlaggedSection
+                  t={t}
+                  items={adminFlagged}
+                  loading={adminFlaggedLoading}
+                  onRefresh={loadAdminFlagged}
+                />
+
                 {adminLoading ? (
                   <div className="muted">Loading...</div>
                 ) : (
@@ -715,6 +779,7 @@ export default function UserMenu({
                 setOpen(false);
                 setPanel("admin");
                 loadAdminUsers();
+                loadAdminFlagged();
               }}
             >
               Admin
@@ -745,7 +810,7 @@ export default function UserMenu({
                 ? t("settings")
                 : panel === "support"
                   ? t("settingsSupportAuthors")
-                  : "Admin"
+                  : t("adminPanelTitle")
           }
           onClose={() => setPanel(null)}
           t={t}
@@ -946,6 +1011,13 @@ export default function UserMenu({
                 setText={setAdminBroadcastText}
                 busy={adminBroadcastBusy}
                 onSend={sendOfficialBroadcast}
+              />
+
+              <AdminFlaggedSection
+                t={t}
+                items={adminFlagged}
+                loading={adminFlaggedLoading}
+                onRefresh={loadAdminFlagged}
               />
 
               {adminLoading ? (

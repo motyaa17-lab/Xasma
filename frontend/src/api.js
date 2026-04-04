@@ -280,3 +280,7 @@ export async function adminBroadcastOfficial(text) {
   });
 }
 
+export async function adminListFlaggedMessages() {
+  return apiFetch("/api/admin/flagged-messages");
+}
+

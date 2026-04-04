@@ -3282,6 +3282,67 @@ body.body--mobileConversationOpen {
   justify-content: center;
 }
 
+.adminFlaggedBox {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.adminFlaggedHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.adminFlaggedHeader .settingsTitle {
+  margin: 0;
+}
+
+.adminFlaggedHint {
+  margin: 0 0 10px;
+}
+
+.adminFlaggedList {
+  max-height: 280px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 4px;
+}
+
+.adminFlaggedRow {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+}
+
+.adminFlaggedUser {
+  font-weight: 700;
+  color: rgba(229, 231, 235, 0.85);
+}
+
+.adminFlaggedReason {
+  font-size: 12px;
+  margin: 6px 0 4px;
+  color: rgba(251, 191, 36, 0.95);
+}
+
+.adminFlaggedReasonLabel {
+  font-weight: 700;
+}
+
+.adminFlaggedText {
+  font-size: 13px;
+  line-height: 1.35;
+  color: rgba(229, 231, 235, 0.78);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .iconCloseBtn {
   border: none;
   background: transparent;

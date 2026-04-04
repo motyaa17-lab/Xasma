@@ -133,6 +133,15 @@ async function initDb() {
     WHERE type = 'official'
   `);
 
+  // Message safety flags (keyword review; does not block delivery).
+  await query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS flagged BOOLEAN NOT NULL DEFAULT FALSE`);
+  await query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS risk_level TEXT`);
+  await query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS flagged_reason TEXT`);
+  await query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS flagged_at TIMESTAMPTZ`);
+  await query(
+    `CREATE INDEX IF NOT EXISTS idx_messages_flagged ON messages (flagged, flagged_at DESC) WHERE flagged = TRUE`
+  );
+
   // Ensure initial admin (safe if user doesn't exist).
   await query(`UPDATE users SET role = 'admin' WHERE username = 'Xasma'`);
 }
