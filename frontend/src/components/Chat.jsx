@@ -1,12 +1,12 @@
 import React, { forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { tf } from "../i18n.js";
 import { uploadChatImage, uploadChatAudio, uploadChatVideo, getApiBase, reportMessage } from "../api.js";
 import AvatarAura from "./AvatarAura.jsx";
 import GroupInfoModal from "./GroupInfoModal.jsx";
 import VoiceMessagePlayer from "./VoiceMessagePlayer.jsx";
 import CircleVideoMessage from "./CircleVideoMessage.jsx";
 import UserProfileModal from "./UserProfileModal.jsx";
+import { formatUserStatusLine } from "../userStatusLine.js";
 
 const MAX_VIDEO_NOTE_SEC = 60;
 const QUICK_REACTION_EMOJIS = ["❤️", "👍", "😂", "😮", "😢", "🔥"];
@@ -1866,6 +1866,7 @@ export default function Chat({
         userId={profileUserId}
         onClose={() => setProfileUserId(null)}
         t={t}
+        lang={lang}
       />
       {!chatId ? (
         <div className="emptyState">
@@ -2023,7 +2024,7 @@ export default function Chat({
                   <div className="chatHeaderInfo">
                     <div className="chatHeaderName">{chat?.other?.username || ""}</div>
                     <div className="chatHeaderStatus">
-                      {otherTyping ? t("typing") : renderPresence(chat?.other, lang)}
+                      {otherTyping ? t("typing") : formatUserStatusLine(chat?.other, t, lang)}
                     </div>
                   </div>
                 </div>
@@ -3012,35 +3013,6 @@ function formatTime(v) {
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return String(v);
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-
-function renderPresence(user, lang) {
-  if (!user) return "";
-  if (user.isOnline) return tf(lang, "online");
-  if (!user.lastSeenAt) return tf(lang, "lastSeen");
-  return tf(lang, "lastSeenAt", { time: formatLastSeen(user.lastSeenAt, lang) });
-}
-
-function formatLastSeen(v, lang) {
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return String(v);
-  const now = new Date();
-  const sameDay =
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate();
-
-  const locale = lang === "ru" ? "ru-RU" : "en-US";
-  if (sameDay) {
-    return d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
-  }
-  return d.toLocaleString(locale, {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 function getAvatarSrc(message, meId, meAvatar) {

@@ -601,7 +601,7 @@ app.put("/api/me/profile", authRequired, (req, res) => {
 
   const allowedKinds = new Set(["", "online", "dnd", "away", "custom"]);
   const statusKind = allowedKinds.has(statusKindRaw) ? statusKindRaw : "";
-  const statusText = statusTextRaw.length > 140 ? statusTextRaw.slice(0, 140) : statusTextRaw;
+  const statusText = statusTextRaw.length > 30 ? statusTextRaw.slice(0, 30) : statusTextRaw;
   const about = aboutRaw.length > 600 ? aboutRaw.slice(0, 600) : aboutRaw;
 
   const auraParsed = parseAuraColorBody(req.body);
@@ -633,6 +633,11 @@ app.put("/api/me/profile", authRequired, (req, res) => {
     if (!user) return res.status(404).json({ error: "User not found" });
     const auraColor = normalizeAuraColorApi(user.aura_color);
     if (!auraParsed.skip) emitToAll("user:auraColor", { userId: uid, auraColor });
+    emitToAll("user:profileStatus", {
+      userId: uid,
+      statusKind: user.status_kind || "",
+      statusText: user.status_text || "",
+    });
     return res.json({
       user: {
         id: Number(user.id),
@@ -805,6 +810,8 @@ app.get("/api/chats", authRequired, (req, res) => {
         other.aura_color AS other_aura_color,
         other.is_online AS other_is_online,
         other.last_seen_at AS other_last_seen_at,
+        other.status_kind AS other_status_kind,
+        other.status_text AS other_status_text,
         lm.text AS last_text,
         lm.created_at AS last_created_at,
         lm.sender_id AS last_sender_id,
@@ -892,6 +899,8 @@ app.get("/api/chats", authRequired, (req, res) => {
                   auraColor: normalizeAuraColorApi(c.other_aura_color),
                   isOnline: Boolean(c.other_is_online),
                   lastSeenAt: c.other_last_seen_at,
+                  statusKind: c.other_status_kind || "",
+                  statusText: c.other_status_text || "",
                 },
           last: c.last_text
             ? { text: c.last_text, createdAt: c.last_created_at, senderId: Number(c.last_sender_id) }

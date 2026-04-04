@@ -1,23 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { getUserById } from "../api.js";
 import AvatarAura from "./AvatarAura.jsx";
+import { formatUserStatusLine } from "../userStatusLine.js";
 
 function initials(name) {
   const s = String(name || "").trim();
   return (s[0] || "?").toUpperCase();
 }
 
-function renderStatusLine(u, t) {
-  const kind = String(u?.statusKind || "");
-  const text = String(u?.statusText || "").trim();
-  if (kind === "dnd") return t("statusDnd");
-  if (kind === "away") return t("statusAway");
-  if (kind === "online") return t("statusOnline");
-  if (kind === "custom" && text) return text;
-  return u?.isOnline ? t("online") : t("lastSeen");
-}
-
-export default function UserProfileModal({ open, userId, onClose, t }) {
+export default function UserProfileModal({ open, userId, onClose, t, lang = "en" }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
@@ -66,7 +57,7 @@ export default function UserProfileModal({ open, userId, onClose, t }) {
               </AvatarAura>
               <div className="profileMain">
                 <div className="profileValue">{user.username}</div>
-                <div className="muted small">{renderStatusLine(user, t)}</div>
+                <div className="muted small">{formatUserStatusLine(user, t, lang)}</div>
                 {String(user.about || "").trim() ? (
                   <div className="profileAbout">{String(user.about || "").trim()}</div>
                 ) : null}

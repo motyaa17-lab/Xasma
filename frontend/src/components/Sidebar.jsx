@@ -1,5 +1,6 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import AvatarAura from "./AvatarAura.jsx";
+import { formatUserStatusLine } from "../userStatusLine.js";
 
 const Sidebar = forwardRef(function Sidebar(
   {
@@ -299,6 +300,8 @@ const Sidebar = forwardRef(function Sidebar(
               Boolean(c.last?.senderId && me?.id && Number(c.last.senderId) !== Number(me.id));
             const unreadN = Math.max(0, Number(c.unreadCount) || 0);
             const unreadLabel = unreadN > 0 ? (unreadN > 99 ? "99+" : String(unreadN)) : null;
+            const statusSubtitle =
+              !isGroup && !isOfficial && other ? formatUserStatusLine(other, t, lang) : "";
             return (
               <button
                 key={c.id}
@@ -327,12 +330,19 @@ const Sidebar = forwardRef(function Sidebar(
                 </div>
                 <div className="mobileChatRowMain">
                   <div className="mobileChatRowTop">
-                    <span className="mobileChatRowName">
-                      {label}
-                      {isOfficial ? (
-                        <span className="officialChatListBadge">{t("officialChatBadge")}</span>
+                    <div className="mobileChatRowTitleBlock">
+                      <span className="mobileChatRowName">
+                        {label}
+                        {isOfficial ? (
+                          <span className="officialChatListBadge">{t("officialChatBadge")}</span>
+                        ) : null}
+                      </span>
+                      {!isGroup && !isOfficial && statusSubtitle ? (
+                        <span className="mobileChatRowStatus muted" title={statusSubtitle}>
+                          {statusSubtitle}
+                        </span>
                       ) : null}
-                    </span>
+                    </div>
                     <div className="mobileChatRowRight" aria-label={unreadLabel ? t("unreadBadgeAria").replace("{count}", unreadLabel) : undefined}>
                       {c.last?.createdAt ? (
                         <time className="mobileChatRowTime" dateTime={c.last.createdAt}>
@@ -426,6 +436,8 @@ const Sidebar = forwardRef(function Sidebar(
             const unreadN = Math.max(0, Number(c.unreadCount) || 0);
             const unreadLabel = unreadN > 0 ? (unreadN > 99 ? "99+" : String(unreadN)) : null;
             const timeLabel = c.last?.createdAt ? formatListTime(c.last.createdAt, lang) : "";
+            const statusSubtitle =
+              !isGroup && !isOfficial && other ? formatUserStatusLine(other, t, lang) : "";
             return (
               <button
                 key={c.id}
@@ -463,6 +475,11 @@ const Sidebar = forwardRef(function Sidebar(
                         ) : null}
                       </div>
                     </div>
+                    {!isGroup && !isOfficial && statusSubtitle ? (
+                      <div className="chatOtherStatus muted" title={statusSubtitle}>
+                        {statusSubtitle}
+                      </div>
+                    ) : null}
                     {c.last ? (
                       <div className="chatLast">{c.last.text}</div>
                     ) : (

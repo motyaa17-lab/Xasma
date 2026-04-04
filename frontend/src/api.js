@@ -1,3 +1,5 @@
+import { USER_STATUS_TEXT_MAX } from "./userStatusLine.js";
+
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:4000";
 
 export function getApiBase() {
@@ -71,9 +73,11 @@ export async function updateMyAvatar(avatar) {
 }
 
 export async function updateMyProfile({ statusKind, statusText, about, auraColor } = {}) {
+  const st =
+    typeof statusText === "string" ? statusText.trim().slice(0, USER_STATUS_TEXT_MAX) : "";
   const body = {
     statusKind: typeof statusKind === "string" ? statusKind : "",
-    statusText: typeof statusText === "string" ? statusText : "",
+    statusText: st,
     about: typeof about === "string" ? about : "",
   };
   if (auraColor !== undefined) body.auraColor = auraColor;

@@ -9,6 +9,7 @@ import {
 } from "../api.js";
 import { DONATION_ALERTS_URL } from "../config/donation.js";
 import { DEFAULT_AURA_COLOR } from "../avatarAura.js";
+import { USER_STATUS_TEXT_MAX } from "../userStatusLine.js";
 import AvatarAura from "./AvatarAura.jsx";
 
 function openDonationPage() {
@@ -263,7 +264,10 @@ export default function UserMenu({
     try {
       await onChangeProfile({
         statusKind: profileStatusKind,
-        statusText: profileStatusKind === "custom" ? profileStatusText : "",
+        statusText:
+          profileStatusKind === "custom"
+            ? String(profileStatusText || "").trim().slice(0, USER_STATUS_TEXT_MAX)
+            : "",
         about: profileAbout,
         auraColor: profileAuraColor,
       });
@@ -629,9 +633,9 @@ export default function UserMenu({
                   <input
                     className="settingsTextInput"
                     value={profileStatusText}
-                    onChange={(e) => setProfileStatusText(e.target.value)}
+                    onChange={(e) => setProfileStatusText(e.target.value.slice(0, USER_STATUS_TEXT_MAX))}
                     placeholder={t("statusCustom")}
-                    maxLength={140}
+                    maxLength={USER_STATUS_TEXT_MAX}
                   />
                 </div>
                 <div className="settingsFooter">
@@ -1030,9 +1034,9 @@ export default function UserMenu({
                   <input
                     className="searchInput"
                     value={profileStatusText}
-                    onChange={(e) => setProfileStatusText(e.target.value)}
+                    onChange={(e) => setProfileStatusText(e.target.value.slice(0, USER_STATUS_TEXT_MAX))}
                     placeholder={t("statusCustom")}
-                    maxLength={140}
+                    maxLength={USER_STATUS_TEXT_MAX}
                   />
                 ) : null}
               </div>

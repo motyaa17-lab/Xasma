@@ -384,6 +384,21 @@ export default function App() {
       );
     });
 
+    socket.on("user:profileStatus", ({ userId, statusKind, statusText } = {}) => {
+      const uid = Number(userId);
+      if (!uid) return;
+      const sk = typeof statusKind === "string" ? statusKind : "";
+      const st = typeof statusText === "string" ? statusText : "";
+      setMe((prev) =>
+        prev && prev.id === uid ? { ...prev, statusKind: sk, statusText: st } : prev
+      );
+      setChats((prev) =>
+        prev.map((c) =>
+          c.other?.id === uid ? { ...c, other: { ...c.other, statusKind: sk, statusText: st } } : c
+        )
+      );
+    });
+
     socket.on("chat:sendRateLimited", ({ retryAfterMs } = {}) => {
       const sec = Math.max(1, Math.ceil(Number(retryAfterMs || 10_000) / 1000));
       const lang = settingsRef.current?.lang === "ru" ? "ru" : "en";
@@ -407,6 +422,7 @@ export default function App() {
       socket.off("user:banned");
       socket.off("group:avatarUpdated");
       socket.off("user:auraColor");
+      socket.off("user:profileStatus");
       socket.off("chat:sendRateLimited");
       socket.disconnect();
     };
