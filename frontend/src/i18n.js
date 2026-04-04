@@ -221,6 +221,8 @@ export const translations = {
     reportAlreadyReported: "You already reported this message.",
     reportFailed: "Could not send report.",
     messageFrom: "From",
+    profileAuraLabel: "Profile aura",
+    profileAuraHint: "Soft glow around your avatar in chats. Default is blue.",
     sendRateLimited:
       "You're sending too fast. Please wait {seconds}s before sending again.",
     settingsCurrentBackground: "Current background",
@@ -462,6 +464,8 @@ export const translations = {
     reportAlreadyReported: "Вы уже жаловались на это сообщение.",
     reportFailed: "Не удалось отправить жалобу.",
     messageFrom: "От",
+    profileAuraLabel: "Аура профиля",
+    profileAuraHint: "Мягкое свечение вокруг аватара в чатах. По умолчанию — синий.",
     sendRateLimited:
       "Слишком частые сообщения. Подождите {seconds} с. перед следующей отправкой.",
     settingsCurrentBackground: "Текущий фон",

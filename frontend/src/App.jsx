@@ -365,6 +365,25 @@ export default function App() {
       );
     });
 
+    socket.on("user:auraColor", ({ userId, auraColor } = {}) => {
+      const uid = Number(userId);
+      if (!uid) return;
+      const ac = typeof auraColor === "string" ? auraColor : "";
+      setMe((prev) => (prev && prev.id === uid ? { ...prev, auraColor: ac } : prev));
+      setChats((prev) =>
+        prev.map((c) =>
+          c.other?.id === uid ? { ...c, other: { ...c.other, auraColor: ac } } : c
+        )
+      );
+      setMessages((prev) =>
+        prev.map((m) =>
+          Number(m.senderId) === uid && m.sender
+            ? { ...m, sender: { ...m.sender, auraColor: ac } }
+            : m
+        )
+      );
+    });
+
     socket.on("chat:sendRateLimited", ({ retryAfterMs } = {}) => {
       const sec = Math.max(1, Math.ceil(Number(retryAfterMs || 10_000) / 1000));
       const lang = settingsRef.current?.lang === "ru" ? "ru" : "en";
@@ -387,10 +406,17 @@ export default function App() {
       socket.off("user:roleUpdated");
       socket.off("user:banned");
       socket.off("group:avatarUpdated");
+      socket.off("user:auraColor");
       socket.off("chat:sendRateLimited");
       socket.disconnect();
     };
   }, [token, socketEndpoint, me?.id]);
+
+  useEffect(() => {
+    if (!sendRateLimitNotice) return;
+    const id = window.setTimeout(() => setSendRateLimitNotice(""), 12_000);
+    return () => window.clearTimeout(id);
+  }, [sendRateLimitNotice]);
 
   async function refreshMessages(chatId) {
     const list = await getMessages(chatId, 50);
@@ -524,8 +550,24 @@ export default function App() {
     const statusKind = typeof next?.statusKind === "string" ? next.statusKind : "";
     const statusText = typeof next?.statusText === "string" ? next.statusText : "";
     const about = typeof next?.about === "string" ? next.about : "";
-    setMe((prev) => (prev ? { ...prev, statusKind, statusText, about } : prev));
-    const updated = await updateMyProfile({ statusKind, statusText, about });
+    const auraColor = next?.auraColor !== undefined ? next.auraColor : undefined;
+    setMe((prev) =>
+      prev
+        ? {
+            ...prev,
+            statusKind,
+            statusText,
+            about,
+            ...(auraColor !== undefined ? { auraColor } : {}),
+          }
+        : prev
+    );
+    const updated = await updateMyProfile({
+      statusKind,
+      statusText,
+      about,
+      ...(auraColor !== undefined ? { auraColor } : {}),
+    });
     setMe(updated);
   }
 
@@ -568,12 +610,6 @@ export default function App() {
     lang: settings.lang,
   };
 
-  useEffect(() => {
-    if (!sendRateLimitNotice) return;
-    const id = window.setTimeout(() => setSendRateLimitNotice(""), 12_000);
-    return () => window.clearTimeout(id);
-  }, [sendRateLimitNotice]);
-
   const chatPropsBase = {
     chatId: selectedChatId,
     chat: chats.find((c) => c.id === selectedChatId) || null,
@@ -595,6 +631,7 @@ export default function App() {
     t,
     lang: settings.lang,
     sendRateLimitNotice,
+    meAuraColor: me?.auraColor,
   };
 
   const chatPropsDesktop = { ...chatPropsBase, onMobileBack: undefined };

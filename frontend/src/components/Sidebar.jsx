@@ -1,4 +1,5 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
+import AvatarAura from "./AvatarAura.jsx";
 
 const Sidebar = forwardRef(function Sidebar(
   {
@@ -196,9 +197,11 @@ const Sidebar = forwardRef(function Sidebar(
                     className={memberSelected(u.id) ? "searchResult selectedPick" : "searchResult"}
                     onClick={() => toggleMember(u)}
                   >
-                    <div className="avatarSm">
-                      {u.avatar ? <img src={u.avatar} alt="" /> : <span>{initials(u.username)}</span>}
-                    </div>
+                    <AvatarAura auraColor={u.auraColor}>
+                      <div className="avatarSm">
+                        {u.avatar ? <img src={u.avatar} alt="" /> : <span>{initials(u.username)}</span>}
+                      </div>
+                    </AvatarAura>
                     <div className="searchResultMain">
                       <div className="searchUser">{u.username}</div>
                       <div className="muted small">{memberSelected(u.id) ? "✓" : ""}</div>
@@ -304,15 +307,17 @@ const Sidebar = forwardRef(function Sidebar(
                 onClick={() => onSelectChat(c.id)}
               >
                 <div className="mobileChatRowAvatarWrap">
-                  <div className={online ? "mobileChatRowAvatar presence online" : "mobileChatRowAvatar presence"}>
-                  {isGroup && c.avatar ? (
-                    <img src={c.avatar} alt="" />
-                  ) : !isGroup && other?.avatar ? (
-                    <img src={other.avatar} alt="" />
-                  ) : (
-                    <span>{initials(isGroup || isOfficial ? label : other?.username || "")}</span>
-                  )}
-                  </div>
+                  <AvatarAura skip={isGroup || isOfficial} auraColor={other?.auraColor}>
+                    <div className={online ? "mobileChatRowAvatar presence online" : "mobileChatRowAvatar presence"}>
+                      {isGroup && c.avatar ? (
+                        <img src={c.avatar} alt="" />
+                      ) : !isGroup && other?.avatar ? (
+                        <img src={other.avatar} alt="" />
+                      ) : (
+                        <span>{initials(isGroup || isOfficial ? label : other?.username || "")}</span>
+                      )}
+                    </div>
+                  </AvatarAura>
                   {!isGroup && !isOfficial ? (
                     <span
                       className={online ? "avatarPresenceDot avatarPresenceDot--on" : "avatarPresenceDot"}
@@ -361,9 +366,11 @@ const Sidebar = forwardRef(function Sidebar(
                     className="mobileSearchResultBtn"
                     onClick={() => onStartChat(u.id)}
                   >
-                    <div className="avatarSm">
-                      {u.avatar ? <img src={u.avatar} alt="" /> : <span>{initials(u.username)}</span>}
-                    </div>
+                    <AvatarAura auraColor={u.auraColor}>
+                      <div className="avatarSm">
+                        {u.avatar ? <img src={u.avatar} alt="" /> : <span>{initials(u.username)}</span>}
+                      </div>
+                    </AvatarAura>
                     <span className="mobileSearchResultName">{u.username}</span>
                   </button>
                 ))}
@@ -384,9 +391,11 @@ const Sidebar = forwardRef(function Sidebar(
     <aside className="sidebar">
       <div className="sidebarHeader">
         <div className="meRow">
-          <div className="avatarSm" title={me.username}>
-            {me.avatar ? <img src={me.avatar} alt="" /> : <span>{initials(me.username)}</span>}
-          </div>
+          <AvatarAura auraColor={me?.auraColor}>
+            <div className="avatarSm" title={me.username}>
+              {me.avatar ? <img src={me.avatar} alt="" /> : <span>{initials(me.username)}</span>}
+            </div>
+          </AvatarAura>
           <div className="meName">{me.username}</div>
         </div>
       </div>
@@ -426,15 +435,17 @@ const Sidebar = forwardRef(function Sidebar(
               >
                 <div className="chatItemTop">
                   <div className="chatAvatarWrap">
-                    <div className={!isGroup && online ? "avatarSm presence online" : "avatarSm presence"}>
-                      {isGroup && c.avatar ? (
-                        <img src={c.avatar} alt="" />
-                      ) : !isGroup && other?.avatar ? (
-                        <img src={other.avatar} alt="" />
-                      ) : (
-                        <span>{initials(isGroup || isOfficial ? label : other?.username || "")}</span>
-                      )}
-                    </div>
+                    <AvatarAura skip={isGroup || isOfficial} auraColor={other?.auraColor}>
+                      <div className={!isGroup && online ? "avatarSm presence online" : "avatarSm presence"}>
+                        {isGroup && c.avatar ? (
+                          <img src={c.avatar} alt="" />
+                        ) : !isGroup && other?.avatar ? (
+                          <img src={other.avatar} alt="" />
+                        ) : (
+                          <span>{initials(isGroup || isOfficial ? label : other?.username || "")}</span>
+                        )}
+                      </div>
+                    </AvatarAura>
                     {!isGroup && !isOfficial ? (
                       <span
                         className={online ? "avatarPresenceDot avatarPresenceDot--on" : "avatarPresenceDot"}
@@ -499,9 +510,11 @@ const Sidebar = forwardRef(function Sidebar(
                 className="searchResult"
                 onClick={() => onStartChat(u.id)}
               >
-                <div className="avatarSm">
-                  {u.avatar ? <img src={u.avatar} alt="" /> : <span>{initials(u.username)}</span>}
-                </div>
+                <AvatarAura auraColor={u.auraColor}>
+                  <div className="avatarSm">
+                    {u.avatar ? <img src={u.avatar} alt="" /> : <span>{initials(u.username)}</span>}
+                  </div>
+                </AvatarAura>
                 <div>
                   <div className="searchUser">{u.username}</div>
                 </div>

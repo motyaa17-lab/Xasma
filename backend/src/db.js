@@ -154,6 +154,8 @@ async function initDb() {
   `);
   await query(`CREATE INDEX IF NOT EXISTS idx_message_reports_created ON message_reports (created_at DESC)`);
 
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS aura_color TEXT`);
+
   // Ensure initial admin (safe if user doesn't exist).
   await query(`UPDATE users SET role = 'admin' WHERE username = 'Xasma'`);
 }

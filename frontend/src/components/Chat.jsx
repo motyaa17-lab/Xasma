@@ -2,6 +2,7 @@ import React, { forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, us
 import { createPortal } from "react-dom";
 import { tf } from "../i18n.js";
 import { uploadChatImage, uploadChatAudio, uploadChatVideo, getApiBase, reportMessage } from "../api.js";
+import AvatarAura from "./AvatarAura.jsx";
 import GroupInfoModal from "./GroupInfoModal.jsx";
 import VoiceMessagePlayer from "./VoiceMessagePlayer.jsx";
 import CircleVideoMessage from "./CircleVideoMessage.jsx";
@@ -206,6 +207,7 @@ export default function Chat({
   lang,
   onMobileBack,
   sendRateLimitNotice = "",
+  meAuraColor,
 }) {
   const safeMessages = useMemo(() => {
     if (!Array.isArray(messages)) return [];
@@ -1958,13 +1960,15 @@ export default function Chat({
               ) : null}
               {isGroup ? (
                 <button type="button" className="chatHeaderGroupTap" onClick={() => setGroupInfoOpen(true)}>
-                  <div className="avatarSm">
-                    {chat?.avatar ? (
-                      <img src={chat.avatar} alt="" />
-                    ) : (
-                      <span>{initials(chat?.title || "")}</span>
-                    )}
-                  </div>
+                  <AvatarAura skip>
+                    <div className="avatarSm">
+                      {chat?.avatar ? (
+                        <img src={chat.avatar} alt="" />
+                      ) : (
+                        <span>{initials(chat?.title || "")}</span>
+                      )}
+                    </div>
+                  </AvatarAura>
                   <div className="chatHeaderInfo">
                     <div className="chatHeaderName">
                       <span className="chatHeaderTitleText">{chat?.title || t("groupChat")}</span>
@@ -1990,9 +1994,11 @@ export default function Chat({
                 </button>
               ) : isOfficial ? (
                 <div className="chatHeaderLeft">
-                  <div className="avatarSm" aria-hidden>
-                    <span>{initials(chat?.title || t("appTitle"))}</span>
-                  </div>
+                  <AvatarAura auraColor={chat?.other?.auraColor}>
+                    <div className="avatarSm" aria-hidden>
+                      <span>{initials(chat?.title || t("appTitle"))}</span>
+                    </div>
+                  </AvatarAura>
                   <div className="chatHeaderInfo">
                     <div className="chatHeaderName">{chat?.title || t("appTitle")}</div>
                     <div className="chatHeaderStatus muted">{t("officialChatSubtitle")}</div>
@@ -2000,18 +2006,20 @@ export default function Chat({
                 </div>
               ) : (
                 <div className="chatHeaderLeft">
-                  <button
-                    type="button"
-                    className="avatarSm avatarTapBtn"
-                    onClick={() => chat?.other?.id && setProfileUserId(Number(chat.other.id))}
-                    aria-label={t("profile")}
-                  >
-                    {chat?.other?.avatar ? (
-                      <img src={chat.other.avatar} alt="" />
-                    ) : (
-                      <span>{initials(chat?.other?.username || "")}</span>
-                    )}
-                  </button>
+                  <AvatarAura auraColor={chat?.other?.auraColor}>
+                    <button
+                      type="button"
+                      className="avatarSm avatarTapBtn"
+                      onClick={() => chat?.other?.id && setProfileUserId(Number(chat.other.id))}
+                      aria-label={t("profile")}
+                    >
+                      {chat?.other?.avatar ? (
+                        <img src={chat.other.avatar} alt="" />
+                      ) : (
+                        <span>{initials(chat?.other?.username || "")}</span>
+                      )}
+                    </button>
+                  </AvatarAura>
                   <div className="chatHeaderInfo">
                     <div className="chatHeaderName">{chat?.other?.username || ""}</div>
                     <div className="chatHeaderStatus">
@@ -2092,6 +2100,9 @@ export default function Chat({
                     (m.type || "text") !== "system";
                   const hasSecondaryActions = canEditOwn || canReport || canAdminDelete;
 
+                  const msgAura =
+                    (m.senderId === meId ? meAuraColor : m.sender?.auraColor) || undefined;
+
                   return (
                 <div
                   key={m.id}
@@ -2103,23 +2114,25 @@ export default function Chat({
                       : ""
                   }`}
                 >
-                  <button
-                    type="button"
-                    className="msgAvatar avatarTapBtn"
-                    title={m.sender?.username || ""}
-                    onClick={() => {
-                      const uid = Number(m.senderId);
-                      if (!uid || uid === Number(meId)) return;
-                      setProfileUserId(uid);
-                    }}
-                    aria-label={t("profile")}
-                  >
-                    {getAvatarSrc(m, meId, meAvatar) ? (
-                      <img src={getAvatarSrc(m, meId, meAvatar)} alt="" />
-                    ) : (
-                      <span>{initials(getDisplayName(m, meId, meUsername))}</span>
-                    )}
-                  </button>
+                  <AvatarAura auraColor={msgAura}>
+                    <button
+                      type="button"
+                      className="msgAvatar avatarTapBtn"
+                      title={m.sender?.username || ""}
+                      onClick={() => {
+                        const uid = Number(m.senderId);
+                        if (!uid || uid === Number(meId)) return;
+                        setProfileUserId(uid);
+                      }}
+                      aria-label={t("profile")}
+                    >
+                      {getAvatarSrc(m, meId, meAvatar) ? (
+                        <img src={getAvatarSrc(m, meId, meAvatar)} alt="" />
+                      ) : (
+                        <span>{initials(getDisplayName(m, meId, meUsername))}</span>
+                      )}
+                    </button>
+                  </AvatarAura>
                   <div
                     className={
                       (m.senderId === meId

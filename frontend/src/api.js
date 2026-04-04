@@ -70,14 +70,16 @@ export async function updateMyAvatar(avatar) {
   return data.user;
 }
 
-export async function updateMyProfile({ statusKind, statusText, about } = {}) {
+export async function updateMyProfile({ statusKind, statusText, about, auraColor } = {}) {
+  const body = {
+    statusKind: typeof statusKind === "string" ? statusKind : "",
+    statusText: typeof statusText === "string" ? statusText : "",
+    about: typeof about === "string" ? about : "",
+  };
+  if (auraColor !== undefined) body.auraColor = auraColor;
   const data = await apiFetch("/api/me/profile", {
     method: "PUT",
-    body: {
-      statusKind: typeof statusKind === "string" ? statusKind : "",
-      statusText: typeof statusText === "string" ? statusText : "",
-      about: typeof about === "string" ? about : "",
-    },
+    body,
   });
   return data.user;
 }

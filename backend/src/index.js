@@ -15,6 +15,24 @@ const { query, initDb, pool } = require("./db");
 const { scanOutgoingMessageText } = require("./messageSafety");
 const { checkSendRateLimit } = require("./sendRateLimit");
 
+const DEFAULT_AURA_COLOR = "#0096ff";
+
+function normalizeAuraColorApi(raw) {
+  if (raw == null || raw === "") return DEFAULT_AURA_COLOR;
+  const s = String(raw).trim();
+  return /^#[0-9a-fA-F]{6}$/.test(s) ? s.toLowerCase() : DEFAULT_AURA_COLOR;
+}
+
+function parseAuraColorBody(body) {
+  if (!body || !Object.prototype.hasOwnProperty.call(body, "auraColor")) {
+    return { ok: true, skip: true };
+  }
+  const v = typeof body.auraColor === "string" ? body.auraColor.trim() : "";
+  if (!v) return { ok: true, skip: false, value: null };
+  if (/^#[0-9a-fA-F]{6}$/.test(v)) return { ok: true, skip: false, value: v.toLowerCase() };
+  return { ok: false };
+}
+
 const PORT = process.env.PORT || 4000;
 const uploadsDir = path.join(__dirname, "..", "uploads");
 fs.mkdirSync(uploadsDir, { recursive: true });
@@ -337,8 +355,13 @@ function messageRowToApi(mr, reactions = []) {
   const sid = Number(mr.sender_id);
   const fromOfficial = botId && sid === botId;
   const sender = fromOfficial
-    ? { id: sid, username: "Xasma", avatar: "" }
-    : { id: sid, username: mr.username, avatar: mr.avatar_url };
+    ? { id: sid, username: "Xasma", avatar: "", auraColor: DEFAULT_AURA_COLOR }
+    : {
+        id: sid,
+        username: mr.username,
+        avatar: mr.avatar_url,
+        auraColor: normalizeAuraColorApi(mr.aura_color),
+      };
   const replyFromOfficial =
     botId && mr.reply_to_sender_id != null && Number(mr.reply_to_sender_id) === botId;
   return {
@@ -379,7 +402,7 @@ async function fetchMessageById(messageId) {
     `
       SELECT m.id, m.chat_id, m.sender_id, m.text, m.reply_to_message_id, m.delivered_at, m.read_at, m.edited_at, m.created_at,
              m.message_type, m.system_kind, m.system_payload, m.image_url, m.audio_url, m.video_url,
-             u.username, u.avatar_url,
+             u.username, u.avatar_url, u.aura_color,
              rm.sender_id AS reply_to_sender_id,
              ru.username AS reply_to_sender_username,
              rm.text AS reply_to_text,
@@ -487,7 +510,7 @@ app.post("/api/register", async (req, res) => {
 
   const password_hash = await bcrypt.hash(password, 10);
   const inserted = await query(
-    `INSERT INTO users (username, password_hash, avatar_url) VALUES ($1, $2, $3) RETURNING id, username, avatar_url, role, banned`,
+    `INSERT INTO users (username, password_hash, avatar_url) VALUES ($1, $2, $3) RETURNING id, username, avatar_url, role, banned, aura_color`,
     [uname, password_hash, avatar_url]
   );
   const user = inserted.rows[0];
@@ -505,6 +528,7 @@ app.post("/api/register", async (req, res) => {
       avatar: user.avatar_url,
       role: user.role,
       banned: Boolean(user.banned),
+      auraColor: normalizeAuraColorApi(user.aura_color),
     },
   });
 });
@@ -514,7 +538,7 @@ app.post("/api/login", async (req, res) => {
   if (!username || !password) return res.status(400).json({ error: "username and password are required" });
 
   const r = await query(
-    `SELECT id, username, password_hash, avatar_url, role, banned FROM users WHERE username = $1`,
+    `SELECT id, username, password_hash, avatar_url, role, banned, aura_color FROM users WHERE username = $1`,
     [username.trim()]
   );
   const user = r.rows[0];
@@ -539,6 +563,7 @@ app.post("/api/login", async (req, res) => {
       avatar: user.avatar_url,
       role: user.role,
       banned: Boolean(user.banned),
+      auraColor: normalizeAuraColorApi(user.aura_color),
     },
   });
 });
@@ -546,7 +571,7 @@ app.post("/api/login", async (req, res) => {
 app.get("/api/me", authRequired, (req, res) => {
   const uid = Number(req.user.id);
   return query(
-    `SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about FROM users WHERE id = $1`,
+    `SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about, aura_color FROM users WHERE id = $1`,
     [uid]
   ).then((r) => {
     const user = r.rows[0];
@@ -563,6 +588,7 @@ app.get("/api/me", authRequired, (req, res) => {
       statusKind: user.status_kind || "",
       statusText: user.status_text || "",
       about: user.about || "",
+      auraColor: normalizeAuraColorApi(user.aura_color),
     },
   });
   });
@@ -578,20 +604,35 @@ app.put("/api/me/profile", authRequired, (req, res) => {
   const statusText = statusTextRaw.length > 140 ? statusTextRaw.slice(0, 140) : statusTextRaw;
   const about = aboutRaw.length > 600 ? aboutRaw.slice(0, 600) : aboutRaw;
 
+  const auraParsed = parseAuraColorBody(req.body);
+  if (!auraParsed.ok) return res.status(400).json({ error: "Invalid aura color (use #RRGGBB)" });
+
   (async () => {
     const uid = Number(req.user.id);
-    await query(`UPDATE users SET status_kind = $1, status_text = $2, about = $3 WHERE id = $4`, [
-      statusKind || null,
-      statusText || null,
-      about || null,
-      uid,
-    ]);
+    if (auraParsed.skip) {
+      await query(`UPDATE users SET status_kind = $1, status_text = $2, about = $3 WHERE id = $4`, [
+        statusKind || null,
+        statusText || null,
+        about || null,
+        uid,
+      ]);
+    } else {
+      await query(`UPDATE users SET status_kind = $1, status_text = $2, about = $3, aura_color = $4 WHERE id = $5`, [
+        statusKind || null,
+        statusText || null,
+        about || null,
+        auraParsed.value,
+        uid,
+      ]);
+    }
     const r = await query(
-      `SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about FROM users WHERE id = $1`,
+      `SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about, aura_color FROM users WHERE id = $1`,
       [uid]
     );
     const user = r.rows[0];
     if (!user) return res.status(404).json({ error: "User not found" });
+    const auraColor = normalizeAuraColorApi(user.aura_color);
+    if (!auraParsed.skip) emitToAll("user:auraColor", { userId: uid, auraColor });
     return res.json({
       user: {
         id: Number(user.id),
@@ -604,6 +645,7 @@ app.put("/api/me/profile", authRequired, (req, res) => {
         statusKind: user.status_kind || "",
         statusText: user.status_text || "",
         about: user.about || "",
+        auraColor,
       },
     });
   })().catch(() => res.status(500).json({ error: "Server error" }));
@@ -673,7 +715,7 @@ app.get("/api/users", authRequired, (req, res) => {
     const uid = Number(req.user.id);
     const users = await query(
       `
-      SELECT id, username, avatar_url, is_online, last_seen_at, status_kind, status_text
+      SELECT id, username, avatar_url, aura_color, is_online, last_seen_at, status_kind, status_text
       FROM users
       WHERE id != $1
         AND username != $4
@@ -688,6 +730,7 @@ app.get("/api/users", authRequired, (req, res) => {
         id: Number(u.id),
         username: u.username,
         avatar: u.avatar_url,
+        auraColor: normalizeAuraColorApi(u.aura_color),
         isOnline: Boolean(u.is_online),
         lastSeenAt: u.last_seen_at,
         statusKind: u.status_kind || "",
@@ -708,6 +751,7 @@ app.get("/api/users/:userId", authRequired, (req, res) => {
           id: botId,
           username: "Xasma",
           avatar: "",
+          auraColor: DEFAULT_AURA_COLOR,
           isOnline: false,
           lastSeenAt: null,
           statusKind: "",
@@ -717,7 +761,7 @@ app.get("/api/users/:userId", authRequired, (req, res) => {
       });
     }
     const r = await query(
-      `SELECT id, username, avatar_url, is_online, last_seen_at, status_kind, status_text, about
+      `SELECT id, username, avatar_url, aura_color, is_online, last_seen_at, status_kind, status_text, about
        FROM users
        WHERE id = $1`,
       [uid]
@@ -729,6 +773,7 @@ app.get("/api/users/:userId", authRequired, (req, res) => {
         id: Number(u.id),
         username: u.username,
         avatar: u.avatar_url || "",
+        auraColor: normalizeAuraColorApi(u.aura_color),
         isOnline: Boolean(u.is_online),
         lastSeenAt: u.last_seen_at,
         statusKind: u.status_kind || "",
@@ -757,6 +802,7 @@ app.get("/api/chats", authRequired, (req, res) => {
         other.id AS other_id,
         other.username AS other_username,
         other.avatar_url AS other_avatar_url,
+        other.aura_color AS other_aura_color,
         other.is_online AS other_is_online,
         other.last_seen_at AS other_last_seen_at,
         lm.text AS last_text,
@@ -835,6 +881,7 @@ app.get("/api/chats", authRequired, (req, res) => {
                   id: botId || 0,
                   username: "Xasma",
                   avatar: "",
+                  auraColor: DEFAULT_AURA_COLOR,
                   isOnline: false,
                   lastSeenAt: null,
                 }
@@ -842,6 +889,7 @@ app.get("/api/chats", authRequired, (req, res) => {
                   id: Number(c.other_id),
                   username: c.other_username,
                   avatar: c.other_avatar_url,
+                  auraColor: normalizeAuraColorApi(c.other_aura_color),
                   isOnline: Boolean(c.other_is_online),
                   lastSeenAt: c.other_last_seen_at,
                 },
@@ -1193,6 +1241,7 @@ app.get("/api/chats/:chatId/messages", authRequired, (req, res) => {
       m.video_url,
       u.username,
       u.avatar_url,
+      u.aura_color,
       rm.sender_id AS reply_to_sender_id,
       ru.username AS reply_to_sender_username,
       rm.text AS reply_to_text,
@@ -1374,7 +1423,7 @@ app.put("/api/messages/:messageId", authRequired, (req, res) => {
       `
       SELECT m.id, m.chat_id, m.sender_id, m.text, m.delivered_at, m.read_at, m.edited_at, m.created_at,
              m.message_type, m.system_kind, m.system_payload, m.image_url, m.audio_url, m.video_url,
-             u.username, u.avatar_url
+             u.username, u.avatar_url, u.aura_color
       FROM messages m
       JOIN users u ON u.id = m.sender_id
       WHERE m.id = $1

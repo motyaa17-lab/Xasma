@@ -8,6 +8,8 @@ import {
   adminSetUserRole,
 } from "../api.js";
 import { DONATION_ALERTS_URL } from "../config/donation.js";
+import { DEFAULT_AURA_COLOR } from "../avatarAura.js";
+import AvatarAura from "./AvatarAura.jsx";
 
 function openDonationPage() {
   if (typeof window === "undefined") return;
@@ -201,6 +203,7 @@ export default function UserMenu({
   const [profileStatusKind, setProfileStatusKind] = useState("");
   const [profileStatusText, setProfileStatusText] = useState("");
   const [profileAbout, setProfileAbout] = useState("");
+  const [profileAuraColor, setProfileAuraColor] = useState(DEFAULT_AURA_COLOR);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaveError, setProfileSaveError] = useState("");
   const [adminUsers, setAdminUsers] = useState([]);
@@ -249,8 +252,9 @@ export default function UserMenu({
     setProfileStatusKind(String(me?.statusKind || ""));
     setProfileStatusText(String(me?.statusText || ""));
     setProfileAbout(String(me?.about || ""));
+    setProfileAuraColor(String(me?.auraColor || "").trim() || DEFAULT_AURA_COLOR);
     setProfileSaveError("");
-  }, [panel, me?.statusKind, me?.statusText, me?.about]);
+  }, [panel, me?.statusKind, me?.statusText, me?.about, me?.auraColor]);
 
   async function saveProfile() {
     if (!onChangeProfile) return;
@@ -261,6 +265,7 @@ export default function UserMenu({
         statusKind: profileStatusKind,
         statusText: profileStatusKind === "custom" ? profileStatusText : "",
         about: profileAbout,
+        auraColor: profileAuraColor,
       });
     } catch (e) {
       setProfileSaveError(e.message || "Failed");
@@ -486,13 +491,15 @@ export default function UserMenu({
               <div className="settingsModalList">
                 {avatarError ? <div className="authError">{avatarError}</div> : null}
                 <div className="settingsProfileHeader">
-                  <div className="settingsProfileAvatar">
-                    {avatarPreview || me?.avatar ? (
-                      <img src={avatarPreview || me.avatar} alt="" />
-                    ) : (
-                      <span>{initials(me?.username)}</span>
-                    )}
-                  </div>
+                  <AvatarAura auraColor={profileAuraColor}>
+                    <div className="settingsProfileAvatar">
+                      {avatarPreview || me?.avatar ? (
+                        <img src={avatarPreview || me.avatar} alt="" />
+                      ) : (
+                        <span>{initials(me?.username)}</span>
+                      )}
+                    </div>
+                  </AvatarAura>
                   <div className="settingsProfileMain">
                     <div className="settingsProfileName">{me?.username}</div>
                     <div className="settingsProfileStatus muted small">{statusLine}</div>
@@ -524,6 +531,35 @@ export default function UserMenu({
                     }}
                     disabled={avatarBusy}
                   />
+                </div>
+
+                <div className="settingsSection settingsSection--padded profileAuraSection">
+                  <div className="settingsTitle">{t("profileAuraLabel")}</div>
+                  <p className="muted small profileAuraHint">{t("profileAuraHint")}</p>
+                  <div className="profileAuraControls">
+                    <label className="profileAuraColorLabel">
+                      <span className="srOnly">{t("profileAuraLabel")}</span>
+                      <input
+                        type="color"
+                        className="profileAuraColorInput"
+                        value={profileAuraColor}
+                        onChange={(e) => setProfileAuraColor(e.target.value)}
+                      />
+                    </label>
+                    <div className="profileAuraPresets" role="list">
+                      {["#0096ff", "#a855f7", "#22c55e", "#f97316", "#ec4899", "#06b6d4"].map((hex) => (
+                        <button
+                          key={hex}
+                          type="button"
+                          className={`profileAuraPreset${profileAuraColor === hex ? " profileAuraPreset--active" : ""}`}
+                          style={{ background: hex }}
+                          onClick={() => setProfileAuraColor(hex)}
+                          title={hex}
+                          aria-label={hex}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="settingsSection">
@@ -886,13 +922,15 @@ export default function UserMenu({
             <div>
               {avatarError ? <div className="authError">{avatarError}</div> : null}
               <div className="profilePanel">
-                <div className="profileAvatar">
-                  {avatarPreview ? (
-                    <img src={avatarPreview} alt="" />
-                  ) : (
-                    <span>{initials(me.username)}</span>
-                  )}
-                </div>
+                <AvatarAura auraColor={profileAuraColor}>
+                  <div className="profileAvatar">
+                    {avatarPreview ? (
+                      <img src={avatarPreview} alt="" />
+                    ) : (
+                      <span>{initials(me.username)}</span>
+                    )}
+                  </div>
+                </AvatarAura>
 
                 <div className="profileInfo">
                   <div className="profileLabel">{t("username")}</div>
@@ -936,6 +974,35 @@ export default function UserMenu({
                 </button>
                 <div className="muted small profileLimitHint">
                   {t("maxAvatarHint")}
+                </div>
+              </div>
+
+              <div className="settingsSection profileAuraSection">
+                <div className="settingsTitle">{t("profileAuraLabel")}</div>
+                <p className="muted small profileAuraHint">{t("profileAuraHint")}</p>
+                <div className="profileAuraControls">
+                  <label className="profileAuraColorLabel">
+                    <span className="srOnly">{t("profileAuraLabel")}</span>
+                    <input
+                      type="color"
+                      className="profileAuraColorInput"
+                      value={profileAuraColor}
+                      onChange={(e) => setProfileAuraColor(e.target.value)}
+                    />
+                  </label>
+                  <div className="profileAuraPresets" role="list">
+                    {["#0096ff", "#a855f7", "#22c55e", "#f97316", "#ec4899", "#06b6d4"].map((hex) => (
+                      <button
+                        key={hex}
+                        type="button"
+                        className={`profileAuraPreset${profileAuraColor === hex ? " profileAuraPreset--active" : ""}`}
+                        style={{ background: hex }}
+                        onClick={() => setProfileAuraColor(hex)}
+                        title={hex}
+                        aria-label={hex}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
 

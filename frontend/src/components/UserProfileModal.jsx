@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { getUserById } from "../api.js";
+import AvatarAura from "./AvatarAura.jsx";
 
 function initials(name) {
   const s = String(name || "").trim();
@@ -58,9 +59,11 @@ export default function UserProfileModal({ open, userId, onClose, t }) {
           {err ? <div className="authError">{err}</div> : null}
           {user ? (
             <div className="profilePanel profilePanel--stack">
-              <div className="profileAvatar profileAvatar--lg">
-                {user.avatar ? <img src={user.avatar} alt="" /> : <span>{initials(user.username)}</span>}
-              </div>
+              <AvatarAura auraColor={user.auraColor}>
+                <div className="profileAvatar profileAvatar--lg">
+                  {user.avatar ? <img src={user.avatar} alt="" /> : <span>{initials(user.username)}</span>}
+                </div>
+              </AvatarAura>
               <div className="profileMain">
                 <div className="profileValue">{user.username}</div>
                 <div className="muted small">{renderStatusLine(user, t)}</div>
