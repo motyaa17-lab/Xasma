@@ -967,7 +967,7 @@ export default function Chat({
       return;
     }
     setChatOpening(true);
-    const t = window.setTimeout(() => setChatOpening(false), 420);
+    const t = window.setTimeout(() => setChatOpening(false), 450);
     return () => window.clearTimeout(t);
   }, [chatId, isMobileChat]);
 

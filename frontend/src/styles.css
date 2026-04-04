@@ -14,9 +14,11 @@
   --ease-tg-out: cubic-bezier(0.25, 0.82, 0.22, 1);
   --ease-tg-snappy: cubic-bezier(0.2, 0.88, 0.28, 1);
   --ease-tg-pop: cubic-bezier(0.34, 1.2, 0.42, 1);
-  --dur-chat-shell: 0.38s;
-  --dur-msg-in: 0.28s;
-  --dur-msg-own: 0.24s;
+  --ease-ui: ease;
+  --dur-ui: 0.2s;
+  --dur-chat-shell: 0.32s;
+  --dur-msg-in: 0.2s;
+  --dur-msg-own: 0.2s;
   --dur-menu: 0.24s;
   --dur-tap: 0.14s;
 }
@@ -79,6 +81,19 @@ body.body--mobileConversationOpen {
   overflow: hidden;
   height: 100%;
   max-height: 100%;
+}
+
+/* Subtle press on most buttons (excludes composer/media — they keep their own :active) */
+.appRoot button:not(:disabled):not(.noTapScale):not(.sendBtn):not(.videoCamBtn):not(.voiceMicBtn):not(.attachPhotoBtn):not(.msgMenuReactionBtn):not(.msgMenuBtn):not(.composerActionBtn),
+.appRoot [role="button"]:not([aria-disabled="true"]):not(.noTapScale) {
+  transition:
+    transform var(--dur-ui) var(--ease-ui),
+    opacity var(--dur-ui) var(--ease-ui);
+}
+
+.appRoot button:not(:disabled):not(.noTapScale):not(.sendBtn):not(.videoCamBtn):not(.voiceMicBtn):not(.attachPhotoBtn):not(.msgMenuReactionBtn):not(.msgMenuBtn):not(.composerActionBtn):active,
+.appRoot [role="button"]:not([aria-disabled="true"]):not(.noTapScale):active {
+  transform: scale(0.98);
 }
 
 .authWrap {
@@ -1360,55 +1375,45 @@ body.body--mobileConversationOpen {
 @keyframes chatShellIn {
   from {
     opacity: 0;
-    transform: translate3d(0, 22px, 0) scale(0.98);
+    transform: translate3d(0, 10px, 0);
   }
   to {
     opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
+    transform: translate3d(0, 0, 0);
   }
 }
 
-/* Scroll container: opacity only (no transform — avoids iOS scroll quirks) */
 @keyframes chatMessagesShellIn {
   from {
     opacity: 0;
+    transform: translate3d(0, 6px, 0);
   }
   to {
     opacity: 1;
+    transform: translate3d(0, 0, 0);
   }
 }
 
-@keyframes bubbleMessageIn {
+@keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translate3d(0, 18px, 0) scale(0.93);
+    transform: translate3d(0, 8px, 0);
   }
   to {
     opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
+    transform: translate3d(0, 0, 0);
   }
 }
 
-/* Outgoing: quick slide from the right + fade (Telegram-ish) */
-@keyframes bubbleMessageInOwn {
+/* Outgoing: slight slide from the right + fade (Telegram-ish, fast) */
+@keyframes fadeInUpOwn {
   from {
     opacity: 0;
-    transform: translate3d(22px, 12px, 0) scale(0.92);
+    transform: translate3d(10px, 4px, 0);
   }
   to {
     opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-}
-
-@keyframes systemMessageIn {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 12px, 0) scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
+    transform: translate3d(0, 0, 0);
   }
 }
 
@@ -1483,27 +1488,27 @@ body.body--mobileConversationOpen {
 }
 
 .chatMain--opening .chatHeader {
-  animation: chatShellIn var(--dur-chat-shell) var(--ease-tg-out) both;
+  animation: chatShellIn var(--dur-chat-shell) var(--ease-ui) both;
 }
 
 .chatMain--opening .messages {
-  animation: chatMessagesShellIn calc(var(--dur-chat-shell) * 0.85) var(--ease-tg-out) 0.05s both;
+  animation: chatMessagesShellIn calc(var(--dur-chat-shell) * 0.88) var(--ease-ui) 0.04s both;
 }
 
 .chatMain--opening .composer {
-  animation: chatShellIn var(--dur-chat-shell) var(--ease-tg-out) 0.07s both;
+  animation: chatShellIn var(--dur-chat-shell) var(--ease-ui) 0.06s both;
 }
 
 .bubbleRow--enter {
-  animation: bubbleMessageIn var(--dur-msg-in) var(--ease-tg-out) both;
+  animation: fadeInUp var(--dur-ui) var(--ease-ui) both;
 }
 
 .bubbleRow.me.bubbleRow--enterOwn {
-  animation: bubbleMessageInOwn var(--dur-msg-own) var(--ease-tg-snappy) both;
+  animation: fadeInUpOwn var(--dur-ui) var(--ease-ui) both;
 }
 
 .systemMessageRow--enter {
-  animation: systemMessageIn 0.26s var(--ease-tg-out) both;
+  animation: fadeInUp var(--dur-ui) var(--ease-ui) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1518,6 +1523,11 @@ body.body--mobileConversationOpen {
   .appShell--mobile .mobilePane:not(.mobilePane--conversation),
   .appShell--mobile .mobileChatShell {
     animation: none !important;
+  }
+
+  .appRoot button:not(:disabled):active,
+  .appRoot [role="button"]:active {
+    transform: none !important;
   }
 
   .msgMenuReactionBtn:active,
@@ -3663,7 +3673,7 @@ body.body--mobileConversationOpen {
 }
 
 .appShell--mobile .mobilePane:not(.mobilePane--conversation) {
-  animation: mobilePaneStackIn 0.4s var(--ease-tg-out) both;
+  animation: mobilePaneStackIn calc(var(--dur-chat-shell) * 0.9) var(--ease-ui) both;
 }
 
 .mobilePane--inbox {
@@ -4047,7 +4057,7 @@ body.body--mobileConversationOpen {
 }
 
 .appShell--mobile .mobileChatShell {
-  animation: mobileChatShellIn 0.36s var(--ease-tg-out) both;
+  animation: mobileChatShellIn var(--dur-chat-shell) var(--ease-ui) both;
 }
 
 .mobileChatShell .chatMain {
