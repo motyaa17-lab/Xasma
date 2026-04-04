@@ -21,6 +21,10 @@
   --dur-msg-own: 0.2s;
   --dur-menu: 0.24s;
   --dur-tap: 0.14s;
+  /* Subtle glows (dark UI — keep low alpha) */
+  --glow-focus: 0 0 0 1px rgba(59, 130, 246, 0.22), 0 0 10px rgba(0, 150, 255, 0.07);
+  --glow-active: 0 0 8px rgba(37, 99, 235, 0.16);
+  --shadow-avatar: 0 2px 10px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 * {
@@ -88,12 +92,14 @@ body.body--mobileConversationOpen {
 .appRoot [role="button"]:not([aria-disabled="true"]):not(.noTapScale) {
   transition:
     transform var(--dur-ui) var(--ease-ui),
-    opacity var(--dur-ui) var(--ease-ui);
+    opacity var(--dur-ui) var(--ease-ui),
+    box-shadow 0.2s var(--ease-ui);
 }
 
 .appRoot button:not(:disabled):not(.noTapScale):not(.sendBtn):not(.videoCamBtn):not(.voiceMicBtn):not(.attachPhotoBtn):not(.msgMenuReactionBtn):not(.msgMenuBtn):not(.composerActionBtn):active,
 .appRoot [role="button"]:not([aria-disabled="true"]):not(.noTapScale):active {
   transform: scale(0.98);
+  box-shadow: var(--glow-active);
 }
 
 .authWrap {
@@ -139,6 +145,7 @@ body.body--mobileConversationOpen {
 .seg.active {
   background: rgba(37, 99, 235, 0.25);
   border-color: rgba(37, 99, 235, 0.55);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2), 0 0 12px rgba(0, 130, 255, 0.08);
 }
 
 .authError {
@@ -167,6 +174,12 @@ body.body--mobileConversationOpen {
   background: var(--panel2);
   color: var(--text);
   outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.field input:focus-visible {
+  border-color: rgba(59, 130, 246, 0.42);
+  box-shadow: var(--glow-focus);
 }
 
 /* iOS Safari: prevent focus-zoom on inputs (<16px font). */
@@ -193,6 +206,7 @@ body.body--mobileConversationOpen {
   background: var(--primary);
   color: white;
   font-weight: 600;
+  transition: background 0.15s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.15s ease;
 }
 
 .primaryBtn:disabled {
@@ -286,6 +300,7 @@ body.body--mobileConversationOpen {
   border-radius: 10px;
   padding: 8px 12px;
   cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .userMenu {
@@ -309,6 +324,7 @@ body.body--mobileConversationOpen {
 .menuBtn.active {
   border-color: rgba(37, 99, 235, 0.55);
   background: rgba(37, 99, 235, 0.18);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.18), 0 0 12px rgba(0, 130, 255, 0.08);
 }
 
 .hamburger {
@@ -440,6 +456,7 @@ body.body--mobileConversationOpen {
   justify-content: center;
   overflow: hidden;
   flex: 0 0 auto;
+  box-shadow: var(--shadow-avatar);
 }
 
 .profileAvatar img {
@@ -620,6 +637,7 @@ body.body--mobileConversationOpen {
 .pillBtn.active {
   border-color: rgba(37, 99, 235, 0.55);
   background: rgba(37, 99, 235, 0.18);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2), 0 0 12px rgba(37, 99, 235, 0.1);
 }
 
 .themeGrid {
@@ -637,10 +655,12 @@ body.body--mobileConversationOpen {
   cursor: pointer;
   overflow: hidden;
   padding: 0;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .themeCard.active {
   border-color: rgba(37, 99, 235, 0.55);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.18), 0 0 14px rgba(37, 99, 235, 0.1);
 }
 
 .themePreview {
@@ -1230,6 +1250,7 @@ body.body--mobileConversationOpen {
   justify-content: center;
   overflow: hidden;
   flex: 0 0 auto;
+  box-shadow: var(--shadow-avatar);
 }
 
 .avatarSm img {
@@ -1252,6 +1273,12 @@ body.body--mobileConversationOpen {
   color: var(--text);
   outline: none;
   margin-bottom: 10px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.searchInput:focus-visible {
+  border-color: rgba(59, 130, 246, 0.42);
+  box-shadow: var(--glow-focus);
 }
 
 .searchResults {
@@ -1624,6 +1651,7 @@ body.body--mobileConversationOpen {
   justify-content: center;
   overflow: hidden;
   flex: 0 0 auto;
+  box-shadow: var(--shadow-avatar);
 }
 
 .avatarTapBtn {
@@ -2992,7 +3020,7 @@ body.body--mobileConversationOpen {
 
 .composerMain .composerInputShell:focus-within {
   border-color: rgba(59, 130, 246, 0.42);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18);
+  box-shadow: var(--glow-focus);
 }
 
 .composerMain .composerInputShell:has(.composerInput:disabled) {
@@ -3084,11 +3112,13 @@ body.body--mobileConversationOpen {
   transition:
     transform var(--dur-tap) var(--ease-tg-snappy),
     opacity 0.12s ease,
-    background 0.14s ease;
+    background 0.14s ease,
+    box-shadow 0.2s ease;
 }
 
 .sendBtn:not(:disabled):active {
   transform: scale(0.9);
+  box-shadow: var(--glow-active);
 }
 
 .sendBtn:disabled {
@@ -3794,11 +3824,13 @@ body.body--mobileConversationOpen {
   color: var(--text);
   font-size: 16px;
   outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
+.mobileChatSearch:focus-visible,
 .mobileChatSearch:focus {
   border-color: rgba(59, 130, 246, 0.45);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  box-shadow: var(--glow-focus);
 }
 
 .mobileChatListScroll {
@@ -3871,6 +3903,7 @@ body.body--mobileConversationOpen {
   border: 1px solid rgba(59, 130, 246, 0.25);
   font-weight: 800;
   font-size: 14px;
+  box-shadow: var(--shadow-avatar);
 }
 
 .mobileChatRowAvatarWrap {
@@ -4415,7 +4448,8 @@ body.body--mobileConversationOpen {
   transition:
     transform var(--dur-tap) var(--ease-tg-snappy),
     color 0.16s ease,
-    background 0.16s ease;
+    background 0.16s ease,
+    box-shadow 0.2s ease;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -4426,6 +4460,7 @@ body.body--mobileConversationOpen {
 .mobileNavItem--active {
   color: #bfdbfe;
   background: rgba(37, 99, 235, 0.18);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2), 0 0 12px rgba(0, 120, 255, 0.08);
 }
 
 .mobileNavIcon {
@@ -4706,6 +4741,13 @@ body.body--mobileConversationOpen {
   background: rgba(15, 23, 42, 0.65);
   color: var(--text);
   outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.settingsTextInput:focus-visible,
+.settingsTextArea:focus-visible {
+  border-color: rgba(59, 130, 246, 0.38);
+  box-shadow: var(--glow-focus);
 }
 
 .settingsTextArea {
@@ -4731,6 +4773,7 @@ body.body--mobileConversationOpen {
   overflow: hidden;
   background: rgba(37, 99, 235, 0.25);
   border: 2px solid rgba(59, 130, 246, 0.35);
+  box-shadow: var(--shadow-avatar);
   display: flex;
   align-items: center;
   justify-content: center;
