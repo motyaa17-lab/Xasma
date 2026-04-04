@@ -609,7 +609,7 @@ body.body--mobileConversationOpen {
 
 .themeGrid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 10px;
 }
 
@@ -632,16 +632,24 @@ body.body--mobileConversationOpen {
   height: 48px;
 }
 
-.themePreview.theme-ocean {
-  background: linear-gradient(180deg, rgba(37, 99, 235, 0.25), rgba(11, 18, 32, 0.55));
+.themePreview.theme-dark {
+  background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
 }
 
-.themePreview.theme-midnight {
-  background: radial-gradient(260px 120px at 30% 30%, rgba(37, 99, 235, 0.35), rgba(11, 18, 32, 0.75));
+.themePreview.theme-glass {
+  background: linear-gradient(180deg, rgba(148, 163, 184, 0.35) 0%, rgba(15, 23, 42, 0.85) 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
-.themePreview.theme-slate {
-  background: linear-gradient(180deg, rgba(148, 163, 184, 0.20), rgba(15, 23, 42, 0.65));
+.themePreview.theme-noise {
+  background-color: #020617;
+  background-image: linear-gradient(180deg, #0f172a, #020617),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E");
+  background-size: auto, 48px 48px;
+}
+
+.themePreview.theme-night {
+  background: linear-gradient(168deg, #0a0f1e 0%, #1e1b4b 45%, #312e81 100%);
 }
 
 .themeLabel {
@@ -1263,19 +1271,80 @@ body.body--mobileConversationOpen {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: rgba(17, 27, 46, 0.25);
+  position: relative;
+  isolation: isolate;
+  /* Fallback if theme class missing */
+  background: linear-gradient(180deg, #0f172a, #020617);
 }
 
+/* Chat column only — Telegram-like dark; bubbles unchanged */
+.chatTheme-dark.chatMain {
+  background: linear-gradient(180deg, #0f172a 0%, #0a0f1a 55%, #020617 100%);
+}
+
+/* Soft glass: frosted layer + cool tint (backdrop blurs shell behind column) */
+.chatTheme-glass.chatMain {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.72) 0%, rgba(2, 6, 23, 0.92) 100%);
+  backdrop-filter: blur(22px) saturate(1.12);
+  -webkit-backdrop-filter: blur(22px) saturate(1.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.chatTheme-glass.chatMain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.05) 0%, transparent 45%, rgba(59, 130, 246, 0.04) 100%);
+  border-radius: inherit;
+}
+
+.chatTheme-glass.chatMain > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Subtle grain — dark base + soft noise tile */
+.chatTheme-noise.chatMain {
+  background-color: #020617;
+  background-image: linear-gradient(180deg, #0f172a 0%, #020617 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='a'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23a)' opacity='0.35'/%3E%3C/svg%3E");
+  background-blend-mode: normal, soft-light;
+  background-size: auto, 180px 180px;
+}
+
+.chatTheme-noise.chatMain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.45;
+  background-image: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(148, 163, 184, 0.06), transparent 55%);
+}
+
+.chatTheme-noise.chatMain > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Night blue / purple */
+.chatTheme-night.chatMain {
+  background: linear-gradient(168deg, #0a0f1e 0%, #1e1b4b 42%, #312e81 78%, #1e1033 100%);
+}
+
+/* Legacy IDs (class may still exist on old cached HTML) */
 .chatTheme-ocean {
-  background: linear-gradient(180deg, rgba(17, 27, 46, 0.35), rgba(11, 18, 32, 0.55));
+  background: linear-gradient(180deg, #0f172a 0%, #0a0f1a 55%, #020617 100%);
 }
 
 .chatTheme-midnight {
-  background: radial-gradient(1200px 700px at 20% 10%, rgba(37, 99, 235, 0.20), rgba(11, 18, 32, 0.72) 60%);
+  background: linear-gradient(168deg, #0a0f1e 0%, #1e1b4b 42%, #312e81 78%, #1e1033 100%);
 }
 
 .chatTheme-slate {
-  background: linear-gradient(180deg, rgba(31, 41, 55, 0.35), rgba(15, 23, 42, 0.65));
+  background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
 }
 
 .emptyState {

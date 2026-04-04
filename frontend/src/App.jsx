@@ -39,15 +39,17 @@ export default function App() {
     try {
       const raw = localStorage.getItem("settings");
       const parsed = raw ? JSON.parse(raw) : {};
+      const allowed = new Set(["dark", "glass", "noise", "night"]);
+      const legacy = { ocean: "dark", midnight: "night", slate: "dark" };
+      const rawTheme = typeof parsed.chatTheme === "string" ? parsed.chatTheme : "dark";
+      const chatTheme = allowed.has(rawTheme) ? rawTheme : legacy[rawTheme] || "dark";
       return {
         lang: parsed.lang === "ru" ? "ru" : "en",
-        chatTheme: ["ocean", "midnight", "slate"].includes(parsed.chatTheme)
-          ? parsed.chatTheme
-          : "ocean",
+        chatTheme,
         messageNotificationsEnabled: Boolean(parsed.messageNotificationsEnabled),
       };
     } catch {
-      return { lang: "en", chatTheme: "ocean", messageNotificationsEnabled: false };
+      return { lang: "en", chatTheme: "dark", messageNotificationsEnabled: false };
     }
   });
 

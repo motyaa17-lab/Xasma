@@ -236,9 +236,10 @@ export const translations = {
     lastSeenAt: "Last seen {time}",
     typing: "Typing...",
 
-    ocean: "Ocean",
-    midnight: "Midnight",
-    slate: "Slate",
+    themeDark: "Dark",
+    themeGlass: "Glass",
+    themeNoise: "Noise",
+    themeNight: "Night",
 
     maxAvatarHint: "Max 3MB. (Stored in SQLite as base64 for now.)",
   },
@@ -481,9 +482,10 @@ export const translations = {
     lastSeenAt: "Был(а) {time}",
     typing: "Печатает...",
 
-    ocean: "Океан",
-    midnight: "Полночь",
-    slate: "Сланец",
+    themeDark: "Тёмный",
+    themeGlass: "Стекло",
+    themeNoise: "Зернистость",
+    themeNight: "Ночь",
 
     maxAvatarHint: "До 3MB. (Сохраняется в SQLite в base64.)",
   },

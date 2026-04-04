@@ -18,6 +18,12 @@ function openDonationPage() {
   window.open(DONATION_ALERTS_URL, "_blank", "noopener,noreferrer");
 }
 
+function chatThemeLabel(t, id) {
+  const key =
+    { dark: "themeDark", glass: "themeGlass", noise: "themeNoise", night: "themeNight" }[id] || "themeDark";
+  return t(key);
+}
+
 function AdminMessageReportsSection({ t, items, loading, onRefresh }) {
   return (
     <div className="adminMessageReportsBox">
@@ -443,7 +449,7 @@ export default function UserMenu({
           <div className="settingsSection">
             <SettingsRow
               label={t("settingsCurrentBackground")}
-              right={t(settings?.chatTheme || "ocean")}
+              right={chatThemeLabel(t, settings?.chatTheme || "dark")}
               onClick={() => setPanel("chatBackground")}
             />
           </div>
@@ -710,9 +716,10 @@ export default function UserMenu({
               <div className="settingsModalList">
                 <div className="settingsSection">
                   {[
-                    { id: "ocean", label: t("ocean") },
-                    { id: "midnight", label: t("midnight") },
-                    { id: "slate", label: t("slate") },
+                    { id: "dark", label: t("themeDark") },
+                    { id: "glass", label: t("themeGlass") },
+                    { id: "noise", label: t("themeNoise") },
+                    { id: "night", label: t("themeNight") },
                   ].map((theme) => (
                     <SettingsChoiceRow
                       key={theme.id}
@@ -1106,9 +1113,10 @@ export default function UserMenu({
                 <div className="settingsTitle">{t("chatBackground")}</div>
                 <div className="themeGrid">
                   {[
-                    { id: "ocean", label: t("ocean") },
-                    { id: "midnight", label: t("midnight") },
-                    { id: "slate", label: t("slate") },
+                    { id: "dark", label: t("themeDark") },
+                    { id: "glass", label: t("themeGlass") },
+                    { id: "noise", label: t("themeNoise") },
+                    { id: "night", label: t("themeNight") },
                   ].map((theme) => (
                     <button
                       key={theme.id}
