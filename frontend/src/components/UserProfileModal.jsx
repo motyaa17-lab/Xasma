@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { getUserById } from "../api.js";
 import AvatarAura from "./AvatarAura.jsx";
 import { formatUserStatusLine } from "../userStatusLine.js";
+import ActivityBadge from "./ActivityBadge.jsx";
 
 function initials(name) {
   const s = String(name || "").trim();
@@ -56,7 +57,10 @@ export default function UserProfileModal({ open, userId, onClose, t, lang = "en"
                 </div>
               </AvatarAura>
               <div className="profileMain">
-                <div className="profileValue">{user.username}</div>
+                <div className="profileValue">
+                  {user.username}
+                  <ActivityBadge messageCount={user.messageCount} t={t} />
+                </div>
                 <div className="muted small">{formatUserStatusLine(user, t, lang)}</div>
                 {String(user.about || "").trim() ? (
                   <div className="profileAbout">{String(user.about || "").trim()}</div>

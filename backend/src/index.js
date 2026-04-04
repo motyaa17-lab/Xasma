@@ -355,12 +355,13 @@ function messageRowToApi(mr, reactions = []) {
   const sid = Number(mr.sender_id);
   const fromOfficial = botId && sid === botId;
   const sender = fromOfficial
-    ? { id: sid, username: "Xasma", avatar: "", auraColor: DEFAULT_AURA_COLOR }
+    ? { id: sid, username: "Xasma", avatar: "", auraColor: DEFAULT_AURA_COLOR, messageCount: 0 }
     : {
         id: sid,
         username: mr.username,
         avatar: mr.avatar_url,
         auraColor: normalizeAuraColorApi(mr.aura_color),
+        messageCount: Math.max(0, Number(mr.messages_sent_count) || 0),
       };
   const replyFromOfficial =
     botId && mr.reply_to_sender_id != null && Number(mr.reply_to_sender_id) === botId;
@@ -402,7 +403,7 @@ async function fetchMessageById(messageId) {
     `
       SELECT m.id, m.chat_id, m.sender_id, m.text, m.reply_to_message_id, m.delivered_at, m.read_at, m.edited_at, m.created_at,
              m.message_type, m.system_kind, m.system_payload, m.image_url, m.audio_url, m.video_url,
-             u.username, u.avatar_url, u.aura_color,
+             u.username, u.avatar_url, u.aura_color, u.messages_sent_count,
              rm.sender_id AS reply_to_sender_id,
              ru.username AS reply_to_sender_username,
              rm.text AS reply_to_text,
@@ -479,6 +480,14 @@ async function insertChatMessageAndBroadcast(chatId, senderId, bodyText, imageUr
     ]
   );
   const insertedId = Number(inserted.rows[0].id);
+
+  const inc = await query(
+    `UPDATE users SET messages_sent_count = messages_sent_count + 1 WHERE id = $1 RETURNING messages_sent_count`,
+    [senderId]
+  );
+  const newMessageCount = Math.max(0, Number(inc.rows[0]?.messages_sent_count) || 0);
+  emitToAll("user:messageCount", { userId: Number(senderId), messageCount: newMessageCount });
+
   const message = await fetchMessageById(insertedId);
   await emitToChatMemberSockets(chatId, "chat:message", message);
 
@@ -529,6 +538,7 @@ app.post("/api/register", async (req, res) => {
       role: user.role,
       banned: Boolean(user.banned),
       auraColor: normalizeAuraColorApi(user.aura_color),
+      messageCount: 0,
     },
   });
 });
@@ -538,7 +548,7 @@ app.post("/api/login", async (req, res) => {
   if (!username || !password) return res.status(400).json({ error: "username and password are required" });
 
   const r = await query(
-    `SELECT id, username, password_hash, avatar_url, role, banned, aura_color FROM users WHERE username = $1`,
+    `SELECT id, username, password_hash, avatar_url, role, banned, aura_color, messages_sent_count FROM users WHERE username = $1`,
     [username.trim()]
   );
   const user = r.rows[0];
@@ -564,6 +574,7 @@ app.post("/api/login", async (req, res) => {
       role: user.role,
       banned: Boolean(user.banned),
       auraColor: normalizeAuraColorApi(user.aura_color),
+      messageCount: Math.max(0, Number(user.messages_sent_count) || 0),
     },
   });
 });
@@ -571,7 +582,7 @@ app.post("/api/login", async (req, res) => {
 app.get("/api/me", authRequired, (req, res) => {
   const uid = Number(req.user.id);
   return query(
-    `SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about, aura_color FROM users WHERE id = $1`,
+    `SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about, aura_color, messages_sent_count FROM users WHERE id = $1`,
     [uid]
   ).then((r) => {
     const user = r.rows[0];
@@ -589,6 +600,7 @@ app.get("/api/me", authRequired, (req, res) => {
       statusText: user.status_text || "",
       about: user.about || "",
       auraColor: normalizeAuraColorApi(user.aura_color),
+      messageCount: Math.max(0, Number(user.messages_sent_count) || 0),
     },
   });
   });
@@ -626,7 +638,7 @@ app.put("/api/me/profile", authRequired, (req, res) => {
       ]);
     }
     const r = await query(
-      `SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about, aura_color FROM users WHERE id = $1`,
+      `SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about, aura_color, messages_sent_count FROM users WHERE id = $1`,
       [uid]
     );
     const user = r.rows[0];
@@ -651,6 +663,7 @@ app.put("/api/me/profile", authRequired, (req, res) => {
         statusText: user.status_text || "",
         about: user.about || "",
         auraColor,
+        messageCount: Math.max(0, Number(user.messages_sent_count) || 0),
       },
     });
   })().catch(() => res.status(500).json({ error: "Server error" }));
@@ -720,7 +733,7 @@ app.get("/api/users", authRequired, (req, res) => {
     const uid = Number(req.user.id);
     const users = await query(
       `
-      SELECT id, username, avatar_url, aura_color, is_online, last_seen_at, status_kind, status_text
+      SELECT id, username, avatar_url, aura_color, is_online, last_seen_at, status_kind, status_text, messages_sent_count
       FROM users
       WHERE id != $1
         AND username != $4
@@ -740,6 +753,7 @@ app.get("/api/users", authRequired, (req, res) => {
         lastSeenAt: u.last_seen_at,
         statusKind: u.status_kind || "",
         statusText: u.status_text || "",
+        messageCount: Math.max(0, Number(u.messages_sent_count) || 0),
       })),
     });
   })().catch(() => res.status(500).json({ error: "Server error" }));
@@ -762,11 +776,12 @@ app.get("/api/users/:userId", authRequired, (req, res) => {
           statusKind: "",
           statusText: "",
           about: "",
+          messageCount: 0,
         },
       });
     }
     const r = await query(
-      `SELECT id, username, avatar_url, aura_color, is_online, last_seen_at, status_kind, status_text, about
+      `SELECT id, username, avatar_url, aura_color, is_online, last_seen_at, status_kind, status_text, about, messages_sent_count
        FROM users
        WHERE id = $1`,
       [uid]
@@ -784,6 +799,7 @@ app.get("/api/users/:userId", authRequired, (req, res) => {
         statusKind: u.status_kind || "",
         statusText: u.status_text || "",
         about: u.about || "",
+        messageCount: Math.max(0, Number(u.messages_sent_count) || 0),
       },
     });
   })().catch(() => res.status(500).json({ error: "Server error" }));
@@ -812,6 +828,7 @@ app.get("/api/chats", authRequired, (req, res) => {
         other.last_seen_at AS other_last_seen_at,
         other.status_kind AS other_status_kind,
         other.status_text AS other_status_text,
+        other.messages_sent_count AS other_messages_sent_count,
         lm.text AS last_text,
         lm.created_at AS last_created_at,
         lm.sender_id AS last_sender_id,
@@ -891,6 +908,9 @@ app.get("/api/chats", authRequired, (req, res) => {
                   auraColor: DEFAULT_AURA_COLOR,
                   isOnline: false,
                   lastSeenAt: null,
+                  statusKind: "",
+                  statusText: "",
+                  messageCount: 0,
                 }
               : {
                   id: Number(c.other_id),
@@ -901,6 +921,7 @@ app.get("/api/chats", authRequired, (req, res) => {
                   lastSeenAt: c.other_last_seen_at,
                   statusKind: c.other_status_kind || "",
                   statusText: c.other_status_text || "",
+                  messageCount: Math.max(0, Number(c.other_messages_sent_count) || 0),
                 },
           last: c.last_text
             ? { text: c.last_text, createdAt: c.last_created_at, senderId: Number(c.last_sender_id) }
@@ -988,7 +1009,7 @@ app.get("/api/groups/:chatId", authRequired, (req, res) => {
 
     const members = await query(
       `
-      SELECT u.id, u.username, u.avatar_url, u.is_online, u.last_seen_at
+      SELECT u.id, u.username, u.avatar_url, u.is_online, u.last_seen_at, u.messages_sent_count
       FROM chat_members cm
       JOIN users u ON u.id = cm.user_id
       WHERE cm.chat_id = $1
@@ -1017,6 +1038,7 @@ app.get("/api/groups/:chatId", authRequired, (req, res) => {
         isOnline: Boolean(u.is_online),
         lastSeenAt: u.last_seen_at,
         isCreator: Number(u.id) === createdBy,
+        messageCount: Math.max(0, Number(u.messages_sent_count) || 0),
       })),
     });
   })().catch(() => res.status(500).json({ error: "Server error" }));
@@ -1251,6 +1273,7 @@ app.get("/api/chats/:chatId/messages", authRequired, (req, res) => {
       u.username,
       u.avatar_url,
       u.aura_color,
+      u.messages_sent_count,
       rm.sender_id AS reply_to_sender_id,
       ru.username AS reply_to_sender_username,
       rm.text AS reply_to_text,
@@ -1432,7 +1455,7 @@ app.put("/api/messages/:messageId", authRequired, (req, res) => {
       `
       SELECT m.id, m.chat_id, m.sender_id, m.text, m.delivered_at, m.read_at, m.edited_at, m.created_at,
              m.message_type, m.system_kind, m.system_payload, m.image_url, m.audio_url, m.video_url,
-             u.username, u.avatar_url, u.aura_color
+             u.username, u.avatar_url, u.aura_color, u.messages_sent_count
       FROM messages m
       JOIN users u ON u.id = m.sender_id
       WHERE m.id = $1
@@ -1596,7 +1619,7 @@ app.get("/api/admin/users", authRequired, requireAdmin, (req, res) => {
   (async () => {
     const r = await query(
       `
-      SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, created_at
+      SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, created_at, messages_sent_count
       FROM users
       WHERE username != $1
       ORDER BY created_at DESC, id DESC
@@ -1613,6 +1636,7 @@ app.get("/api/admin/users", authRequired, requireAdmin, (req, res) => {
         is_online: Boolean(u.is_online),
         last_seen_at: u.last_seen_at,
         created_at: u.created_at,
+        messageCount: Math.max(0, Number(u.messages_sent_count) || 0),
       })),
     });
   })().catch(() => res.status(500).json({ error: "Server error" }));

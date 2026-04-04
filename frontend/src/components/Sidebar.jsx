@@ -1,6 +1,7 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import AvatarAura from "./AvatarAura.jsx";
 import { formatUserStatusLine } from "../userStatusLine.js";
+import ActivityBadge from "./ActivityBadge.jsx";
 
 const Sidebar = forwardRef(function Sidebar(
   {
@@ -336,6 +337,9 @@ const Sidebar = forwardRef(function Sidebar(
                         {isOfficial ? (
                           <span className="officialChatListBadge">{t("officialChatBadge")}</span>
                         ) : null}
+                        {!isGroup && !isOfficial ? (
+                          <ActivityBadge messageCount={other?.messageCount} t={t} />
+                        ) : null}
                       </span>
                       {!isGroup && !isOfficial && statusSubtitle ? (
                         <span className="mobileChatRowStatus muted" title={statusSubtitle}>
@@ -406,7 +410,10 @@ const Sidebar = forwardRef(function Sidebar(
               {me.avatar ? <img src={me.avatar} alt="" /> : <span>{initials(me.username)}</span>}
             </div>
           </AvatarAura>
-          <div className="meName">{me.username}</div>
+          <div className="meName">
+            {me.username}
+            <ActivityBadge messageCount={me?.messageCount} t={t} />
+          </div>
         </div>
       </div>
 
@@ -472,6 +479,9 @@ const Sidebar = forwardRef(function Sidebar(
                         {label}
                         {isOfficial ? (
                           <span className="officialChatListBadge">{t("officialChatBadge")}</span>
+                        ) : null}
+                        {!isGroup && !isOfficial ? (
+                          <ActivityBadge messageCount={other?.messageCount} t={t} />
                         ) : null}
                       </div>
                     </div>

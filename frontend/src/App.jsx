@@ -399,6 +399,25 @@ export default function App() {
       );
     });
 
+    socket.on("user:messageCount", ({ userId, messageCount } = {}) => {
+      const uid = Number(userId);
+      if (!uid) return;
+      const mc = Math.max(0, Number(messageCount) || 0);
+      setMe((prev) => (prev && prev.id === uid ? { ...prev, messageCount: mc } : prev));
+      setChats((prev) =>
+        prev.map((c) =>
+          c.other?.id === uid ? { ...c, other: { ...c.other, messageCount: mc } } : c
+        )
+      );
+      setMessages((prev) =>
+        prev.map((m) =>
+          Number(m.senderId) === uid && m.sender
+            ? { ...m, sender: { ...m.sender, messageCount: mc } }
+            : m
+        )
+      );
+    });
+
     socket.on("chat:sendRateLimited", ({ retryAfterMs } = {}) => {
       const sec = Math.max(1, Math.ceil(Number(retryAfterMs || 10_000) / 1000));
       const lang = settingsRef.current?.lang === "ru" ? "ru" : "en";
@@ -423,6 +442,7 @@ export default function App() {
       socket.off("group:avatarUpdated");
       socket.off("user:auraColor");
       socket.off("user:profileStatus");
+      socket.off("user:messageCount");
       socket.off("chat:sendRateLimited");
       socket.disconnect();
     };

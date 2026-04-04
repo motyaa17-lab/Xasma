@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { addGroupMember, getGroup, patchGroupAvatar, removeGroupMember, searchUsers } from "../api.js";
+import ActivityBadge from "./ActivityBadge.jsx";
 
 export default function GroupInfoModal({
   open,
@@ -267,7 +268,10 @@ export default function GroupInfoModal({
                       </div>
                       <div className="groupMemberMain">
                         <div className="groupMemberNameRow">
-                          <span className="groupMemberName">{m.username}</span>
+                          <span className="groupMemberName">
+                            {m.username}
+                            <ActivityBadge messageCount={m.messageCount} t={t} />
+                          </span>
                           {m.isCreator ? <span className="creatorBadge">{t("groupCreator")}</span> : null}
                         </div>
                         <div className="muted small">{memberPresenceLine(m, t, lang)}</div>

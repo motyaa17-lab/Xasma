@@ -446,6 +446,23 @@ body.body--mobileConversationOpen {
 .profileValue {
   font-size: 16px;
   font-weight: 800;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35em;
+}
+
+.activityBadge {
+  font-size: 0.82em;
+  font-weight: 800;
+  color: rgba(148, 163, 184, 0.95);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.activityBadge--legendary {
+  color: #fbbf24;
+  text-shadow: 0 0 10px rgba(251, 191, 36, 0.4);
 }
 
 .profileHint {
@@ -662,6 +679,11 @@ body.body--mobileConversationOpen {
 
 .meName {
   font-weight: 700;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35em;
+  min-width: 0;
 }
 
 .sidebarSection {
@@ -755,9 +777,11 @@ body.body--mobileConversationOpen {
   font-weight: 700;
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35em;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .chatOtherNameRow {
@@ -867,6 +891,11 @@ body.body--mobileConversationOpen {
 
 .chatHeaderName {
   font-weight: 900;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35em;
+  min-width: 0;
 }
 
 .chatHeaderTitleText {
@@ -1057,6 +1086,11 @@ body.body--mobileConversationOpen {
 
 .groupMemberName {
   font-weight: 800;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35em;
+  min-width: 0;
 }
 
 .creatorBadge {
@@ -1929,6 +1963,10 @@ body.body--mobileConversationOpen {
   font-weight: 700;
   color: rgba(229, 231, 235, 0.88);
   margin-bottom: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35em;
 }
 
 .systemMessageRow {
@@ -4414,9 +4452,12 @@ body.body--mobileConversationOpen {
   font-size: 16px;
   font-weight: 800;
   line-height: 1.2;
-  white-space: nowrap;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35em;
+  min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .settingsTopStatus {

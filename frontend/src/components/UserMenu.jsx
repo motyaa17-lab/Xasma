@@ -11,6 +11,7 @@ import { DONATION_ALERTS_URL } from "../config/donation.js";
 import { DEFAULT_AURA_COLOR } from "../avatarAura.js";
 import { USER_STATUS_TEXT_MAX } from "../userStatusLine.js";
 import AvatarAura from "./AvatarAura.jsx";
+import ActivityBadge from "./ActivityBadge.jsx";
 
 function openDonationPage() {
   if (typeof window === "undefined") return;
@@ -407,7 +408,10 @@ export default function UserMenu({
             {me?.avatar ? <img src={me.avatar} alt="" /> : <span>{initials(me?.username)}</span>}
           </span>
           <span className="settingsTopMain">
-            <span className="settingsTopName">{me?.username}</span>
+            <span className="settingsTopName">
+              {me?.username}
+              <ActivityBadge messageCount={me?.messageCount} t={t} />
+            </span>
             <span className="settingsTopStatus">{statusLine}</span>
           </span>
           <span className="settingsTopChevron" aria-hidden>
@@ -938,7 +942,10 @@ export default function UserMenu({
 
                 <div className="profileInfo">
                   <div className="profileLabel">{t("username")}</div>
-                  <div className="profileValue">{me.username}</div>
+                  <div className="profileValue">
+                    {me.username}
+                    <ActivityBadge messageCount={me?.messageCount} t={t} />
+                  </div>
                   <div className="profileHint muted small">
                     {me?.isOnline ? t("online") : me?.lastSeenAt ? t("lastSeenAt").replace("{time}", formatLastSeen(me.lastSeenAt, settings?.lang)) : t("lastSeen")}
                   </div>

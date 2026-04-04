@@ -155,6 +155,20 @@ async function initDb() {
   await query(`CREATE INDEX IF NOT EXISTS idx_message_reports_created ON message_reports (created_at DESC)`);
 
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS aura_color TEXT`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS messages_sent_count BIGINT NOT NULL DEFAULT 0`);
+
+  // Backfill message counts from existing text messages (system messages excluded).
+  await query(`
+    UPDATE users u
+    SET messages_sent_count = COALESCE(s.cnt, 0)
+    FROM (
+      SELECT sender_id, COUNT(*)::bigint AS cnt
+      FROM messages
+      WHERE COALESCE(message_type, 'text') = 'text'
+      GROUP BY sender_id
+    ) s
+    WHERE u.id = s.sender_id
+  `);
 
   // Ensure initial admin (safe if user doesn't exist).
   await query(`UPDATE users SET role = 'admin' WHERE username = 'Xasma'`);

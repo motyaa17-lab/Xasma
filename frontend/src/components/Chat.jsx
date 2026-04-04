@@ -6,6 +6,7 @@ import GroupInfoModal from "./GroupInfoModal.jsx";
 import VoiceMessagePlayer from "./VoiceMessagePlayer.jsx";
 import CircleVideoMessage from "./CircleVideoMessage.jsx";
 import UserProfileModal from "./UserProfileModal.jsx";
+import ActivityBadge from "./ActivityBadge.jsx";
 import { formatUserStatusLine } from "../userStatusLine.js";
 
 const MAX_VIDEO_NOTE_SEC = 60;
@@ -2022,7 +2023,10 @@ export default function Chat({
                     </button>
                   </AvatarAura>
                   <div className="chatHeaderInfo">
-                    <div className="chatHeaderName">{chat?.other?.username || ""}</div>
+                    <div className="chatHeaderName">
+                      {chat?.other?.username || ""}
+                      <ActivityBadge messageCount={chat?.other?.messageCount} t={t} />
+                    </div>
                     <div className="chatHeaderStatus">
                       {otherTyping ? t("typing") : formatUserStatusLine(chat?.other, t, lang)}
                     </div>
@@ -2245,7 +2249,10 @@ export default function Chat({
                       </div>
                     ) : null}
                     {isGroup ? (
-                      <div className="msgSenderName">{m.sender?.username || "?"}</div>
+                      <div className="msgSenderName">
+                        {m.sender?.username || "?"}
+                        <ActivityBadge messageCount={m.sender?.messageCount} t={t} />
+                      </div>
                     ) : null}
                     {m.replyTo ? (
                       <div className="replyBlock" aria-label={t("replyTo")}>
