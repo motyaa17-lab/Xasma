@@ -13,6 +13,7 @@ const { Server } = require("socket.io");
 
 const { query, initDb, pool } = require("./db");
 const { scanOutgoingMessageText } = require("./messageSafety");
+const { checkSendRateLimit } = require("./sendRateLimit");
 
 const PORT = process.env.PORT || 4000;
 const uploadsDir = path.join(__dirname, "..", "uploads");
@@ -1142,6 +1143,16 @@ app.post("/api/chats/:chatId/messages", authRequired, (req, res) => {
     if (chat.type === "official") return res.status(403).json({ error: "Cannot send messages in this chat" });
     if (!(await isUserChatMember(chatId, uid))) return res.status(403).json({ error: "Not a member of this chat" });
 
+    const rate = checkSendRateLimit(uid);
+    if (!rate.allowed) {
+      const ra = Math.max(1, Math.ceil(rate.retryAfterMs / 1000));
+      res.setHeader("Retry-After", String(ra));
+      return res.status(429).json({
+        error: "Too many messages. Try again in a few seconds.",
+        retryAfterMs: Math.ceil(rate.retryAfterMs),
+      });
+    }
+
     const message = await insertChatMessageAndBroadcast(chatId, uid, bodyText, img, aud, vid, replyToMessageId);
     if (!message) return res.status(400).json({ error: "Invalid message" });
     return res.json({ message });
@@ -1740,6 +1751,12 @@ io.on("connection", (socket) => {
     if (!chat) return;
     if (chat.type === "official") return;
     if (!(await isUserChatMember(cid, Number(userId)))) return;
+
+    const rate = checkSendRateLimit(Number(userId));
+    if (!rate.allowed) {
+      socket.emit("chat:sendRateLimited", { retryAfterMs: Math.ceil(rate.retryAfterMs) });
+      return;
+    }
 
     try {
       await insertChatMessageAndBroadcast(cid, Number(userId), bodyText, img, aud, vid, replyToMessageId);

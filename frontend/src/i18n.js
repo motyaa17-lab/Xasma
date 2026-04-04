@@ -221,6 +221,8 @@ export const translations = {
     reportAlreadyReported: "You already reported this message.",
     reportFailed: "Could not send report.",
     messageFrom: "From",
+    sendRateLimited:
+      "You're sending too fast. Please wait {seconds}s before sending again.",
     settingsCurrentBackground: "Current background",
     settingsEmpty: "Empty",
     settingsFilled: "Filled",
@@ -460,6 +462,8 @@ export const translations = {
     reportAlreadyReported: "Вы уже жаловались на это сообщение.",
     reportFailed: "Не удалось отправить жалобу.",
     messageFrom: "От",
+    sendRateLimited:
+      "Слишком частые сообщения. Подождите {seconds} с. перед следующей отправкой.",
     settingsCurrentBackground: "Текущий фон",
     settingsEmpty: "Пусто",
     settingsFilled: "Заполнено",

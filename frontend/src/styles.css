@@ -3430,6 +3430,18 @@ body.body--mobileConversationOpen {
   border: 1px solid rgba(34, 197, 94, 0.35);
 }
 
+.rateLimitBanner {
+  margin: 0 12px 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  background: rgba(251, 191, 36, 0.15);
+  color: rgba(254, 243, 199, 0.98);
+  border: 1px solid rgba(251, 191, 36, 0.4);
+}
+
 .iconCloseBtn {
   border: none;
   background: transparent;

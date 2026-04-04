@@ -73,6 +73,7 @@ export default function App() {
   const isMobile = useIsMobile(900);
   const [mobileTab, setMobileTab] = useState("chats");
   const [installDownloadOpen, setInstallDownloadOpen] = useState(false);
+  const [sendRateLimitNotice, setSendRateLimitNotice] = useState("");
   const mobileConversationOpen = Boolean(isMobile && mobileTab === "chats" && selectedChatId);
 
   useEffect(() => {
@@ -364,6 +365,12 @@ export default function App() {
       );
     });
 
+    socket.on("chat:sendRateLimited", ({ retryAfterMs } = {}) => {
+      const sec = Math.max(1, Math.ceil(Number(retryAfterMs || 10_000) / 1000));
+      const lang = settingsRef.current?.lang === "ru" ? "ru" : "en";
+      setSendRateLimitNotice(tr(lang, "sendRateLimited").replace("{seconds}", String(sec)));
+    });
+
     return () => {
       if (chatsRefreshAfterStatusTimerRef.current) {
         clearTimeout(chatsRefreshAfterStatusTimerRef.current);
@@ -380,6 +387,7 @@ export default function App() {
       socket.off("user:roleUpdated");
       socket.off("user:banned");
       socket.off("group:avatarUpdated");
+      socket.off("chat:sendRateLimited");
       socket.disconnect();
     };
   }, [token, socketEndpoint, me?.id]);
@@ -390,6 +398,7 @@ export default function App() {
   }
 
   async function selectChat(chatId) {
+    setSendRateLimitNotice("");
     setSelectedChatId(chatId);
     setChats((prev) =>
       prev.map((c) => (Number(c.id) === Number(chatId) ? { ...c, unreadCount: 0 } : c))
@@ -559,6 +568,12 @@ export default function App() {
     lang: settings.lang,
   };
 
+  useEffect(() => {
+    if (!sendRateLimitNotice) return;
+    const id = window.setTimeout(() => setSendRateLimitNotice(""), 12_000);
+    return () => window.clearTimeout(id);
+  }, [sendRateLimitNotice]);
+
   const chatPropsBase = {
     chatId: selectedChatId,
     chat: chats.find((c) => c.id === selectedChatId) || null,
@@ -579,6 +594,7 @@ export default function App() {
     presenceTick,
     t,
     lang: settings.lang,
+    sendRateLimitNotice,
   };
 
   const chatPropsDesktop = { ...chatPropsBase, onMobileBack: undefined };

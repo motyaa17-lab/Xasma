@@ -205,6 +205,7 @@ export default function Chat({
   t,
   lang,
   onMobileBack,
+  sendRateLimitNotice = "",
 }) {
   const safeMessages = useMemo(() => {
     if (!Array.isArray(messages)) return [];
@@ -1789,6 +1790,7 @@ export default function Chat({
     const trimmed = String(text).trim();
     onTyping?.(false);
     if (isBanned) return;
+    if (sendRateLimitNotice && !editingMessageId) return;
     if (voiceRecording || voiceArming) return;
     if (videoRecording || videoArming) return;
     if (editingMessageId) {
@@ -1836,7 +1838,9 @@ export default function Chat({
   const composerHasText = trimmedComposerText.length > 0;
   const composerHasMedia = Boolean(pendingImageUrl) && !editingMessageId;
   const composerCanSend = editingMessageId ? composerHasText : composerHasText || composerHasMedia;
-  const showSendAction = composerCanSend && !(voiceRecording || voiceArming || videoRecording || videoArming);
+  const showSendAction =
+    composerCanSend && !(voiceRecording || voiceArming || videoRecording || videoArming);
+  const sendBlockedByRateLimit = Boolean(sendRateLimitNotice);
 
   const chatMainClass = [
     "chatMain",
@@ -2358,6 +2362,7 @@ export default function Chat({
             {isBanned ? <div className="banBanner">{t("authBanned")}</div> : null}
             {uploadError ? <div className="uploadErrBanner">{uploadError}</div> : null}
             {reportFeedback ? <div className="reportToastBanner">{reportFeedback}</div> : null}
+            {sendRateLimitNotice ? <div className="rateLimitBanner">{sendRateLimitNotice}</div> : null}
             {imageUploading ? <div className="uploadProgressHint">{t("uploadImageProgress")}</div> : null}
             {voiceUploading ? <div className="uploadProgressHint">{t("voiceSending")}</div> : null}
             {videoNoteUploading ? <div className="uploadProgressHint">{t("videoNoteUploading")}</div> : null}
@@ -2634,6 +2639,7 @@ export default function Chat({
                   onClick={handlePrimary}
                   disabled={
                     isBanned ||
+                    sendBlockedByRateLimit ||
                     imageUploading ||
                     voiceRecording ||
                     voiceArming ||
