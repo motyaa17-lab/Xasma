@@ -142,6 +142,18 @@ async function initDb() {
     `CREATE INDEX IF NOT EXISTS idx_messages_flagged ON messages (flagged, flagged_at DESC) WHERE flagged = TRUE`
   );
 
+  await query(`
+    CREATE TABLE IF NOT EXISTS message_reports (
+      id BIGSERIAL PRIMARY KEY,
+      message_id BIGINT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+      reporter_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      reason TEXT NOT NULL CHECK (reason IN ('spam', 'scam', 'abuse')),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (message_id, reporter_id)
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_message_reports_created ON message_reports (created_at DESC)`);
+
   // Ensure initial admin (safe if user doesn't exist).
   await query(`UPDATE users SET role = 'admin' WHERE username = 'Xasma'`);
 }

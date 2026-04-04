@@ -1381,6 +1381,49 @@ app.put("/api/messages/:messageId", authRequired, (req, res) => {
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });
 
+app.post("/api/messages/:messageId/report", authRequired, (req, res) => {
+  const messageId = Number(req.params.messageId);
+  const reasonRaw = typeof req.body?.reason === "string" ? req.body.reason.trim().toLowerCase() : "";
+  const allowed = new Set(["spam", "scam", "abuse"]);
+  if (!messageId) return res.status(400).json({ error: "Invalid message id" });
+  if (!allowed.has(reasonRaw)) return res.status(400).json({ error: "Invalid reason" });
+
+  (async () => {
+    const uid = Number(req.user.id);
+    const banned = await query(`SELECT banned FROM users WHERE id = $1`, [uid]);
+    if (banned.rows[0]?.banned) return res.status(403).json({ error: "Not allowed" });
+
+    const msgR = await query(
+      `SELECT m.id, m.chat_id, m.sender_id, m.message_type FROM messages m WHERE m.id = $1`,
+      [messageId]
+    );
+    const msgRow = msgR.rows[0];
+    if (!msgRow) return res.status(404).json({ error: "Message not found" });
+    if ((msgRow.message_type || "text") === "system") return res.status(400).json({ error: "Cannot report this message" });
+    if (Number(msgRow.sender_id) === uid) return res.status(400).json({ error: "Cannot report your own message" });
+
+    const cid = Number(msgRow.chat_id);
+    const chat = await getChatById(cid);
+    if (!chat) return res.status(404).json({ error: "Chat not found" });
+    if (chat.type === "official") return res.status(400).json({ error: "Cannot report in this chat" });
+    if (!(await isUserChatMember(cid, uid))) return res.status(403).json({ error: "Not a member of this chat" });
+
+    const ins = await query(
+      `
+      INSERT INTO message_reports (message_id, reporter_id, reason)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (message_id, reporter_id) DO NOTHING
+      RETURNING id
+    `,
+      [messageId, uid, reasonRaw]
+    );
+    if (!ins.rows[0]) {
+      return res.json({ ok: true, duplicate: true });
+    }
+    return res.json({ ok: true, duplicate: false });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
 function formatChatLabelForFlagged(row) {
   const t = row.chat_type || "direct";
   if (t === "official") return "Xasma (official)";
@@ -1391,6 +1434,52 @@ function formatChatLabelForFlagged(row) {
 }
 
 // Admin APIs
+app.get("/api/admin/message-reports", authRequired, requireAdmin, (req, res) => {
+  const limit = Math.min(parseInt(String(req.query.limit || "100"), 10), 500);
+  (async () => {
+    const r = await query(
+      `
+      SELECT
+        r.id AS report_id,
+        r.reason,
+        r.created_at,
+        m.id AS message_id,
+        m.text AS message_text,
+        m.chat_id,
+        ru.username AS reporter_username,
+        su.username AS sender_username,
+        c.type AS chat_type,
+        c.title AS chat_title,
+        du1.username AS direct_u1,
+        du2.username AS direct_u2
+      FROM message_reports r
+      JOIN messages m ON m.id = r.message_id
+      JOIN users ru ON ru.id = r.reporter_id
+      JOIN users su ON su.id = m.sender_id
+      JOIN chats c ON c.id = m.chat_id
+      LEFT JOIN users du1 ON du1.id = c.user1_id
+      LEFT JOIN users du2 ON du2.id = c.user2_id
+      ORDER BY r.created_at DESC, r.id DESC
+      LIMIT $1
+    `,
+      [limit]
+    );
+    return res.json({
+      reports: r.rows.map((row) => ({
+        id: Number(row.report_id),
+        reason: row.reason,
+        createdAt: row.created_at,
+        messageId: Number(row.message_id),
+        messageText: row.message_text,
+        chatId: Number(row.chat_id),
+        reporterUsername: row.reporter_username,
+        senderUsername: row.sender_username,
+        chatLabel: formatChatLabelForFlagged(row),
+      })),
+    });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
 app.get("/api/admin/flagged-messages", authRequired, requireAdmin, (req, res) => {
   const limit = Math.min(parseInt(String(req.query.limit || "100"), 10), 500);
   (async () => {

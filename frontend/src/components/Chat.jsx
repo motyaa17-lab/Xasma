@@ -1,7 +1,7 @@
 import React, { forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { tf } from "../i18n.js";
-import { uploadChatImage, uploadChatAudio, uploadChatVideo, getApiBase } from "../api.js";
+import { uploadChatImage, uploadChatAudio, uploadChatVideo, getApiBase, reportMessage } from "../api.js";
 import GroupInfoModal from "./GroupInfoModal.jsx";
 import VoiceMessagePlayer from "./VoiceMessagePlayer.jsx";
 import CircleVideoMessage from "./CircleVideoMessage.jsx";
@@ -33,11 +33,13 @@ const MessageActionMenuPanel = forwardRef(function MessageActionMenuPanel(
     canQuickReact,
     hasSecondaryActions,
     canEditOwn,
+    canReport,
     canAdminDelete,
     className,
     style,
     onToggleReaction,
     onEdit,
+    onReport,
     onAdminDelete,
     closeMenu,
   },
@@ -90,6 +92,22 @@ const MessageActionMenuPanel = forwardRef(function MessageActionMenuPanel(
           }}
         >
           {t("edit")}
+        </button>
+      ) : null}
+      {canReport ? (
+        <button
+          type="button"
+          className="msgMenuItem"
+          role="menuitem"
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            closeMenu();
+            onReport?.();
+          }}
+        >
+          {t("reportMessage")}
         </button>
       ) : null}
       {canAdminDelete ? (
@@ -201,6 +219,9 @@ export default function Chat({
   const [text, setText] = useState("");
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [menuMessageId, setMenuMessageId] = useState(null);
+  const [reportTargetMessage, setReportTargetMessage] = useState(null);
+  const [reportBusy, setReportBusy] = useState(false);
+  const [reportFeedback, setReportFeedback] = useState("");
   const [enteringMessageIds, setEnteringMessageIds] = useState(() => new Set());
   const [chatOpening, setChatOpening] = useState(false);
   const [groupInfoOpen, setGroupInfoOpen] = useState(false);
@@ -415,19 +436,23 @@ export default function Chat({
   const mobileMenuFlags = useMemo(() => {
     const m = mobileMenuTarget;
     if (!m) return null;
+    if (isOfficial && !isAdmin) return null;
     const showMessageMenu =
       (m.senderId === meId && (!isBanned || isAdmin)) ||
       (m.senderId !== meId && (isAdmin || !isBanned));
     if (!showMessageMenu) return null;
     const canEditOwn = m.senderId === meId && !isBanned;
     const canAdminDelete = Boolean(isAdmin);
+    const canReport =
+      !isOfficial && !isBanned && m.senderId !== meId && (m.type || "text") !== "system";
     return {
       canQuickReact: !isBanned,
       canEditOwn,
+      canReport,
       canAdminDelete,
-      hasSecondaryActions: canEditOwn || canAdminDelete,
+      hasSecondaryActions: canEditOwn || canReport || canAdminDelete,
     };
-  }, [mobileMenuTarget, meId, isBanned, isAdmin]);
+  }, [mobileMenuTarget, meId, isBanned, isAdmin, isOfficial]);
 
   const clearBubbleLongPress = useCallback(() => {
     if (longPressTimerRef.current != null) {
@@ -486,8 +511,8 @@ export default function Chat({
   }, []);
 
   const onMobileBubbleTouchStart = useCallback(
-    (e, messageId, showMessageMenu) => {
-      if (!isMobileChat || !showMessageMenu || showVideoNoteOverlay) return;
+    (e, messageId, showBubbleInteractionMenu) => {
+      if (!isMobileChat || !showBubbleInteractionMenu || showVideoNoteOverlay) return;
       if (e.touches.length !== 1) return;
       // Important: arm long-press on the bubble itself even if the touch starts on
       // interactive voice controls (play button, waveform, audio element).
@@ -506,6 +531,31 @@ export default function Chat({
     },
     [isMobileChat, showVideoNoteOverlay, clearBubbleLongPress, triggerMobileMessageMenuFeedback, triggerMobileLongPressFlash]
   );
+
+  const handleReportSubmit = useCallback(
+    async (reason) => {
+      if (!reportTargetMessage || reportBusy) return;
+      setReportBusy(true);
+      setReportFeedback("");
+      try {
+        const res = await reportMessage(reportTargetMessage.id, reason);
+        setReportTargetMessage(null);
+        setMenuMessageId(null);
+        setReportFeedback(res.duplicate ? t("reportAlreadyReported") : t("reportSent"));
+      } catch (e) {
+        setReportFeedback(e.message || t("reportFailed"));
+      } finally {
+        setReportBusy(false);
+      }
+    },
+    [reportTargetMessage, reportBusy, t]
+  );
+
+  useEffect(() => {
+    if (!reportFeedback) return;
+    const id = window.setTimeout(() => setReportFeedback(""), 4500);
+    return () => window.clearTimeout(id);
+  }, [reportFeedback]);
 
   const onMobileBubbleTouchMove = useCallback(
     (e) => {
@@ -2023,14 +2073,20 @@ export default function Chat({
                   const isVoiceOnly =
                     Boolean(m.audioUrl) && !m.imageUrl && !m.videoUrl && !textTrim && !m.editedAt;
                   const bubbleMediaBare = isCircleVideoOnly || isVoiceOnly ? " bubbleMediaBare" : "";
-                  const showMessageMenu =
-                    (m.senderId === meId && (!isBanned || isAdmin)) ||
-                    (m.senderId !== meId && (isAdmin || !isBanned));
-                  const showMenuButton = showMessageMenu && !isMobileChat;
+                  const showBubbleInteractionMenu =
+                    (!isOfficial || isAdmin) &&
+                    ((m.senderId === meId && (!isBanned || isAdmin)) ||
+                      (m.senderId !== meId && (isAdmin || !isBanned)));
+                  const showMenuButton = showBubbleInteractionMenu && !isMobileChat;
                   const canQuickReact = !isBanned;
                   const canEditOwn = m.senderId === meId && !isBanned;
                   const canAdminDelete = Boolean(isAdmin);
-                  const hasSecondaryActions = canEditOwn || canAdminDelete;
+                  const canReport =
+                    !isOfficial &&
+                    !isBanned &&
+                    m.senderId !== meId &&
+                    (m.type || "text") !== "system";
+                  const hasSecondaryActions = canEditOwn || canReport || canAdminDelete;
 
                   return (
                 <div
@@ -2079,7 +2135,7 @@ export default function Chat({
                     onTouchStart={
                       isMobileChat
                         ? (e) => {
-                            onMobileBubbleTouchStart(e, m.id, showMessageMenu);
+                            onMobileBubbleTouchStart(e, m.id, showBubbleInteractionMenu);
                             if (ENABLE_SWIPE_TO_REPLY) onMobileBubbleSwipeTouchStart(e, m);
                           }
                         : undefined
@@ -2122,7 +2178,7 @@ export default function Chat({
                         : undefined
                     }
                     onContextMenu={
-                      isMobileChat && showMessageMenu ? (e) => e.preventDefault() : undefined
+                      isMobileChat && showBubbleInteractionMenu ? (e) => e.preventDefault() : undefined
                     }
                   >
                     {ENABLE_SWIPE_TO_REPLY && isMobileChat ? (
@@ -2154,6 +2210,7 @@ export default function Chat({
                             canQuickReact={canQuickReact}
                             hasSecondaryActions={hasSecondaryActions}
                             canEditOwn={canEditOwn}
+                            canReport={canReport}
                             canAdminDelete={canAdminDelete}
                             className="msgMenuDropdown"
                             onToggleReaction={(emo) => onToggleReaction?.(m.id, emo)}
@@ -2162,6 +2219,7 @@ export default function Chat({
                               setText(String(m.text ?? ""));
                               onTyping?.(false);
                             }}
+                            onReport={() => setReportTargetMessage(m)}
                             onAdminDelete={() => onAdminDeleteMessage?.(m.id)}
                             closeMenu={() => setMenuMessageId(null)}
                           />
@@ -2299,6 +2357,7 @@ export default function Chat({
           <div className="composer" ref={composerRef}>
             {isBanned ? <div className="banBanner">{t("authBanned")}</div> : null}
             {uploadError ? <div className="uploadErrBanner">{uploadError}</div> : null}
+            {reportFeedback ? <div className="reportToastBanner">{reportFeedback}</div> : null}
             {imageUploading ? <div className="uploadProgressHint">{t("uploadImageProgress")}</div> : null}
             {voiceUploading ? <div className="uploadProgressHint">{t("voiceSending")}</div> : null}
             {videoNoteUploading ? <div className="uploadProgressHint">{t("videoNoteUploading")}</div> : null}
@@ -2608,7 +2667,6 @@ export default function Chat({
           </div>
           )}
             {isMobileChat &&
-            !isOfficial &&
             menuMessageId != null &&
             mobileMenuTarget &&
             mobileMenuFlags &&
@@ -2620,6 +2678,7 @@ export default function Chat({
                     canQuickReact={mobileMenuFlags.canQuickReact}
                     hasSecondaryActions={mobileMenuFlags.hasSecondaryActions}
                     canEditOwn={mobileMenuFlags.canEditOwn}
+                    canReport={mobileMenuFlags.canReport}
                     canAdminDelete={mobileMenuFlags.canAdminDelete}
                     className={`msgMenuDropdown msgMenuDropdown--mobileFixed${
                       mobileMenuPlacement?.openUp ? " msgMenuDropdown--openUp" : ""
@@ -2651,9 +2710,62 @@ export default function Chat({
                       setText(String(mobileMenuTarget.text ?? ""));
                       onTyping?.(false);
                     }}
+                    onReport={() => setReportTargetMessage(mobileMenuTarget)}
                     onAdminDelete={() => onAdminDeleteMessage?.(mobileMenuTarget.id)}
                     closeMenu={() => setMenuMessageId(null)}
                   />,
+                  document.body
+                )
+              : null}
+            {reportTargetMessage && typeof document !== "undefined"
+              ? createPortal(
+                  <div
+                    className="reportModalOverlay"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="reportModalTitle"
+                    onMouseDown={(e) => {
+                      if (e.target === e.currentTarget && !reportBusy) setReportTargetMessage(null);
+                    }}
+                    onTouchStart={(e) => {
+                      if (e.target === e.currentTarget && !reportBusy) setReportTargetMessage(null);
+                    }}
+                  >
+                    <div
+                      className="reportModal"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div id="reportModalTitle" className="reportModalTitle">
+                        {t("reportChooseReason")}
+                      </div>
+                      <div className="reportModalReasons">
+                        {(["spam", "scam", "abuse"]).map((r) => (
+                          <button
+                            key={r}
+                            type="button"
+                            className="reportModalReasonBtn"
+                            disabled={reportBusy}
+                            onClick={() => handleReportSubmit(r)}
+                          >
+                            {r === "spam"
+                              ? t("reportReasonSpam")
+                              : r === "scam"
+                                ? t("reportReasonScam")
+                                : t("reportReasonAbuse")}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        className="ghostBtn reportModalCancel"
+                        disabled={reportBusy}
+                        onClick={() => setReportTargetMessage(null)}
+                      >
+                        {t("reportCancel")}
+                      </button>
+                    </div>
+                  </div>,
                   document.body
                 )
               : null}

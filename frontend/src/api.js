@@ -284,3 +284,15 @@ export async function adminListFlaggedMessages() {
   return apiFetch("/api/admin/flagged-messages");
 }
 
+export async function reportMessage(messageId, reason) {
+  const mid = Number(messageId);
+  return apiFetch(`/api/messages/${mid}/report`, {
+    method: "POST",
+    body: { reason: String(reason || "").trim().toLowerCase() },
+  });
+}
+
+export async function adminListMessageReports() {
+  return apiFetch("/api/admin/message-reports");
+}
+

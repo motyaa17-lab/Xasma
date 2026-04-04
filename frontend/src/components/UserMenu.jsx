@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   adminBroadcastOfficial,
   adminListFlaggedMessages,
+  adminListMessageReports,
   adminListUsers,
   adminSetUserBanned,
   adminSetUserRole,
@@ -11,6 +12,49 @@ import { DONATION_ALERTS_URL } from "../config/donation.js";
 function openDonationPage() {
   if (typeof window === "undefined") return;
   window.open(DONATION_ALERTS_URL, "_blank", "noopener,noreferrer");
+}
+
+function AdminMessageReportsSection({ t, items, loading, onRefresh }) {
+  return (
+    <div className="adminMessageReportsBox">
+      <div className="adminFlaggedHeader">
+        <div className="settingsTitle">{t("adminMessageReportsTitle")}</div>
+        <button type="button" className="ghostBtn" onClick={onRefresh} disabled={loading}>
+          {t("adminFlaggedRefresh")}
+        </button>
+      </div>
+      <p className="muted small adminFlaggedHint">{t("adminMessageReportsHint")}</p>
+      {loading ? (
+        <div className="muted">{t("adminFlaggedLoading")}</div>
+      ) : !items.length ? (
+        <div className="muted">{t("adminMessageReportsEmpty")}</div>
+      ) : (
+        <div className="adminFlaggedList">
+          {items.map((r) => (
+            <div key={r.id} className="adminFlaggedRow adminReportRow">
+              <div className="adminFlaggedMeta muted small">
+                <span className="adminFlaggedUser">{r.reporterUsername}</span>
+                <span> · </span>
+                <span>{r.chatLabel}</span>
+                <span> · </span>
+                <span className="adminReportReason">{r.reason}</span>
+                {r.createdAt ? (
+                  <>
+                    <span> · </span>
+                    <span>{new Date(r.createdAt).toLocaleString()}</span>
+                  </>
+                ) : null}
+              </div>
+              <div className="adminFlaggedMeta muted small">
+                {t("messageFrom")}: <span className="adminFlaggedUser">{r.senderUsername}</span>
+              </div>
+              <div className="adminFlaggedText">{r.messageText}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function AdminFlaggedSection({ t, items, loading, onRefresh }) {
@@ -167,6 +211,8 @@ export default function UserMenu({
   const [adminBroadcastBusy, setAdminBroadcastBusy] = useState(false);
   const [adminFlagged, setAdminFlagged] = useState([]);
   const [adminFlaggedLoading, setAdminFlaggedLoading] = useState(false);
+  const [adminReports, setAdminReports] = useState([]);
+  const [adminReportsLoading, setAdminReportsLoading] = useState(false);
 
   useEffect(() => {
     function onDocMouseDown(e) {
@@ -246,6 +292,18 @@ export default function UserMenu({
       setAdminError(e.message || "Request failed");
     } finally {
       setAdminFlaggedLoading(false);
+    }
+  }
+
+  async function loadAdminReports() {
+    setAdminReportsLoading(true);
+    try {
+      const data = await adminListMessageReports();
+      setAdminReports(Array.isArray(data.reports) ? data.reports : []);
+    } catch (e) {
+      setAdminError(e.message || "Request failed");
+    } finally {
+      setAdminReportsLoading(false);
     }
   }
 
@@ -387,6 +445,7 @@ export default function UserMenu({
                     setPanel("admin");
                     loadAdminUsers();
                     loadAdminFlagged();
+                    loadAdminReports();
                   }}
                 />
               </div>
@@ -660,6 +719,13 @@ export default function UserMenu({
                   onRefresh={loadAdminFlagged}
                 />
 
+                <AdminMessageReportsSection
+                  t={t}
+                  items={adminReports}
+                  loading={adminReportsLoading}
+                  onRefresh={loadAdminReports}
+                />
+
                 {adminLoading ? (
                   <div className="muted">Loading...</div>
                 ) : (
@@ -780,6 +846,7 @@ export default function UserMenu({
                 setPanel("admin");
                 loadAdminUsers();
                 loadAdminFlagged();
+                loadAdminReports();
               }}
             >
               Admin
@@ -1018,6 +1085,13 @@ export default function UserMenu({
                 items={adminFlagged}
                 loading={adminFlaggedLoading}
                 onRefresh={loadAdminFlagged}
+              />
+
+              <AdminMessageReportsSection
+                t={t}
+                items={adminReports}
+                loading={adminReportsLoading}
+                onRefresh={loadAdminReports}
               />
 
               {adminLoading ? (
