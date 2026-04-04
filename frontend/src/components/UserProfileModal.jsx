@@ -25,7 +25,7 @@ export default function UserProfileModal({ open, userId, onClose, t, lang = "en"
         const u = await getUserById(userId);
         if (!cancelled) setUser(u);
       } catch (e) {
-        if (!cancelled) setErr(e.message || "Failed");
+        if (!cancelled) setErr(e.message || t("errorGeneric"));
       } finally {
         if (!cancelled) setLoading(false);
       }

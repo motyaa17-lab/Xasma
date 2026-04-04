@@ -1,5 +1,6 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import AvatarAura from "./AvatarAura.jsx";
+import { localeForLang } from "../i18n.js";
 import { formatUserStatusLine } from "../userStatusLine.js";
 import ActivityBadge from "./ActivityBadge.jsx";
 
@@ -77,7 +78,7 @@ const Sidebar = forwardRef(function Sidebar(
         const users = await mod.searchUsers(query.trim());
         setResults(users);
       } catch (e) {
-        setSearchError(e.message || "Search failed");
+        setSearchError(e.message || t("searchFailed"));
       } finally {
         setSearching(false);
       }
@@ -145,7 +146,7 @@ const Sidebar = forwardRef(function Sidebar(
       setGroupResults([]);
       setSelectedMembers([]);
     } catch (e) {
-      setGroupError(e.message || "Failed");
+      setGroupError(e.message || t("errorGeneric"));
     } finally {
       setGroupSubmitting(false);
     }
@@ -563,7 +564,7 @@ function presenceText(user, t, lang) {
   if (user.isOnline) return t("online");
   if (!user.lastSeenAt) return t("lastSeen");
   const d = new Date(user.lastSeenAt);
-  const locale = lang === "ru" ? "ru-RU" : "en-US";
+  const locale = localeForLang(lang);
   const s = Number.isNaN(d.getTime())
     ? String(user.lastSeenAt)
     : d.toLocaleString(locale, { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -585,7 +586,7 @@ function formatListTime(iso, lang) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   const now = new Date();
-  const locale = lang === "ru" ? "ru-RU" : "en-US";
+  const locale = localeForLang(lang);
   const sameDay =
     d.getFullYear() === now.getFullYear() &&
     d.getMonth() === now.getMonth() &&

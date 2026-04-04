@@ -7,6 +7,7 @@ import VoiceMessagePlayer from "./VoiceMessagePlayer.jsx";
 import CircleVideoMessage from "./CircleVideoMessage.jsx";
 import UserProfileModal from "./UserProfileModal.jsx";
 import ActivityBadge from "./ActivityBadge.jsx";
+import { localeForLang } from "../i18n.js";
 import { formatUserStatusLine } from "../userStatusLine.js";
 
 const MAX_VIDEO_NOTE_SEC = 60;
@@ -385,12 +386,12 @@ export default function Chat({
         swipeClickBlockUntilRef.current = Date.now() + 700;
         setReplyToMessage({
           id: msg.id,
-          senderUsername: msg.sender?.username || getDisplayName(msg, meId, meUsername),
+          senderUsername: msg.sender?.username || getDisplayName(msg, meId, meUsername, t),
           preview: getReplyPreviewForMessage(msg),
         });
       }
     },
-    [getReplyPreviewForMessage, maybeTriggerReplyHaptic, meId, meUsername]
+    [getReplyPreviewForMessage, maybeTriggerReplyHaptic, meId, meUsername, t]
   );
 
   const onMobileBubbleSwipeTouchEnd = useCallback(() => finishSwipe(true), [finishSwipe]);
@@ -1936,7 +1937,7 @@ export default function Chat({
                       <button type="button" className="videoNoteBtn videoNoteBtn--ghost" onClick={cancelVideoRecording}>
                         {t("videoNoteCancel")}
                       </button>
-                      {videoLocked ? <div className="videoNoteLockPill" aria-label="Locked">🔒</div> : null}
+                      {videoLocked ? <div className="videoNoteLockPill" aria-label={t("videoNoteLocked")}>🔒</div> : null}
                       <button type="button" className="videoNoteBtn videoNoteBtn--primary" onClick={finishVideoRecording}>
                         {t("videoNoteStop")}
                       </button>
@@ -2080,7 +2081,7 @@ export default function Chat({
                       formatSystemLine(m, t)
                     )}
                   </div>
-                  <div className="systemMessageTime">{formatTime(m.createdAt)}</div>
+                  <div className="systemMessageTime">{formatTime(m.createdAt, lang)}</div>
                 </div>
               ) : (
                 (() => {
@@ -2134,7 +2135,7 @@ export default function Chat({
                       {getAvatarSrc(m, meId, meAvatar) ? (
                         <img src={getAvatarSrc(m, meId, meAvatar)} alt="" />
                       ) : (
-                        <span>{initials(getDisplayName(m, meId, meUsername))}</span>
+                        <span>{initials(getDisplayName(m, meId, meUsername, t))}</span>
                       )}
                     </button>
                   </AvatarAura>
@@ -2302,6 +2303,8 @@ export default function Chat({
                         isOwn={m.senderId === meId}
                         playLabel={t("voicePlay")}
                         pauseLabel={t("voicePause")}
+                        ariaLabel={t("voiceMessageAria")}
+                        seekAriaLabel={t("voiceSeekAria")}
                       />
                     ) : null}
                     {String(m.text ?? "").trim() ? (
@@ -2317,7 +2320,7 @@ export default function Chat({
                       </div>
                     ) : null}
                     <div className="bubbleMeta">
-                      <span className="bubbleTime">{formatTime(m.createdAt)}</span>
+                      <span className="bubbleTime">{formatTime(m.createdAt, lang)}</span>
                       {m.senderId === meId ? (
                         <span className="bubbleChecks" title={checksTitle(m, t)}>
                           {renderChecks(m)}
@@ -3015,11 +3018,11 @@ function formatSystemLine(m, t) {
   }
 }
 
-function formatTime(v) {
+function formatTime(v, lang) {
   if (!v) return "";
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return String(v);
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString(localeForLang(lang), { hour: "2-digit", minute: "2-digit" });
 }
 
 function getAvatarSrc(message, meId, meAvatar) {
@@ -3034,14 +3037,14 @@ function renderChecks(m) {
 }
 
 function checksTitle(m, t) {
-  if (m.readAt) return "Read";
-  if (m.deliveredAt) return "Delivered";
+  if (m.readAt) return t("messageStatusRead");
+  if (m.deliveredAt) return t("messageStatusDelivered");
   return "";
 }
 
-function getDisplayName(message, meId, meUsername) {
-  if (message.senderId === meId) return meUsername || "Me";
-  return message.sender?.username || "User";
+function getDisplayName(message, meId, meUsername, t) {
+  if (message.senderId === meId) return meUsername || t("displayNameMe");
+  return message.sender?.username || t("displayNameUser");
 }
 
 function initials(name) {

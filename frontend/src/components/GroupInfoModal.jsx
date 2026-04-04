@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { localeForLang } from "../i18n.js";
 import { addGroupMember, getGroup, patchGroupAvatar, removeGroupMember, searchUsers } from "../api.js";
 import ActivityBadge from "./ActivityBadge.jsx";
 
@@ -94,14 +95,14 @@ export default function GroupInfoModal({
       setAddResults([]);
       onMetaChanged?.();
     } catch (e) {
-      setActionError(e.message || "Failed");
+      setActionError(e.message || t("errorGeneric"));
     } finally {
       setBusyId(null);
     }
   }
 
   async function handleRemove(userId) {
-    const ok = window.confirm(lang === "ru" ? "Удалить этого участника?" : "Remove this member?");
+    const ok = window.confirm(t("groupRemoveMemberConfirm"));
     if (!ok) return;
     setActionError("");
     setBusyId(userId);
@@ -112,7 +113,7 @@ export default function GroupInfoModal({
       setMembers(data.members || []);
       onMetaChanged?.();
     } catch (e) {
-      setActionError(e.message || "Failed");
+      setActionError(e.message || t("errorGeneric"));
     } finally {
       setBusyId(null);
     }
@@ -122,11 +123,11 @@ export default function GroupInfoModal({
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file || !file.type.startsWith("image/")) {
-      setActionError(lang === "ru" ? "Выберите изображение" : "Choose an image file");
+      setActionError(t("groupAvatarChooseImage"));
       return;
     }
     if (file.size > 380 * 1024) {
-      setActionError(lang === "ru" ? "Файл слишком большой" : "File too large");
+      setActionError(t("groupAvatarFileTooLarge"));
       return;
     }
     const reader = new FileReader();
@@ -149,7 +150,7 @@ export default function GroupInfoModal({
       setAvatarDraft(null);
       onMetaChanged?.();
     } catch (e) {
-      setActionError(e.message || "Failed");
+      setActionError(e.message || t("errorGeneric"));
     } finally {
       setAvatarBusy(false);
     }
@@ -164,7 +165,7 @@ export default function GroupInfoModal({
       setAvatarDraft(null);
       onMetaChanged?.();
     } catch (e) {
-      setActionError(e.message || "Failed");
+      setActionError(e.message || t("errorGeneric"));
     } finally {
       setAvatarBusy(false);
     }
@@ -335,7 +336,7 @@ function memberPresenceLine(m, t, lang) {
   if (m.isOnline) return t("online");
   if (!m.lastSeenAt) return t("lastSeen");
   const d = new Date(m.lastSeenAt);
-  const locale = lang === "ru" ? "ru-RU" : "en-US";
+  const locale = localeForLang(lang);
   const s = Number.isNaN(d.getTime())
     ? String(m.lastSeenAt)
     : d.toLocaleString(locale, { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });

@@ -38,7 +38,15 @@ function formatAudioTime(sec) {
  * Custom voice bubble: hidden <audio>, play/pause, times, waveform bars + progress.
  * Waveform from decodeAudioData when CORS allows; else deterministic fallback bars.
  */
-export default function VoiceMessagePlayer({ src, messageId, isOwn, playLabel, pauseLabel }) {
+export default function VoiceMessagePlayer({
+  src,
+  messageId,
+  isOwn,
+  playLabel,
+  pauseLabel,
+  ariaLabel = "Voice message",
+  seekAriaLabel = "Seek voice message",
+}) {
   const audioRef = useRef(null);
   const trackRef = useRef(null);
   const rafProgressRef = useRef(0);
@@ -164,7 +172,7 @@ export default function VoiceMessagePlayer({ src, messageId, isOwn, playLabel, p
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
       role="group"
-      aria-label="Voice message"
+      aria-label={ariaLabel}
     >
       <audio
         ref={audioRef}
@@ -196,7 +204,7 @@ export default function VoiceMessagePlayer({ src, messageId, isOwn, playLabel, p
           className="voiceMsgWaveTrack"
           role="button"
           tabIndex={0}
-          aria-label="Seek voice message"
+          aria-label={seekAriaLabel}
           onPointerDown={(e) => {
             if (e.pointerType === "mouse" && e.button !== 0) return;
             onTrackSeek(e);

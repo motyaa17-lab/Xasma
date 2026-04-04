@@ -1,3 +1,5 @@
+import { localeForLang } from "./i18n.js";
+
 /** Max length for custom status (emoji + text); enforced server-side too. */
 export const USER_STATUS_TEXT_MAX = 30;
 
@@ -10,7 +12,7 @@ export function formatLastSeenForStatus(v, lang) {
     d.getMonth() === now.getMonth() &&
     d.getDate() === now.getDate();
 
-  const locale = lang === "ru" ? "ru-RU" : "en-US";
+  const locale = localeForLang(lang);
   if (sameDay) {
     return d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
   }

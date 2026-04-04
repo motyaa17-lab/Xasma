@@ -7,7 +7,7 @@ import Chat from "./components/Chat.jsx";
 import UserMenu from "./components/UserMenu.jsx";
 import InstallDownloadPanel from "./components/InstallDownloadPanel.jsx";
 import { useIsMobile } from "./hooks/useIsMobile.js";
-import { t as tr } from "./i18n.js";
+import { t as tr, normalizeLang } from "./i18n.js";
 import {
   createChat,
   createGroup,
@@ -44,7 +44,7 @@ export default function App() {
       const rawTheme = typeof parsed.chatTheme === "string" ? parsed.chatTheme : "dark";
       const chatTheme = allowed.has(rawTheme) ? rawTheme : legacy[rawTheme] || "dark";
       return {
-        lang: parsed.lang === "ru" ? "ru" : "en",
+        lang: normalizeLang(parsed.lang),
         chatTheme,
         messageNotificationsEnabled: Boolean(parsed.messageNotificationsEnabled),
       };
@@ -135,7 +135,7 @@ export default function App() {
         setMe(meUser);
       } catch (e) {
         if (cancelled) return;
-        setAuthError(e.message || "Authentication failed");
+        setAuthError(e.message || tr(normalizeLang(settingsRef.current?.lang), "authSessionFailed"));
         localStorage.removeItem("token");
         setToken("");
       }
@@ -218,7 +218,7 @@ export default function App() {
         }
       }, 250);
 
-      const lang = settingsRef.current?.lang === "ru" ? "ru" : "en";
+      const lang = normalizeLang(settingsRef.current?.lang);
       tryShowIncomingMessageNotification(msg, {
         meId: me?.id,
         openChatId: selectedChatIdRef.current,
@@ -422,7 +422,7 @@ export default function App() {
 
     socket.on("chat:sendRateLimited", ({ retryAfterMs } = {}) => {
       const sec = Math.max(1, Math.ceil(Number(retryAfterMs || 10_000) / 1000));
-      const lang = settingsRef.current?.lang === "ru" ? "ru" : "en";
+      const lang = normalizeLang(settingsRef.current?.lang);
       setSendRateLimitNotice(tr(lang, "sendRateLimited").replace("{seconds}", String(sec)));
     });
 

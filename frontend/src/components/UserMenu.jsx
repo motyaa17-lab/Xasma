@@ -7,6 +7,7 @@ import {
   adminSetUserBanned,
   adminSetUserRole,
 } from "../api.js";
+import { currentLanguageLabel, localeForLang } from "../i18n.js";
 import { DONATION_ALERTS_URL } from "../config/donation.js";
 import { DEFAULT_AURA_COLOR } from "../avatarAura.js";
 import { USER_STATUS_TEXT_MAX } from "../userStatusLine.js";
@@ -279,7 +280,7 @@ export default function UserMenu({
         auraColor: profileAuraColor,
       });
     } catch (e) {
-      setProfileSaveError(e.message || "Failed");
+      setProfileSaveError(e.message || t("errorGeneric"));
     } finally {
       setProfileSaving(false);
     }
@@ -293,7 +294,7 @@ export default function UserMenu({
       const data = await adminListUsers();
       setAdminUsers(Array.isArray(data.users) ? data.users : []);
     } catch (e) {
-      setAdminError(e.message || "Request failed");
+      setAdminError(e.message || t("adminRequestFailed"));
     } finally {
       setAdminLoading(false);
     }
@@ -305,7 +306,7 @@ export default function UserMenu({
       const data = await adminListFlaggedMessages();
       setAdminFlagged(Array.isArray(data.messages) ? data.messages : []);
     } catch (e) {
-      setAdminError(e.message || "Request failed");
+      setAdminError(e.message || t("adminRequestFailed"));
     } finally {
       setAdminFlaggedLoading(false);
     }
@@ -317,7 +318,7 @@ export default function UserMenu({
       const data = await adminListMessageReports();
       setAdminReports(Array.isArray(data.reports) ? data.reports : []);
     } catch (e) {
-      setAdminError(e.message || "Request failed");
+      setAdminError(e.message || t("adminRequestFailed"));
     } finally {
       setAdminReportsLoading(false);
     }
@@ -353,7 +354,7 @@ export default function UserMenu({
       setAvatarPreview(dataUrl);
       await onChangeAvatar?.(dataUrl);
     } catch (e) {
-      setAvatarError(e.message || "Failed to update avatar");
+      setAvatarError(e.message === "fileRead" ? t("fileReadFailed") : e.message || t("avatarUpdateFailed"));
     } finally {
       setAvatarBusy(false);
     }
@@ -435,7 +436,7 @@ export default function UserMenu({
           <div className="settingsSection">
             <SettingsRow
               label={t("language")}
-              right={settings?.lang === "ru" ? "Русский" : "English"}
+              right={currentLanguageLabel(settings?.lang, t)}
               onClick={() => setPanel("language")}
             />
           </div>
@@ -456,10 +457,10 @@ export default function UserMenu({
 
           {me?.role === "admin" ? (
             <>
-              <div className="settingsSectionHeader">Admin</div>
+              <div className="settingsSectionHeader">{t("adminPanelTitle")}</div>
               <div className="settingsSection">
                 <SettingsRow
-                  label="Admin"
+                  label={t("adminPanelTitle")}
                   onClick={() => {
                     setPanel("admin");
                     loadAdminUsers();
@@ -540,7 +541,11 @@ export default function UserMenu({
                       setAvatarBusy(true);
                       setAvatarError("");
                       Promise.resolve(onChangeAvatar?.(""))
-                        .catch((e) => setAvatarError(e.message || "Failed to update avatar"))
+                        .catch((e) =>
+                          setAvatarError(
+                            e.message === "fileRead" ? t("fileReadFailed") : e.message || t("avatarUpdateFailed")
+                          )
+                        )
                         .finally(() => setAvatarBusy(false));
                     }}
                     disabled={avatarBusy}
@@ -677,7 +682,7 @@ export default function UserMenu({
               <div className="settingsModalList">
                 <div className="settingsSection">
                   <SettingsChoiceRow
-                    label="English"
+                    label={t("langOptionEnglish")}
                     selected={settings?.lang === "en"}
                     onClick={() => {
                       onChangeSettings?.({ lang: "en" });
@@ -685,10 +690,18 @@ export default function UserMenu({
                     }}
                   />
                   <SettingsChoiceRow
-                    label="Русский"
+                    label={t("langOptionRussian")}
                     selected={settings?.lang === "ru"}
                     onClick={() => {
                       onChangeSettings?.({ lang: "ru" });
+                      setPanel(null);
+                    }}
+                  />
+                  <SettingsChoiceRow
+                    label={t("langOptionUkrainian")}
+                    selected={settings?.lang === "uk"}
+                    onClick={() => {
+                      onChangeSettings?.({ lang: "uk" });
                       setPanel(null);
                     }}
                   />
@@ -751,7 +764,7 @@ export default function UserMenu({
                 {adminNotice ? <div className="muted">{adminNotice}</div> : null}
                 <div className="adminTopRow">
                   <button className="ghostBtn" type="button" onClick={loadAdminUsers} disabled={adminLoading}>
-                    Refresh
+                    {t("adminRefresh")}
                   </button>
                 </div>
 
@@ -778,7 +791,7 @@ export default function UserMenu({
                 />
 
                 {adminLoading ? (
-                  <div className="muted">Loading...</div>
+                  <div className="muted">{t("adminLoadingUsers")}</div>
                 ) : (
                   <div className="adminUserList">
                     {adminUsers.map((u) => (
@@ -789,7 +802,7 @@ export default function UserMenu({
                             <div className={u.is_online ? "presenceDot online" : "presenceDot"} />
                           </div>
                           <div className="adminUserMeta muted small">
-                            role: {u.role} · {u.banned ? "banned" : "active"}
+                            {t("adminRoleLabel")}: {u.role} · {u.banned ? t("adminStatusBanned") : t("adminStatusActive")}
                           </div>
                         </div>
 
@@ -809,17 +822,15 @@ export default function UserMenu({
                                   prev.map((x) => (x.id === u.id ? { ...x, ...updated } : x))
                                 );
                                 setAdminNotice(
-                                  u.id === me.id
-                                    ? "Role updated."
-                                    : "Role updated. The user may need to relogin to refresh permissions."
+                                  u.id === me.id ? t("adminRoleUpdated") : t("adminRoleUpdatedRelogin")
                                 );
                               } catch (e) {
-                                setAdminError(e.message || "Request failed");
+                                setAdminError(e.message || t("adminRequestFailed"));
                                 loadAdminUsers();
                               }
                             }}
                           >
-                            {u.role === "admin" ? "Remove admin" : "Make admin"}
+                            {u.role === "admin" ? t("adminRemoveAdmin") : t("adminMakeAdmin")}
                           </button>
                           <button
                             type="button"
@@ -835,14 +846,14 @@ export default function UserMenu({
                                 setAdminUsers((prev) =>
                                   prev.map((x) => (x.id === u.id ? { ...x, ...updated } : x))
                                 );
-                                setAdminNotice(next ? "User banned." : "User unbanned.");
+                                setAdminNotice(next ? t("adminUserBanned") : t("adminUserUnbanned"));
                               } catch (e) {
-                                setAdminError(e.message || "Request failed");
+                                setAdminError(e.message || t("adminRequestFailed"));
                                 loadAdminUsers();
                               }
                             }}
                           >
-                            {u.banned ? "Unban" : "Ban"}
+                            {u.banned ? t("adminUnban") : t("adminBan")}
                           </button>
                         </div>
                       </div>
@@ -900,7 +911,7 @@ export default function UserMenu({
                 loadAdminReports();
               }}
             >
-              Admin
+              {t("adminPanelTitle")}
             </button>
           ) : null}
           <div className="dropdownSep" />
@@ -983,7 +994,11 @@ export default function UserMenu({
                     setAvatarBusy(true);
                     setAvatarError("");
                     Promise.resolve(onChangeAvatar?.(""))
-                      .catch((e) => setAvatarError(e.message || "Failed to update avatar"))
+                      .catch((e) =>
+                        setAvatarError(
+                          e.message === "fileRead" ? t("fileReadFailed") : e.message || t("avatarUpdateFailed")
+                        )
+                      )
                       .finally(() => setAvatarBusy(false));
                   }}
                   disabled={avatarBusy}
@@ -1095,14 +1110,21 @@ export default function UserMenu({
                     className={settings?.lang === "en" ? "pillBtn active" : "pillBtn"}
                     onClick={() => onChangeSettings?.({ lang: "en" })}
                   >
-                    English
+                    {t("langOptionEnglish")}
                   </button>
                   <button
                     type="button"
                     className={settings?.lang === "ru" ? "pillBtn active" : "pillBtn"}
                     onClick={() => onChangeSettings?.({ lang: "ru" })}
                   >
-                    Русский
+                    {t("langOptionRussian")}
+                  </button>
+                  <button
+                    type="button"
+                    className={settings?.lang === "uk" ? "pillBtn active" : "pillBtn"}
+                    onClick={() => onChangeSettings?.({ lang: "uk" })}
+                  >
+                    {t("langOptionUkrainian")}
                   </button>
                 </div>
               </div>
@@ -1154,7 +1176,7 @@ export default function UserMenu({
               {adminNotice ? <div className="muted">{adminNotice}</div> : null}
               <div className="adminTopRow">
                 <button className="ghostBtn" type="button" onClick={loadAdminUsers} disabled={adminLoading}>
-                  Refresh
+                  {t("adminRefresh")}
                 </button>
               </div>
 
@@ -1181,7 +1203,7 @@ export default function UserMenu({
               />
 
               {adminLoading ? (
-                <div className="muted">Loading...</div>
+                <div className="muted">{t("adminLoadingUsers")}</div>
               ) : (
                 <div className="adminUserList">
                   {adminUsers.map((u) => (
@@ -1192,7 +1214,7 @@ export default function UserMenu({
                           <div className={u.is_online ? "presenceDot online" : "presenceDot"} />
                         </div>
                         <div className="adminUserMeta muted small">
-                          role: {u.role} · {u.banned ? "banned" : "active"}
+                          {t("adminRoleLabel")}: {u.role} · {u.banned ? t("adminStatusBanned") : t("adminStatusActive")}
                         </div>
                       </div>
 
@@ -1212,17 +1234,15 @@ export default function UserMenu({
                                 prev.map((x) => (x.id === u.id ? { ...x, ...updated } : x))
                               );
                               setAdminNotice(
-                                u.id === me.id
-                                  ? "Role updated."
-                                  : "Role updated. The user may need to relogin to refresh permissions."
+                                u.id === me.id ? t("adminRoleUpdated") : t("adminRoleUpdatedRelogin")
                               );
                             } catch (e) {
-                              setAdminError(e.message || "Request failed");
+                              setAdminError(e.message || t("adminRequestFailed"));
                               loadAdminUsers();
                             }
                           }}
                         >
-                          {u.role === "admin" ? "Remove admin" : "Make admin"}
+                          {u.role === "admin" ? t("adminRemoveAdmin") : t("adminMakeAdmin")}
                         </button>
                         <button
                           type="button"
@@ -1238,14 +1258,14 @@ export default function UserMenu({
                               setAdminUsers((prev) =>
                                 prev.map((x) => (x.id === u.id ? { ...x, ...updated } : x))
                               );
-                              setAdminNotice(next ? "User banned." : "User unbanned.");
+                              setAdminNotice(next ? t("adminUserBanned") : t("adminUserUnbanned"));
                             } catch (e) {
-                              setAdminError(e.message || "Request failed");
+                              setAdminError(e.message || t("adminRequestFailed"));
                               loadAdminUsers();
                             }
                           }}
                         >
-                          {u.banned ? "Unban" : "Ban"}
+                          {u.banned ? t("adminUnban") : t("adminBan")}
                         </button>
                       </div>
                     </div>
@@ -1263,7 +1283,7 @@ export default function UserMenu({
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.onerror = () => reject(new Error("fileRead"));
     reader.onload = () => resolve(String(reader.result || ""));
     reader.readAsDataURL(file);
   });
@@ -1298,7 +1318,7 @@ function initials(name) {
 function formatLastSeen(v, lang) {
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return String(v);
-  const locale = lang === "ru" ? "ru-RU" : "en-US";
+  const locale = localeForLang(lang);
   return d.toLocaleString(locale, {
     year: "numeric",
     month: "2-digit",

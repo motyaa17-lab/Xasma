@@ -72,7 +72,7 @@ export default function Auth({ onLogin, onRegister, error, t }) {
               <input
                 value={avatar}
                 onChange={(e) => setAvatar(e.target.value)}
-                placeholder="https://example.com/avatar.png"
+                placeholder={t("avatarUrlPlaceholder")}
               />
             </label>
           ) : null}
