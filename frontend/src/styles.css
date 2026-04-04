@@ -4828,15 +4828,50 @@ body.body--mobileConversationOpen {
 
 .modalCard--mobileFriendly {
   width: min(100vw - 24px, 520px);
-  max-height: min(88vh, 720px);
+  max-height: min(100dvh - 24px, 720px);
+  min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
+.modalCard--mobileFriendly .modalHeader {
+  flex-shrink: 0;
+}
+
+/* Single scroll surface: body flex-shrinks so overflow-y can scroll inside max-height */
 .modalCard--mobileFriendly .modalBody {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/*
+ * Desktop admin (dropdown UserMenu): plain .modalCard has no max-height, so long
+ * user lists overflow the viewport with no scroll. Bound the card and scroll .modalBody only.
+ */
+.modalCard:has(.adminPanel) {
+  max-height: min(100dvh - 32px, 720px);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modalCard:has(.adminPanel) .modalHeader {
+  flex-shrink: 0;
+}
+
+.modalCard:has(.adminPanel) .modalBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 @media (max-width: 520px) {
