@@ -1,6 +1,6 @@
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import AvatarAura from "./AvatarAura.jsx";
-import MobileChatRowSwipe from "./MobileChatRowSwipe.jsx";
+import MobileChatRowSwipe, { MOBILE_CHAT_SWIPE_ENABLED } from "./MobileChatRowSwipe.jsx";
 import { localeForLang } from "../i18n.js";
 import { formatUserStatusLine } from "../userStatusLine.js";
 import ActivityBadge from "./ActivityBadge.jsx";
@@ -58,6 +58,7 @@ const Sidebar = forwardRef(function Sidebar(
   }, []);
 
   const onMobileChatListScroll = useCallback(() => {
+    if (!MOBILE_CHAT_SWIPE_ENABLED) return;
     if (chatListScrollCloseRaf.current != null) return;
     chatListScrollCloseRaf.current = requestAnimationFrame(() => {
       chatListScrollCloseRaf.current = null;
@@ -583,7 +584,7 @@ const Sidebar = forwardRef(function Sidebar(
             aria-label={t("searchUnifiedPlaceholder")}
           />
         </div>
-        <div className="mobileChatListScroll" onScroll={onMobileChatListScroll}>
+        <div className="mobileChatListScroll" onScroll={MOBILE_CHAT_SWIPE_ENABLED ? onMobileChatListScroll : undefined}>
           {canSearch && searching ? (
             <div className="mobileSearchStatus muted" role="status">
               {t("searching")}
@@ -702,8 +703,8 @@ const Sidebar = forwardRef(function Sidebar(
                   onOpenChat={() => onSelectChat(c.id)}
                   onRequestDelete={() => setDeleteConfirmId(c.id)}
                   onToggleListPin={() => onChatListPinToggle(c.id, !c.listPinned)}
-                  shouldCollapse={swipeOpenId !== null && swipeOpenId !== c.id}
-                  scrollCloseNonce={swipeScrollNonce}
+                  shouldCollapse={MOBILE_CHAT_SWIPE_ENABLED && swipeOpenId !== null && swipeOpenId !== c.id}
+                  scrollCloseNonce={MOBILE_CHAT_SWIPE_ENABLED ? swipeScrollNonce : 0}
                   onSwipeActiveChange={handleSwipePhase}
                   t={t}
                 >

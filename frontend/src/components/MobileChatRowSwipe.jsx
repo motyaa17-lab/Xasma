@@ -1,5 +1,11 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 
+/**
+ * Emergency / rollout switch: touch chat rows use plain buttons when false.
+ * Keeps full swipe implementation in this file; set to true after iOS rendering is verified.
+ */
+export const MOBILE_CHAT_SWIPE_ENABLED = false;
+
 /** Reveal width (px) — slightly softer than a full 76px rail. */
 const ACTION_PX = 62;
 /** Horizontal movement (px) before swipe can activate (12–18px range). */
@@ -87,7 +93,9 @@ export default function MobileChatRowSwipe({
   const touchIdRef = useRef(null);
   const rafRef = useRef(0);
 
-  const touchEnabled = isTouchDevice();
+  const isTouch = isTouchDevice();
+  /** Touch without swipe flag → same plain row as desktop (avoids iOS white-screen / compositor issues). */
+  const useSwipeUi = isTouch && MOBILE_CHAT_SWIPE_ENABLED;
 
   const applyOffset = useCallback((x, withTransition) => {
     const isRest = withTransition && Math.abs(x) < 0.5;
@@ -109,11 +117,13 @@ export default function MobileChatRowSwipe({
   );
 
   useEffect(() => {
+    if (!useSwipeUi) return;
     if (shouldCollapse && touchIdRef.current == null) snapTo(0);
-  }, [shouldCollapse, snapTo]);
+  }, [shouldCollapse, snapTo, useSwipeUi]);
 
   /** List scroll closes any peek / in-progress row (parent also clears swipeOpenId). */
   useEffect(() => {
+    if (!useSwipeUi) return;
     if (scrollCloseNonce === 0) return;
     touchIdRef.current = null;
     gestureRef.current = "pending";
@@ -123,7 +133,7 @@ export default function MobileChatRowSwipe({
     }
     applyOffset(0, true);
     onSwipeActiveChange?.(chatId, "end");
-  }, [scrollCloseNonce, applyOffset, chatId, onSwipeActiveChange]);
+  }, [scrollCloseNonce, applyOffset, chatId, onSwipeActiveChange, useSwipeUi]);
 
   useEffect(() => {
     return () => {
@@ -142,12 +152,12 @@ export default function MobileChatRowSwipe({
       startOffRef.current = offsetRef.current;
       gestureRef.current = "pending";
     },
-    [touchEnabled]
+    [useSwipeUi]
   );
 
   const onTouchMove = useCallback(
     (e) => {
-      if (!touchEnabled) return;
+      if (!useSwipeUi) return;
       if (touchIdRef.current == null) return;
       const tch = Array.from(e.touches).find((x) => x.identifier === touchIdRef.current);
       if (!tch) return;
@@ -190,7 +200,7 @@ export default function MobileChatRowSwipe({
         applyOffset(next, false);
       });
     },
-    [applyOffset, canDelete, chatId, onSwipeActiveChange, touchEnabled]
+    [applyOffset, canDelete, chatId, onSwipeActiveChange, useSwipeUi]
   );
 
   const touchMoveRef = useRef(onTouchMove);
@@ -198,15 +208,15 @@ export default function MobileChatRowSwipe({
 
   useLayoutEffect(() => {
     const el = frontRef.current;
-    if (!el || !touchEnabled) return;
+    if (!el || !useSwipeUi) return;
     const fn = (e) => touchMoveRef.current(e);
     el.addEventListener("touchmove", fn, { passive: false });
     return () => el.removeEventListener("touchmove", fn);
-  }, [touchEnabled]);
+  }, [useSwipeUi]);
 
   const onTouchEnd = useCallback(
     (e) => {
-      if (!touchEnabled) return;
+      if (!useSwipeUi) return;
       const tid = touchIdRef.current;
       if (tid == null) return;
       const still = [...e.touches].some((x) => x.identifier === tid);
@@ -246,7 +256,7 @@ export default function MobileChatRowSwipe({
 
       onSwipeActiveChange?.(chatId, "end");
     },
-    [canDelete, chatId, onRequestDelete, onSwipeActiveChange, onToggleListPin, snapTo, touchEnabled, applyOffset]
+    [canDelete, chatId, onRequestDelete, onSwipeActiveChange, onToggleListPin, snapTo, useSwipeUi, applyOffset]
   );
 
   const onTouchCancel = useCallback(() => {
@@ -273,7 +283,7 @@ export default function MobileChatRowSwipe({
     [onOpenChat, snapTo]
   );
 
-  if (!touchEnabled) {
+  if (!useSwipeUi) {
     return (
       <button type="button" className={rowClassName} onClick={onOpenChat}>
         {children}
