@@ -1803,6 +1803,55 @@ body.body--mobileConversationOpen {
   z-index: 1;
 }
 
+/*
+ * Mobile WebKit (iOS Safari): built-in animated themes could blank the chat (white layer).
+ * Causes: stacking isolation + animated background-position on a large layer + transform on
+ * pseudo-elements, and especially backdrop-filter on .chatTheme-softBlur inside overflow chains.
+ * Custom photo (.chatTheme-custom) is unaffected — do not change those rules.
+ */
+@keyframes chatThemeMobileOverlayPulse {
+  0% {
+    opacity: 0.82;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.appShell--mobile .chatMain.chatTheme-darkGradient,
+.appShell--mobile .chatMain.chatTheme-night,
+.appShell--mobile .chatMain.chatTheme-softBlur {
+  isolation: auto;
+}
+
+.appShell--mobile .chatTheme-softBlur.chatMain {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.94) 0%, rgba(15, 23, 42, 0.98) 100%);
+}
+
+/* Safer motion: no background-position animation on main; subtle opacity drift on overlay only */
+.appShell--mobile .chatMain.chatTheme-darkGradient.theme-dark-animated,
+.appShell--mobile .chatMain.chatTheme-night.theme-night-animated {
+  background-size: auto;
+  animation: none;
+}
+
+.appShell--mobile .chatMain.chatTheme-darkGradient.theme-dark-animated::before {
+  animation: chatThemeMobileOverlayPulse 24s ease-in-out infinite alternate;
+  transform: none;
+}
+
+.appShell--mobile .chatMain.chatTheme-night.theme-night-animated::before {
+  animation: chatThemeMobileOverlayPulse 26s ease-in-out infinite alternate;
+  transform: none;
+}
+
+.appShell--mobile .chatMain.chatTheme-softBlur.theme-soft-animated::before {
+  animation: chatThemeMobileOverlayPulse 22s ease-in-out infinite alternate;
+  transform: none;
+}
+
 /* User photo — data URL via --chat-custom-bg; dark veil for bubble contrast */
 .chatTheme-custom.chatMain {
   background: #050a14;
