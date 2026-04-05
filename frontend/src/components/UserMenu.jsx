@@ -1028,6 +1028,7 @@ export default function UserMenu({
           }
           onClose={() => setPanel(null)}
           t={t}
+          cardClassName="modalCard--mobileFriendly"
         >
           {panel === "profile" ? (
             <div>

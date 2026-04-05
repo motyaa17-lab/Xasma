@@ -16,6 +16,18 @@ function isTouchDevice() {
 }
 
 /**
+ * iOS / iPadOS WebKit: stacked swipe rows (overflow + transform layers) in a scroll view can
+ * blank the chat list (white layer). Use plain tap rows there; Android/desktop touch keeps swipe.
+ */
+function isIosLikeDevice() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  if (/iP(hone|ad|od)/.test(ua)) return true;
+  if (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) return true;
+  return false;
+}
+
+/**
  * Touch-only swipe actions behind a chat list row (mobile inbox).
  * Left: delete (caller shows confirm). Right: pin/unpin inbox order.
  * Horizontal intent steals the gesture from vertical scroll; vertical scroll stays smooth otherwise.
@@ -43,6 +55,7 @@ export default function MobileChatRowSwipe({
   const rafRef = useRef(0);
 
   const touchEnabled = isTouchDevice();
+  const swipeUiEnabled = touchEnabled && !isIosLikeDevice();
 
   const applyOffset = useCallback((x, withTransition) => {
     offsetRef.current = x;
@@ -71,7 +84,7 @@ export default function MobileChatRowSwipe({
 
   const onTouchStart = useCallback(
     (e) => {
-      if (!touchEnabled) return;
+      if (!swipeUiEnabled) return;
       if (e.touches.length !== 1) return;
       const tch = e.touches[0];
       touchIdRef.current = tch.identifier;
@@ -80,12 +93,12 @@ export default function MobileChatRowSwipe({
       startOffRef.current = offsetRef.current;
       horizontalRef.current = false;
     },
-    [touchEnabled]
+    [swipeUiEnabled]
   );
 
   const onTouchMove = useCallback(
     (e) => {
-      if (!touchEnabled) return;
+      if (!swipeUiEnabled) return;
       if (touchIdRef.current == null) return;
       const tch = Array.from(e.touches).find((x) => x.identifier === touchIdRef.current);
       if (!tch) return;
@@ -116,7 +129,7 @@ export default function MobileChatRowSwipe({
         applyOffset(next, false);
       });
     },
-    [applyOffset, canDelete, chatId, onSwipeActiveChange, touchEnabled]
+    [applyOffset, canDelete, chatId, onSwipeActiveChange, swipeUiEnabled]
   );
 
   const touchMoveRef = useRef(onTouchMove);
@@ -124,15 +137,15 @@ export default function MobileChatRowSwipe({
 
   useLayoutEffect(() => {
     const el = frontRef.current;
-    if (!el || !touchEnabled) return;
+    if (!el || !swipeUiEnabled) return;
     const fn = (e) => touchMoveRef.current(e);
     el.addEventListener("touchmove", fn, { passive: false });
     return () => el.removeEventListener("touchmove", fn);
-  }, [touchEnabled]);
+  }, [swipeUiEnabled]);
 
   const onTouchEnd = useCallback(
     (e) => {
-      if (!touchEnabled) return;
+      if (!swipeUiEnabled) return;
       const tid = touchIdRef.current;
       if (tid == null) return;
       const still = [...e.touches].some((x) => x.identifier === tid);
@@ -159,7 +172,7 @@ export default function MobileChatRowSwipe({
       }
       onSwipeActiveChange?.(chatId, "end");
     },
-    [canDelete, chatId, onRequestDelete, onSwipeActiveChange, onToggleListPin, snapTo, touchEnabled]
+    [canDelete, chatId, onRequestDelete, onSwipeActiveChange, onToggleListPin, snapTo, swipeUiEnabled]
   );
 
   const onTouchCancel = useCallback(() => {
@@ -182,7 +195,7 @@ export default function MobileChatRowSwipe({
     [onOpenChat, snapTo]
   );
 
-  if (!touchEnabled) {
+  if (!swipeUiEnabled) {
     return (
       <button type="button" className={rowClassName} onClick={onOpenChat}>
         {children}

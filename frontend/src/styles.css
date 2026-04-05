@@ -4257,9 +4257,9 @@ body.body--mobileConversationOpen {
   margin-bottom: 3px;
   border-radius: 14px;
   flex-shrink: 0;
-  /* Clip underlay to rounded rect; isolate stacking for WebKit */
-  isolation: isolate;
-  contain: paint;
+  /* Do NOT use contain: paint / isolation here — iOS Safari can blank the chat list (white layer)
+     when many swipe rows sit inside .mobileChatListScroll. Clipping comes from overflow + radius;
+     idle opacity is handled by .mobileChatRowSwipeFront.mobileChatRow opaque background. */
 }
 
 .mobileChatRowSwipeUnder {
@@ -4307,12 +4307,14 @@ body.body--mobileConversationOpen {
 /* Swipe rows: opaque card — base .mobileChatRow uses rgba(..., 0.55) which lets pin/delete pads show through at rest. */
 .mobileChatRowSwipeFront.mobileChatRow {
   margin-bottom: 0;
-  background: linear-gradient(180deg, rgb(17, 27, 46), rgb(11, 18, 32));
+  background-color: rgb(17, 27, 46);
+  background-image: linear-gradient(180deg, rgb(17, 27, 46), rgb(11, 18, 32));
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .mobileChatRowSwipeFront.mobileChatRow:active {
-  background: linear-gradient(180deg, rgb(19, 31, 52), rgb(12, 20, 36));
+  background-color: rgb(19, 31, 52);
+  background-image: linear-gradient(180deg, rgb(19, 31, 52), rgb(12, 20, 36));
   border-color: rgba(59, 130, 246, 0.25);
 }
 
@@ -4958,14 +4960,21 @@ body.body--mobileConversationOpen {
 
 .mobilePane--settings {
   background: rgba(11, 18, 32, 0.98);
+  /* Flex child of .mobileStage: allow shrinking so .mobileSettingsScroll gets a bounded height */
+  min-height: 0;
 }
 
+/* Single vertical scroll for mobile Settings tab (header fixed; list scrolls) */
 .mobileSettingsScroll {
-  flex: 1;
+  flex: 1 1 0%;
   min-height: 0;
+  max-height: 100%;
+  overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 12px 14px 24px;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  padding: 12px 14px max(24px, env(safe-area-inset-bottom));
 }
 
 .userMenu--mobilePage {
