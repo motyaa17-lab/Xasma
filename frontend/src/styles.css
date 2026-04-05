@@ -1036,6 +1036,72 @@ body.body--mobileConversationOpen {
   background: rgba(17, 27, 46, 0.35);
 }
 
+.chatPinnedBar {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  padding: 8px 12px 8px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(99, 102, 241, 0.12);
+  min-height: 40px;
+}
+
+.chatPinnedBarMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.08s ease;
+}
+
+.chatPinnedBarMain:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.chatPinnedBarIcon {
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.chatPinnedBarText {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.95;
+}
+
+.chatPinnedBarUnpin {
+  flex-shrink: 0;
+  width: 36px;
+  border-radius: 10px;
+  border: none;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.08s ease;
+}
+
+.chatPinnedBarUnpin:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .chatHeaderLead {
   display: flex;
   align-items: center;

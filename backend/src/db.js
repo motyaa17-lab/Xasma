@@ -161,6 +161,11 @@ async function initDb() {
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS tag_color TEXT`);
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS tag_style TEXT`);
 
+  await query(`
+    ALTER TABLE chats ADD COLUMN IF NOT EXISTS pinned_message_id BIGINT
+    REFERENCES messages(id) ON DELETE SET NULL
+  `);
+
   // Backfill message counts from existing text messages (system messages excluded).
   await query(`
     UPDATE users u

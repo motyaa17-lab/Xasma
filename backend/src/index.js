@@ -217,6 +217,34 @@ function canManageGroupMembers(req, chat) {
   return Number(chat.created_by) === Number(req.user.id) || req.user.role === "admin";
 }
 
+/** Direct: both participants. Group: creator or app admin only. Official: none. */
+function canPinMessage(req, chat) {
+  if (!chat) return false;
+  if (chat.type === "official") return false;
+  const uid = Number(req.user.id);
+  if (chat.type === "direct") {
+    return Number(chat.user1_id) === uid || Number(chat.user2_id) === uid;
+  }
+  if (chat.type === "group") {
+    return Number(chat.created_by) === uid || req.user.role === "admin";
+  }
+  return false;
+}
+
+/** Short preview for pinned bar (aligned with chat list last-message hints). */
+function pinnedPreviewFromPinnedJoinRow(c) {
+  if (c.pinned_message_id == null) return null;
+  const mt = c.pinned_message_type || "text";
+  if (mt === "system") return "[Event]";
+  const text = String(c.pinned_text || "").trim();
+  if (c.pinned_video_url && !text) return "[Video message]";
+  if (c.pinned_audio_url && !text) return "[Voice message]";
+  if (c.pinned_image_url && !text) return "[Photo]";
+  const t = text.replace(/\s+/g, " ").trim();
+  if (!t) return "…";
+  return t.length > 200 ? `${t.slice(0, 197)}…` : t;
+}
+
 function normalizeChatUsers(a, b) {
   // Ensure we store each one-to-one chat in a single canonical order.
   return a < b ? [a, b] : [b, a];
@@ -270,10 +298,35 @@ async function backfillOfficialChatsForAllUsers() {
 
 async function getChatById(chatId) {
   const r = await query(
-    `SELECT id, type, title, created_by, user1_id, user2_id, avatar_url, official_for_user_id FROM chats WHERE id = $1`,
+    `SELECT id, type, title, created_by, user1_id, user2_id, avatar_url, official_for_user_id, pinned_message_id FROM chats WHERE id = $1`,
     [chatId]
   );
   return r.rows[0] || null;
+}
+
+async function emitChatPinnedUpdated(chatId) {
+  const cid = Number(chatId);
+  if (!cid) return;
+  const r = await query(
+    `SELECT c.pinned_message_id,
+            pm.message_type AS pinned_message_type,
+            pm.text AS pinned_text,
+            pm.image_url AS pinned_image_url,
+            pm.audio_url AS pinned_audio_url,
+            pm.video_url AS pinned_video_url
+     FROM chats c
+     LEFT JOIN messages pm ON pm.id = c.pinned_message_id
+     WHERE c.id = $1`,
+    [cid]
+  );
+  const row = r.rows[0];
+  const pid = row?.pinned_message_id != null ? Number(row.pinned_message_id) : null;
+  const preview = pid ? pinnedPreviewFromPinnedJoinRow(row) : null;
+  await emitToChatMemberSockets(cid, "chat:pinnedUpdated", {
+    chatId: cid,
+    pinnedMessageId: pid,
+    pinnedPreview: preview,
+  });
 }
 
 async function isUserChatMember(chatId, userId) {
@@ -905,6 +958,12 @@ app.get("/api/chats", authRequired, (req, res) => {
         c.title AS chat_title,
         c.created_by AS chat_created_by,
         c.avatar_url AS chat_avatar_url,
+        c.pinned_message_id,
+        pm.message_type AS pinned_message_type,
+        pm.text AS pinned_text,
+        pm.image_url AS pinned_image_url,
+        pm.audio_url AS pinned_audio_url,
+        pm.video_url AS pinned_video_url,
         c.user1_id,
         c.user2_id,
         other.id AS other_id,
@@ -939,6 +998,7 @@ app.get("/api/chats", authRequired, (req, res) => {
         ) AS unread_count
       FROM chat_members mym
       JOIN chats c ON c.id = mym.chat_id
+      LEFT JOIN messages pm ON pm.id = c.pinned_message_id
       LEFT JOIN users other
         ON c.type = 'direct'
         AND other.id = CASE WHEN c.user1_id = $1 THEN c.user2_id ELSE c.user1_id END
@@ -1021,9 +1081,63 @@ app.get("/api/chats", authRequired, (req, res) => {
             ? { text: c.last_text, createdAt: c.last_created_at, senderId: Number(c.last_sender_id) }
             : null,
           unreadCount: Number(c.unread_count) || 0,
+          pinnedMessageId: c.pinned_message_id != null ? Number(c.pinned_message_id) : null,
+          pinnedPreview: pinnedPreviewFromPinnedJoinRow(c),
         };
       }),
     });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
+app.patch("/api/chats/:chatId/pin", authRequired, (req, res) => {
+  const chatId = Number(req.params.chatId);
+  if (!chatId) return res.status(400).json({ error: "Invalid chat id" });
+  const raw = req.body?.messageId;
+  const messageId = raw === null || raw === undefined || raw === "" ? null : Number(raw);
+
+  (async () => {
+    const uid = Number(req.user.id);
+    const chat = await getChatById(chatId);
+    if (!chat) return res.status(404).json({ error: "Chat not found" });
+    if (!(await isUserChatMember(chatId, uid))) return res.status(403).json({ error: "Not a member of this chat" });
+    if (!canPinMessage(req, chat)) return res.status(403).json({ error: "Not allowed to pin messages" });
+
+    if (messageId === null || Number.isNaN(Number(messageId))) {
+      await query(`UPDATE chats SET pinned_message_id = NULL WHERE id = $1`, [chatId]);
+      await emitChatPinnedUpdated(chatId);
+      return res.json({ ok: true, pinnedMessageId: null, pinnedPreview: null });
+    }
+
+    const mid = Number(messageId);
+    if (!mid) return res.status(400).json({ error: "Invalid message id" });
+
+    const msgCheck = await query(
+      `SELECT id, chat_id, COALESCE(message_type, 'text') AS message_type FROM messages WHERE id = $1 AND chat_id = $2`,
+      [mid, chatId]
+    );
+    const mr = msgCheck.rows[0];
+    if (!mr) return res.status(404).json({ error: "Message not found" });
+    if (String(mr.message_type) === "system") return res.status(400).json({ error: "Cannot pin system messages" });
+
+    await query(`UPDATE chats SET pinned_message_id = $1 WHERE id = $2`, [mid, chatId]);
+    await emitChatPinnedUpdated(chatId);
+
+    const snap = await query(
+      `SELECT c.pinned_message_id,
+              pm.message_type AS pinned_message_type,
+              pm.text AS pinned_text,
+              pm.image_url AS pinned_image_url,
+              pm.audio_url AS pinned_audio_url,
+              pm.video_url AS pinned_video_url
+       FROM chats c
+       LEFT JOIN messages pm ON pm.id = c.pinned_message_id
+       WHERE c.id = $1`,
+      [chatId]
+    );
+    const row = snap.rows[0];
+    const pid = row?.pinned_message_id != null ? Number(row.pinned_message_id) : null;
+    const preview = pid ? pinnedPreviewFromPinnedJoinRow(row) : null;
+    return res.json({ ok: true, pinnedMessageId: pid, pinnedPreview: preview });
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });
 
@@ -1891,10 +2005,14 @@ app.delete("/api/admin/messages/:messageId", authRequired, requireAdmin, (req, r
     const row = r.rows[0];
     if (!row) return res.status(404).json({ error: "Message not found" });
 
+    const chatId = Number(row.chat_id);
+    const pinR = await query(`SELECT pinned_message_id FROM chats WHERE id = $1`, [chatId]);
+    const wasPinned = Number(pinR.rows[0]?.pinned_message_id) === messageId;
+
     await query(`DELETE FROM messages WHERE id = $1`, [messageId]);
 
-    const chatId = Number(row.chat_id);
     await emitToChatMemberSockets(chatId, "message:deleted", { chatId, messageId });
+    if (wasPinned) await emitChatPinnedUpdated(chatId);
 
     return res.json({ ok: true });
   })().catch(() => res.status(500).json({ error: "Server error" }));

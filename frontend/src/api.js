@@ -112,6 +112,15 @@ export async function createChat(withUserId) {
   return data.chatId;
 }
 
+/** Pin a message in a chat, or pass `null` to unpin. */
+export async function patchChatPin(chatId, messageId) {
+  const data = await apiFetch(`/api/chats/${chatId}/pin`, {
+    method: "PATCH",
+    body: { messageId: messageId == null ? null : Number(messageId) },
+  });
+  return data;
+}
+
 export async function createGroup({ title, memberUserIds }) {
   const data = await apiFetch("/api/groups", {
     method: "POST",

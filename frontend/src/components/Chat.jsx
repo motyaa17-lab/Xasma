@@ -39,12 +39,14 @@ const MessageActionMenuPanel = forwardRef(function MessageActionMenuPanel(
     canEditOwn,
     canReport,
     canAdminDelete,
+    canPin,
     className,
     style,
     onToggleReaction,
     onEdit,
     onReport,
     onAdminDelete,
+    onPin,
     closeMenu,
   },
   ref
@@ -130,6 +132,22 @@ const MessageActionMenuPanel = forwardRef(function MessageActionMenuPanel(
           {t("deleteMessage")}
         </button>
       ) : null}
+      {canPin ? (
+        <button
+          type="button"
+          className="msgMenuItem"
+          role="menuitem"
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            closeMenu();
+            onPin?.();
+          }}
+        >
+          {t("pinMessage")}
+        </button>
+      ) : null}
     </div>
   );
 });
@@ -211,6 +229,7 @@ export default function Chat({
   onMobileBack,
   sendRateLimitNotice = "",
   meAuraColor,
+  onSetChatPin,
 }) {
   const safeMessages = useMemo(() => {
     if (!Array.isArray(messages)) return [];
@@ -221,6 +240,18 @@ export default function Chat({
   const isGroup = chat?.type === "group";
   const isOfficial = chat?.type === "official";
   const isMobileChat = Boolean(onMobileBack);
+
+  const canPinForUser = useMemo(() => {
+    if (!chat || isOfficial) return false;
+    if (isBanned && !isAdmin) return false;
+    if (chat.type === "direct") return true;
+    if (chat.type === "group") {
+      return (
+        (chat.createdBy != null && Number(chat.createdBy) === Number(meId)) || Boolean(isAdmin)
+      );
+    }
+    return false;
+  }, [chat, meId, isOfficial, isAdmin, isBanned]);
 
   const [text, setText] = useState("");
   const [editingMessageId, setEditingMessageId] = useState(null);
@@ -252,6 +283,12 @@ export default function Chat({
   const [profileUserId, setProfileUserId] = useState(null);
   const [replyToMessage, setReplyToMessage] = useState(null); // { id, senderUsername, preview }
   const listRef = useRef(null);
+  const scrollToMessageById = useCallback((mid) => {
+    const id = Number(mid);
+    if (!id || !listRef.current) return;
+    const el = listRef.current.querySelector(`[data-message-id="${id}"]`);
+    el?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, []);
   const nearBottomRef = useRef(true);
   const scrollAfterSendRef = useRef(false);
   const scrollAfterSendClearTimerRef = useRef(null);
@@ -451,14 +488,16 @@ export default function Chat({
     const canAdminDelete = Boolean(isAdmin);
     const canReport =
       !isOfficial && !isBanned && m.senderId !== meId && (m.type || "text") !== "system";
+    const canPin = canPinForUser && (m.type || "text") !== "system";
     return {
       canQuickReact: !isBanned,
       canEditOwn,
       canReport,
       canAdminDelete,
-      hasSecondaryActions: canEditOwn || canReport || canAdminDelete,
+      canPin,
+      hasSecondaryActions: canEditOwn || canReport || canAdminDelete || canPin,
     };
-  }, [mobileMenuTarget, meId, isBanned, isAdmin, isOfficial]);
+  }, [mobileMenuTarget, meId, isBanned, isAdmin, isOfficial, canPinForUser]);
 
   const clearBubbleLongPress = useCallback(() => {
     if (longPressTimerRef.current != null) {
@@ -2049,6 +2088,34 @@ export default function Chat({
             ) : null}
           </div>
 
+          {chat?.pinnedMessageId ? (
+            <div className="chatPinnedBar">
+              <button
+                type="button"
+                className="chatPinnedBarMain"
+                onClick={() => scrollToMessageById(chat.pinnedMessageId)}
+                aria-label={t("pinnedMessageJump")}
+              >
+                <span className="chatPinnedBarIcon" aria-hidden>
+                  📌
+                </span>
+                <span className="chatPinnedBarText">
+                  {String(chat.pinnedPreview || "").trim() || "…"}
+                </span>
+              </button>
+              {canPinForUser ? (
+                <button
+                  type="button"
+                  className="chatPinnedBarUnpin"
+                  onClick={() => onSetChatPin?.(null)}
+                  aria-label={t("unpinMessage")}
+                >
+                  ×
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
           {isGroup && chatId ? (
             <GroupInfoModal
               open={groupInfoOpen}
@@ -2092,10 +2159,13 @@ export default function Chat({
                   const isVoiceOnly =
                     Boolean(m.audioUrl) && !m.imageUrl && !m.videoUrl && !textTrim && !m.editedAt;
                   const bubbleMediaBare = isCircleVideoOnly || isVoiceOnly ? " bubbleMediaBare" : "";
+                  const canPinThisMessage =
+                    Boolean(canPinForUser) && (m.type || "text") !== "system";
                   const showBubbleInteractionMenu =
                     (!isOfficial || isAdmin) &&
                     ((m.senderId === meId && (!isBanned || isAdmin)) ||
-                      (m.senderId !== meId && (isAdmin || !isBanned)));
+                      (m.senderId !== meId && (isAdmin || !isBanned)) ||
+                      canPinThisMessage);
                   const showMenuButton = showBubbleInteractionMenu && !isMobileChat;
                   const canQuickReact = !isBanned;
                   const canEditOwn = m.senderId === meId && !isBanned;
@@ -2105,7 +2175,8 @@ export default function Chat({
                     !isBanned &&
                     m.senderId !== meId &&
                     (m.type || "text") !== "system";
-                  const hasSecondaryActions = canEditOwn || canReport || canAdminDelete;
+                  const hasSecondaryActions =
+                    canEditOwn || canReport || canAdminDelete || canPinThisMessage;
 
                   const msgAura =
                     (m.senderId === meId ? meAuraColor : m.sender?.auraColor) || undefined;
@@ -2113,6 +2184,7 @@ export default function Chat({
                   return (
                 <div
                   key={m.id}
+                  data-message-id={m.id}
                   className={`bubbleRow${m.senderId === meId ? " me" : ""}${
                     enteringMessageIds.has(String(m.id))
                       ? m.senderId === meId
@@ -2236,6 +2308,7 @@ export default function Chat({
                             canEditOwn={canEditOwn}
                             canReport={canReport}
                             canAdminDelete={canAdminDelete}
+                            canPin={canPinThisMessage}
                             className="msgMenuDropdown"
                             onToggleReaction={(emo) => onToggleReaction?.(m.id, emo)}
                             onEdit={() => {
@@ -2245,6 +2318,7 @@ export default function Chat({
                             }}
                             onReport={() => setReportTargetMessage(m)}
                             onAdminDelete={() => onAdminDeleteMessage?.(m.id)}
+                            onPin={() => onSetChatPin?.(m.id)}
                             closeMenu={() => setMenuMessageId(null)}
                           />
                         ) : null}
@@ -2716,6 +2790,7 @@ export default function Chat({
                     canEditOwn={mobileMenuFlags.canEditOwn}
                     canReport={mobileMenuFlags.canReport}
                     canAdminDelete={mobileMenuFlags.canAdminDelete}
+                    canPin={mobileMenuFlags.canPin}
                     className={`msgMenuDropdown msgMenuDropdown--mobileFixed${
                       mobileMenuPlacement?.openUp ? " msgMenuDropdown--openUp" : ""
                     }`}
@@ -2748,6 +2823,7 @@ export default function Chat({
                     }}
                     onReport={() => setReportTargetMessage(mobileMenuTarget)}
                     onAdminDelete={() => onAdminDeleteMessage?.(mobileMenuTarget.id)}
+                    onPin={() => onSetChatPin?.(mobileMenuTarget.id)}
                     closeMenu={() => setMenuMessageId(null)}
                   />,
                   document.body

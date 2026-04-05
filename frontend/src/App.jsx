@@ -14,6 +14,7 @@ import {
   getChats,
   getMe,
   getMessages,
+  patchChatPin,
   login,
   register,
   adminDeleteMessage,
@@ -337,11 +338,32 @@ export default function App() {
     });
 
     socket.on("message:deleted", ({ chatId, messageId }) => {
-      const openChatId = selectedChatIdRef.current;
-      if (!openChatId || Number(chatId) !== openChatId) return;
+      const cid = Number(chatId);
       const mid = Number(messageId);
-      if (!mid) return;
-      setMessages((prev) => prev.filter((m) => Number(m.id) !== mid));
+      if (!cid || !mid) return;
+      const openChatId = selectedChatIdRef.current;
+      if (openChatId && cid === openChatId) {
+        setMessages((prev) => prev.filter((m) => Number(m.id) !== mid));
+      }
+      setChats((prev) =>
+        prev.map((c) =>
+          c.id === cid && Number(c.pinnedMessageId) === mid
+            ? { ...c, pinnedMessageId: null, pinnedPreview: null }
+            : c
+        )
+      );
+    });
+
+    socket.on("chat:pinnedUpdated", ({ chatId, pinnedMessageId, pinnedPreview } = {}) => {
+      const cid = Number(chatId);
+      if (!cid) return;
+      const pid = pinnedMessageId != null ? Number(pinnedMessageId) : null;
+      const pv = typeof pinnedPreview === "string" ? pinnedPreview : pinnedPreview == null ? null : String(pinnedPreview);
+      setChats((prev) =>
+        prev.map((c) =>
+          c.id === cid ? { ...c, pinnedMessageId: pid, pinnedPreview: pv } : c
+        )
+      );
     });
 
     socket.on("user:roleUpdated", ({ userId, role }) => {
@@ -464,6 +486,7 @@ export default function App() {
       socket.off("message:edited");
       socket.off("message:reactionsUpdated");
       socket.off("message:deleted");
+      socket.off("chat:pinnedUpdated");
       socket.off("user:roleUpdated");
       socket.off("user:banned");
       socket.off("group:avatarUpdated");
@@ -485,6 +508,27 @@ export default function App() {
   async function refreshMessages(chatId) {
     const list = await getMessages(chatId, 50);
     setMessages(list);
+  }
+
+  async function handleSetChatPin(messageId) {
+    const cid = selectedChatId;
+    if (!cid) return;
+    try {
+      const data = await patchChatPin(cid, messageId);
+      setChats((prev) =>
+        prev.map((c) =>
+          c.id === Number(cid)
+            ? {
+                ...c,
+                pinnedMessageId: data.pinnedMessageId ?? null,
+                pinnedPreview: data.pinnedPreview ?? null,
+              }
+            : c
+        )
+      );
+    } catch {
+      /* ignore; Chat stays consistent on next refresh */
+    }
   }
 
   async function selectChat(chatId) {
@@ -696,6 +740,7 @@ export default function App() {
     lang: settings.lang,
     sendRateLimitNotice,
     meAuraColor: me?.auraColor,
+    onSetChatPin: handleSetChatPin,
   };
 
   const chatPropsDesktop = { ...chatPropsBase, onMobileBack: undefined };
