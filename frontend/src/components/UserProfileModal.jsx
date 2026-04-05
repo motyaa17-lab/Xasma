@@ -3,6 +3,7 @@ import { getUserById } from "../api.js";
 import AvatarAura from "./AvatarAura.jsx";
 import { formatUserStatusLine } from "../userStatusLine.js";
 import ActivityBadge from "./ActivityBadge.jsx";
+import UserTagBadge from "./UserTagBadge.jsx";
 
 function initials(name) {
   const s = String(name || "").trim();
@@ -59,6 +60,7 @@ export default function UserProfileModal({ open, userId, onClose, t, lang = "en"
               <div className="profileMain">
                 <div className="profileValue">
                   {user.username}
+                  <UserTagBadge tag={user.tag} tagColor={user.tagColor} tagStyle={user.tagStyle} />
                   <ActivityBadge messageCount={user.messageCount} t={t} />
                 </div>
                 <div className="muted small">{formatUserStatusLine(user, t, lang)}</div>

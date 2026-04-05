@@ -386,6 +386,31 @@ export default function App() {
       );
     });
 
+    socket.on("user:tagUpdated", ({ userId, tag, tagColor, tagStyle } = {}) => {
+      const uid = Number(userId);
+      if (!uid) return;
+      const tg = typeof tag === "string" ? tag : "";
+      const tc = typeof tagColor === "string" ? tagColor : "";
+      const ts = tagStyle === "gradient" ? "gradient" : "solid";
+      setMe((prev) =>
+        prev && prev.id === uid ? { ...prev, tag: tg, tagColor: tc, tagStyle: ts } : prev
+      );
+      setChats((prev) =>
+        prev.map((c) =>
+          c.other?.id === uid
+            ? { ...c, other: { ...c.other, tag: tg, tagColor: tc, tagStyle: ts } }
+            : c
+        )
+      );
+      setMessages((prev) =>
+        prev.map((m) =>
+          Number(m.senderId) === uid && m.sender
+            ? { ...m, sender: { ...m.sender, tag: tg, tagColor: tc, tagStyle: ts } }
+            : m
+        )
+      );
+    });
+
     socket.on("user:profileStatus", ({ userId, statusKind, statusText } = {}) => {
       const uid = Number(userId);
       if (!uid) return;
@@ -443,6 +468,7 @@ export default function App() {
       socket.off("user:banned");
       socket.off("group:avatarUpdated");
       socket.off("user:auraColor");
+      socket.off("user:tagUpdated");
       socket.off("user:profileStatus");
       socket.off("user:messageCount");
       socket.off("chat:sendRateLimited");

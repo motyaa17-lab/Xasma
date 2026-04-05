@@ -7,6 +7,7 @@ import VoiceMessagePlayer from "./VoiceMessagePlayer.jsx";
 import CircleVideoMessage from "./CircleVideoMessage.jsx";
 import UserProfileModal from "./UserProfileModal.jsx";
 import ActivityBadge from "./ActivityBadge.jsx";
+import UserTagBadge from "./UserTagBadge.jsx";
 import { localeForLang } from "../i18n.js";
 import { formatUserStatusLine } from "../userStatusLine.js";
 
@@ -2252,6 +2253,11 @@ export default function Chat({
                     {isGroup ? (
                       <div className="msgSenderName">
                         {m.sender?.username || "?"}
+                        <UserTagBadge
+                          tag={m.sender?.tag}
+                          tagColor={m.sender?.tagColor}
+                          tagStyle={m.sender?.tagStyle}
+                        />
                         <ActivityBadge messageCount={m.sender?.messageCount} t={t} />
                       </div>
                     ) : null}

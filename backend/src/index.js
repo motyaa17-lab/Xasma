@@ -33,6 +33,45 @@ function parseAuraColorBody(body) {
   return { ok: false };
 }
 
+const DEFAULT_TAG_COLOR = "#6366f1";
+
+function normalizeTagColorApi(raw) {
+  if (raw == null || raw === "") return DEFAULT_TAG_COLOR;
+  const s = String(raw).trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(s)) return s.toLowerCase();
+  if (/^#[0-9a-fA-F]{3}$/.test(s)) {
+    const x = s.slice(1);
+    return `#${x[0]}${x[0]}${x[1]}${x[1]}${x[2]}${x[2]}`.toLowerCase();
+  }
+  return DEFAULT_TAG_COLOR;
+}
+
+function normalizeTagStyleApi(raw) {
+  return String(raw || "").trim().toLowerCase() === "gradient" ? "gradient" : "solid";
+}
+
+/** Tag badge fields for API sender/other objects (from users row joined as mr). */
+function buildSenderTagsFromRow(mr, fromOfficial) {
+  if (fromOfficial) return { tag: null, tagColor: DEFAULT_TAG_COLOR, tagStyle: "solid" };
+  const rawTag = mr.user_tag != null ? String(mr.user_tag).trim() : "";
+  if (!rawTag) return { tag: null, tagColor: DEFAULT_TAG_COLOR, tagStyle: "solid" };
+  return {
+    tag: rawTag.length > 40 ? rawTag.slice(0, 40) : rawTag,
+    tagColor: normalizeTagColorApi(mr.tag_color),
+    tagStyle: normalizeTagStyleApi(mr.tag_style),
+  };
+}
+
+function buildOtherUserTagsFromChatRow(c) {
+  const rawTag = c.other_user_tag != null ? String(c.other_user_tag).trim() : "";
+  if (!rawTag) return { tag: null, tagColor: DEFAULT_TAG_COLOR, tagStyle: "solid" };
+  return {
+    tag: rawTag.length > 40 ? rawTag.slice(0, 40) : rawTag,
+    tagColor: normalizeTagColorApi(c.other_tag_color),
+    tagStyle: normalizeTagStyleApi(c.other_tag_style),
+  };
+}
+
 const PORT = process.env.PORT || 4000;
 const uploadsDir = path.join(__dirname, "..", "uploads");
 fs.mkdirSync(uploadsDir, { recursive: true });
@@ -354,14 +393,25 @@ function messageRowToApi(mr, reactions = []) {
   const botId = getOfficialAnnounceUserId();
   const sid = Number(mr.sender_id);
   const fromOfficial = botId && sid === botId;
+  const tagInfo = buildSenderTagsFromRow(mr, fromOfficial);
   const sender = fromOfficial
-    ? { id: sid, username: "Xasma", avatar: "", auraColor: DEFAULT_AURA_COLOR, messageCount: 0 }
+    ? {
+        id: sid,
+        username: "Xasma",
+        avatar: "",
+        auraColor: DEFAULT_AURA_COLOR,
+        messageCount: 0,
+        tag: null,
+        tagColor: DEFAULT_TAG_COLOR,
+        tagStyle: "solid",
+      }
     : {
         id: sid,
         username: mr.username,
         avatar: mr.avatar_url,
         auraColor: normalizeAuraColorApi(mr.aura_color),
         messageCount: Math.max(0, Number(mr.messages_sent_count) || 0),
+        ...tagInfo,
       };
   const replyFromOfficial =
     botId && mr.reply_to_sender_id != null && Number(mr.reply_to_sender_id) === botId;
@@ -404,6 +454,7 @@ async function fetchMessageById(messageId) {
       SELECT m.id, m.chat_id, m.sender_id, m.text, m.reply_to_message_id, m.delivered_at, m.read_at, m.edited_at, m.created_at,
              m.message_type, m.system_kind, m.system_payload, m.image_url, m.audio_url, m.video_url,
              u.username, u.avatar_url, u.aura_color, u.messages_sent_count,
+             u.user_tag, u.tag_color, u.tag_style,
              rm.sender_id AS reply_to_sender_id,
              ru.username AS reply_to_sender_username,
              rm.text AS reply_to_text,
@@ -539,6 +590,9 @@ app.post("/api/register", async (req, res) => {
       banned: Boolean(user.banned),
       auraColor: normalizeAuraColorApi(user.aura_color),
       messageCount: 0,
+      tag: null,
+      tagColor: DEFAULT_TAG_COLOR,
+      tagStyle: "solid",
     },
   });
 });
@@ -548,7 +602,9 @@ app.post("/api/login", async (req, res) => {
   if (!username || !password) return res.status(400).json({ error: "username and password are required" });
 
   const r = await query(
-    `SELECT id, username, password_hash, avatar_url, role, banned, aura_color, messages_sent_count FROM users WHERE username = $1`,
+    `SELECT id, username, password_hash, avatar_url, role, banned, aura_color, messages_sent_count,
+            user_tag, tag_color, tag_style
+     FROM users WHERE username = $1`,
     [username.trim()]
   );
   const user = r.rows[0];
@@ -565,6 +621,7 @@ app.post("/api/login", async (req, res) => {
   }
 
   const token = signToken(user);
+  const tags = buildSenderTagsFromRow(user, false);
   return res.json({
     token,
     user: {
@@ -575,6 +632,9 @@ app.post("/api/login", async (req, res) => {
       banned: Boolean(user.banned),
       auraColor: normalizeAuraColorApi(user.aura_color),
       messageCount: Math.max(0, Number(user.messages_sent_count) || 0),
+      tag: tags.tag,
+      tagColor: tags.tagColor,
+      tagStyle: tags.tagStyle,
     },
   });
 });
@@ -582,11 +642,14 @@ app.post("/api/login", async (req, res) => {
 app.get("/api/me", authRequired, (req, res) => {
   const uid = Number(req.user.id);
   return query(
-    `SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about, aura_color, messages_sent_count FROM users WHERE id = $1`,
+    `SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about, aura_color, messages_sent_count,
+            user_tag, tag_color, tag_style
+     FROM users WHERE id = $1`,
     [uid]
   ).then((r) => {
     const user = r.rows[0];
     if (!user) return res.status(404).json({ error: "User not found" });
+    const tags = buildSenderTagsFromRow(user, false);
   return res.json({
     user: {
       id: Number(user.id),
@@ -601,6 +664,9 @@ app.get("/api/me", authRequired, (req, res) => {
       about: user.about || "",
       auraColor: normalizeAuraColorApi(user.aura_color),
       messageCount: Math.max(0, Number(user.messages_sent_count) || 0),
+      tag: tags.tag,
+      tagColor: tags.tagColor,
+      tagStyle: tags.tagStyle,
     },
   });
   });
@@ -638,12 +704,15 @@ app.put("/api/me/profile", authRequired, (req, res) => {
       ]);
     }
     const r = await query(
-      `SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about, aura_color, messages_sent_count FROM users WHERE id = $1`,
+      `SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about, aura_color, messages_sent_count,
+              user_tag, tag_color, tag_style
+       FROM users WHERE id = $1`,
       [uid]
     );
     const user = r.rows[0];
     if (!user) return res.status(404).json({ error: "User not found" });
     const auraColor = normalizeAuraColorApi(user.aura_color);
+    const tags = buildSenderTagsFromRow(user, false);
     if (!auraParsed.skip) emitToAll("user:auraColor", { userId: uid, auraColor });
     emitToAll("user:profileStatus", {
       userId: uid,
@@ -664,6 +733,9 @@ app.put("/api/me/profile", authRequired, (req, res) => {
         about: user.about || "",
         auraColor,
         messageCount: Math.max(0, Number(user.messages_sent_count) || 0),
+        tag: tags.tag,
+        tagColor: tags.tagColor,
+        tagStyle: tags.tagStyle,
       },
     });
   })().catch(() => res.status(500).json({ error: "Server error" }));
@@ -733,7 +805,8 @@ app.get("/api/users", authRequired, (req, res) => {
     const uid = Number(req.user.id);
     const users = await query(
       `
-      SELECT id, username, avatar_url, aura_color, is_online, last_seen_at, status_kind, status_text, messages_sent_count
+      SELECT id, username, avatar_url, aura_color, is_online, last_seen_at, status_kind, status_text, messages_sent_count,
+             user_tag, tag_color, tag_style
       FROM users
       WHERE id != $1
         AND username != $4
@@ -744,17 +817,23 @@ app.get("/api/users", authRequired, (req, res) => {
       [uid, `%${q}%`, limit, OFFICIAL_SYSTEM_USERNAME]
     );
     return res.json({
-      users: users.rows.map((u) => ({
-        id: Number(u.id),
-        username: u.username,
-        avatar: u.avatar_url,
-        auraColor: normalizeAuraColorApi(u.aura_color),
-        isOnline: Boolean(u.is_online),
-        lastSeenAt: u.last_seen_at,
-        statusKind: u.status_kind || "",
-        statusText: u.status_text || "",
-        messageCount: Math.max(0, Number(u.messages_sent_count) || 0),
-      })),
+      users: users.rows.map((u) => {
+        const tg = buildSenderTagsFromRow(u, false);
+        return {
+          id: Number(u.id),
+          username: u.username,
+          avatar: u.avatar_url,
+          auraColor: normalizeAuraColorApi(u.aura_color),
+          isOnline: Boolean(u.is_online),
+          lastSeenAt: u.last_seen_at,
+          statusKind: u.status_kind || "",
+          statusText: u.status_text || "",
+          messageCount: Math.max(0, Number(u.messages_sent_count) || 0),
+          tag: tg.tag,
+          tagColor: tg.tagColor,
+          tagStyle: tg.tagStyle,
+        };
+      }),
     });
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });
@@ -777,17 +856,22 @@ app.get("/api/users/:userId", authRequired, (req, res) => {
           statusText: "",
           about: "",
           messageCount: 0,
+          tag: null,
+          tagColor: DEFAULT_TAG_COLOR,
+          tagStyle: "solid",
         },
       });
     }
     const r = await query(
-      `SELECT id, username, avatar_url, aura_color, is_online, last_seen_at, status_kind, status_text, about, messages_sent_count
+      `SELECT id, username, avatar_url, aura_color, is_online, last_seen_at, status_kind, status_text, about, messages_sent_count,
+              user_tag, tag_color, tag_style
        FROM users
        WHERE id = $1`,
       [uid]
     );
     const u = r.rows[0];
     if (!u) return res.status(404).json({ error: "User not found" });
+    const tg = buildSenderTagsFromRow(u, false);
     return res.json({
       user: {
         id: Number(u.id),
@@ -800,6 +884,9 @@ app.get("/api/users/:userId", authRequired, (req, res) => {
         statusText: u.status_text || "",
         about: u.about || "",
         messageCount: Math.max(0, Number(u.messages_sent_count) || 0),
+        tag: tg.tag,
+        tagColor: tg.tagColor,
+        tagStyle: tg.tagStyle,
       },
     });
   })().catch(() => res.status(500).json({ error: "Server error" }));
@@ -829,6 +916,9 @@ app.get("/api/chats", authRequired, (req, res) => {
         other.status_kind AS other_status_kind,
         other.status_text AS other_status_text,
         other.messages_sent_count AS other_messages_sent_count,
+        other.user_tag AS other_user_tag,
+        other.tag_color AS other_tag_color,
+        other.tag_style AS other_tag_style,
         lm.text AS last_text,
         lm.created_at AS last_created_at,
         lm.sender_id AS last_sender_id,
@@ -911,6 +1001,9 @@ app.get("/api/chats", authRequired, (req, res) => {
                   statusKind: "",
                   statusText: "",
                   messageCount: 0,
+                  tag: null,
+                  tagColor: DEFAULT_TAG_COLOR,
+                  tagStyle: "solid",
                 }
               : {
                   id: Number(c.other_id),
@@ -922,6 +1015,7 @@ app.get("/api/chats", authRequired, (req, res) => {
                   statusKind: c.other_status_kind || "",
                   statusText: c.other_status_text || "",
                   messageCount: Math.max(0, Number(c.other_messages_sent_count) || 0),
+                  ...buildOtherUserTagsFromChatRow(c),
                 },
           last: c.last_text
             ? { text: c.last_text, createdAt: c.last_created_at, senderId: Number(c.last_sender_id) }
@@ -1009,7 +1103,8 @@ app.get("/api/groups/:chatId", authRequired, (req, res) => {
 
     const members = await query(
       `
-      SELECT u.id, u.username, u.avatar_url, u.is_online, u.last_seen_at, u.messages_sent_count
+      SELECT u.id, u.username, u.avatar_url, u.is_online, u.last_seen_at, u.messages_sent_count,
+             u.user_tag, u.tag_color, u.tag_style
       FROM chat_members cm
       JOIN users u ON u.id = cm.user_id
       WHERE cm.chat_id = $1
@@ -1030,16 +1125,22 @@ app.get("/api/groups/:chatId", authRequired, (req, res) => {
         canManage,
         avatar: chat.avatar_url || "",
       },
-      members: members.rows.map((u) => ({
-        id: Number(u.id),
-        username: u.username,
-        avatar: u.avatar_url,
-        online: Boolean(u.is_online),
-        isOnline: Boolean(u.is_online),
-        lastSeenAt: u.last_seen_at,
-        isCreator: Number(u.id) === createdBy,
-        messageCount: Math.max(0, Number(u.messages_sent_count) || 0),
-      })),
+      members: members.rows.map((u) => {
+        const tg = buildSenderTagsFromRow(u, false);
+        return {
+          id: Number(u.id),
+          username: u.username,
+          avatar: u.avatar_url,
+          online: Boolean(u.is_online),
+          isOnline: Boolean(u.is_online),
+          lastSeenAt: u.last_seen_at,
+          isCreator: Number(u.id) === createdBy,
+          messageCount: Math.max(0, Number(u.messages_sent_count) || 0),
+          tag: tg.tag,
+          tagColor: tg.tagColor,
+          tagStyle: tg.tagStyle,
+        };
+      }),
     });
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });
@@ -1274,6 +1375,9 @@ app.get("/api/chats/:chatId/messages", authRequired, (req, res) => {
       u.avatar_url,
       u.aura_color,
       u.messages_sent_count,
+      u.user_tag,
+      u.tag_color,
+      u.tag_style,
       rm.sender_id AS reply_to_sender_id,
       ru.username AS reply_to_sender_username,
       rm.text AS reply_to_text,
@@ -1455,7 +1559,8 @@ app.put("/api/messages/:messageId", authRequired, (req, res) => {
       `
       SELECT m.id, m.chat_id, m.sender_id, m.text, m.delivered_at, m.read_at, m.edited_at, m.created_at,
              m.message_type, m.system_kind, m.system_payload, m.image_url, m.audio_url, m.video_url,
-             u.username, u.avatar_url, u.aura_color, u.messages_sent_count
+             u.username, u.avatar_url, u.aura_color, u.messages_sent_count,
+             u.user_tag, u.tag_color, u.tag_style
       FROM messages m
       JOIN users u ON u.id = m.sender_id
       WHERE m.id = $1
@@ -1619,7 +1724,8 @@ app.get("/api/admin/users", authRequired, requireAdmin, (req, res) => {
   (async () => {
     const r = await query(
       `
-      SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, created_at, messages_sent_count
+      SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, created_at, messages_sent_count,
+             user_tag, tag_color, tag_style
       FROM users
       WHERE username != $1
       ORDER BY created_at DESC, id DESC
@@ -1627,7 +1733,65 @@ app.get("/api/admin/users", authRequired, requireAdmin, (req, res) => {
       [OFFICIAL_SYSTEM_USERNAME]
     );
     return res.json({
-      users: r.rows.map((u) => ({
+      users: r.rows.map((u) => {
+        const tg = buildSenderTagsFromRow(u, false);
+        return {
+          id: Number(u.id),
+          username: u.username,
+          avatar_url: u.avatar_url,
+          role: u.role,
+          banned: Boolean(u.banned),
+          is_online: Boolean(u.is_online),
+          last_seen_at: u.last_seen_at,
+          created_at: u.created_at,
+          messageCount: Math.max(0, Number(u.messages_sent_count) || 0),
+          tag: tg.tag,
+          tagColor: tg.tagColor,
+          tagStyle: tg.tagStyle,
+        };
+      }),
+    });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
+app.patch("/api/admin/users/:userId/tag", authRequired, requireAdmin, (req, res) => {
+  const userId = Number(req.params.userId);
+  if (!userId) return res.status(400).json({ error: "Invalid user id" });
+  if (getOfficialAnnounceUserId() && userId === getOfficialAnnounceUserId()) {
+    return res.status(400).json({ error: "Not allowed" });
+  }
+
+  const tagRaw = typeof req.body?.tag === "string" ? req.body.tag.trim() : "";
+  const tag = tagRaw.length > 40 ? tagRaw.slice(0, 40) : tagRaw;
+  const tagColorIn = typeof req.body?.tagColor === "string" ? req.body.tagColor.trim() : "";
+  const tagStyle = normalizeTagStyleApi(req.body?.tagStyle);
+
+  (async () => {
+    let userTag = null;
+    let tagColor = null;
+    let tagStyleDb = null;
+    if (tag) {
+      userTag = tag;
+      tagColor = normalizeTagColorApi(tagColorIn);
+      tagStyleDb = tagStyle;
+    }
+
+    const r = await query(
+      `UPDATE users SET user_tag = $1, tag_color = $2, tag_style = $3 WHERE id = $4
+       RETURNING id, username, avatar_url, role, banned, is_online, last_seen_at, created_at, messages_sent_count, user_tag, tag_color, tag_style`,
+      [userTag, tagColor, tagStyleDb, userId]
+    );
+    const u = r.rows[0];
+    if (!u) return res.status(404).json({ error: "User not found" });
+    const tg = buildSenderTagsFromRow(u, false);
+    emitToAll("user:tagUpdated", {
+      userId: Number(u.id),
+      tag: tg.tag,
+      tagColor: tg.tagColor,
+      tagStyle: tg.tagStyle,
+    });
+    return res.json({
+      user: {
         id: Number(u.id),
         username: u.username,
         avatar_url: u.avatar_url,
@@ -1637,7 +1801,10 @@ app.get("/api/admin/users", authRequired, requireAdmin, (req, res) => {
         last_seen_at: u.last_seen_at,
         created_at: u.created_at,
         messageCount: Math.max(0, Number(u.messages_sent_count) || 0),
-      })),
+        tag: tg.tag,
+        tagColor: tg.tagColor,
+        tagStyle: tg.tagStyle,
+      },
     });
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });

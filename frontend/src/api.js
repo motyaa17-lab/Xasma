@@ -273,6 +273,17 @@ export async function adminSetUserBanned(userId, banned) {
   });
 }
 
+export async function adminPatchUserTag(userId, { tag, tagColor, tagStyle } = {}) {
+  return apiFetch(`/api/admin/users/${userId}/tag`, {
+    method: "PATCH",
+    body: {
+      tag: tag != null ? String(tag) : "",
+      tagColor: tagColor != null ? String(tagColor) : "",
+      tagStyle: tagStyle != null ? String(tagStyle) : "solid",
+    },
+  });
+}
+
 export async function adminDeleteMessage(messageId) {
   return apiFetch(`/api/admin/messages/${messageId}`, {
     method: "DELETE",

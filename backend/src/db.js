@@ -157,6 +157,10 @@ async function initDb() {
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS aura_color TEXT`);
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS messages_sent_count BIGINT NOT NULL DEFAULT 0`);
 
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS user_tag TEXT`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS tag_color TEXT`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS tag_style TEXT`);
+
   // Backfill message counts from existing text messages (system messages excluded).
   await query(`
     UPDATE users u

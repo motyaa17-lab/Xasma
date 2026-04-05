@@ -3,6 +3,7 @@ import AvatarAura from "./AvatarAura.jsx";
 import { localeForLang } from "../i18n.js";
 import { formatUserStatusLine } from "../userStatusLine.js";
 import ActivityBadge from "./ActivityBadge.jsx";
+import UserTagBadge from "./UserTagBadge.jsx";
 
 const Sidebar = forwardRef(function Sidebar(
   {
@@ -206,7 +207,10 @@ const Sidebar = forwardRef(function Sidebar(
                       </div>
                     </AvatarAura>
                     <div className="searchResultMain">
-                      <div className="searchUser">{u.username}</div>
+                      <div className="searchUser">
+                        {u.username}
+                        <UserTagBadge tag={u.tag} tagColor={u.tagColor} tagStyle={u.tagStyle} />
+                      </div>
                       <div className="muted small">{memberSelected(u.id) ? "✓" : ""}</div>
                     </div>
                   </button>
@@ -339,6 +343,13 @@ const Sidebar = forwardRef(function Sidebar(
                           <span className="officialChatListBadge">{t("officialChatBadge")}</span>
                         ) : null}
                         {!isGroup && !isOfficial ? (
+                          <UserTagBadge
+                            tag={other?.tag}
+                            tagColor={other?.tagColor}
+                            tagStyle={other?.tagStyle}
+                          />
+                        ) : null}
+                        {!isGroup && !isOfficial ? (
                           <ActivityBadge messageCount={other?.messageCount} t={t} />
                         ) : null}
                       </span>
@@ -386,7 +397,10 @@ const Sidebar = forwardRef(function Sidebar(
                         {u.avatar ? <img src={u.avatar} alt="" /> : <span>{initials(u.username)}</span>}
                       </div>
                     </AvatarAura>
-                    <span className="mobileSearchResultName">{u.username}</span>
+                    <span className="mobileSearchResultName">
+                      {u.username}
+                      <UserTagBadge tag={u.tag} tagColor={u.tagColor} tagStyle={u.tagStyle} />
+                    </span>
                   </button>
                 ))}
               </div>
@@ -413,6 +427,7 @@ const Sidebar = forwardRef(function Sidebar(
           </AvatarAura>
           <div className="meName">
             {me.username}
+            <UserTagBadge tag={me?.tag} tagColor={me?.tagColor} tagStyle={me?.tagStyle} />
             <ActivityBadge messageCount={me?.messageCount} t={t} />
           </div>
         </div>
@@ -482,6 +497,13 @@ const Sidebar = forwardRef(function Sidebar(
                           <span className="officialChatListBadge">{t("officialChatBadge")}</span>
                         ) : null}
                         {!isGroup && !isOfficial ? (
+                          <UserTagBadge
+                            tag={other?.tag}
+                            tagColor={other?.tagColor}
+                            tagStyle={other?.tagStyle}
+                          />
+                        ) : null}
+                        {!isGroup && !isOfficial ? (
                           <ActivityBadge messageCount={other?.messageCount} t={t} />
                         ) : null}
                       </div>
@@ -544,7 +566,10 @@ const Sidebar = forwardRef(function Sidebar(
                   </div>
                 </AvatarAura>
                 <div>
-                  <div className="searchUser">{u.username}</div>
+                  <div className="searchUser">
+                    {u.username}
+                    <UserTagBadge tag={u.tag} tagColor={u.tagColor} tagStyle={u.tagStyle} />
+                  </div>
                 </div>
               </button>
             ))}

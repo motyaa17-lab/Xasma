@@ -4,6 +4,7 @@ import {
   adminListFlaggedMessages,
   adminListMessageReports,
   adminListUsers,
+  adminPatchUserTag,
   adminSetUserBanned,
   adminSetUserRole,
 } from "../api.js";
@@ -13,6 +14,74 @@ import { DEFAULT_AURA_COLOR } from "../avatarAura.js";
 import { USER_STATUS_TEXT_MAX } from "../userStatusLine.js";
 import AvatarAura from "./AvatarAura.jsx";
 import ActivityBadge from "./ActivityBadge.jsx";
+import UserTagBadge from "./UserTagBadge.jsx";
+
+function AdminUserTagEditor({ user, onUpdate, t }) {
+  const [tag, setTag] = useState(user.tag || "");
+  const [tagColor, setTagColor] = useState(user.tagColor || "#6366f1");
+  const [tagStyle, setTagStyle] = useState(user.tagStyle === "gradient" ? "gradient" : "solid");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setTag(user.tag || "");
+    setTagColor(user.tagColor || "#6366f1");
+    setTagStyle(user.tagStyle === "gradient" ? "gradient" : "solid");
+  }, [user.id, user.tag, user.tagColor, user.tagStyle]);
+
+  async function save() {
+    setBusy(true);
+    try {
+      const res = await adminPatchUserTag(user.id, { tag, tagColor, tagStyle });
+      onUpdate?.(res.user);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const colorVal = /^#[0-9a-fA-F]{6}$/.test(String(tagColor || "").trim())
+    ? String(tagColor).trim()
+    : "#6366f1";
+
+  return (
+    <div className="adminUserTagRow">
+      <input
+        type="text"
+        className="adminTagInput"
+        placeholder={t("userTagLabel")}
+        aria-label={t("userTagLabel")}
+        value={tag}
+        onChange={(e) => setTag(e.target.value)}
+        maxLength={40}
+      />
+      <input
+        type="color"
+        className="adminTagColor"
+        aria-label={t("userTagLabel")}
+        value={colorVal}
+        onChange={(e) => setTagColor(e.target.value)}
+      />
+      <div className="adminTagStyleToggle" role="group">
+        <button
+          type="button"
+          className={tagStyle === "solid" ? "adminTagStyleBtn adminTagStyleBtn--on" : "adminTagStyleBtn"}
+          onClick={() => setTagStyle("solid")}
+        >
+          {t("userTagSolid")}
+        </button>
+        <button
+          type="button"
+          className={tagStyle === "gradient" ? "adminTagStyleBtn adminTagStyleBtn--on" : "adminTagStyleBtn"}
+          onClick={() => setTagStyle("gradient")}
+        >
+          {t("userTagGradient")}
+        </button>
+      </div>
+      <button type="button" className="adminTagSaveBtn" onClick={save} disabled={busy}>
+        {t("save")}
+      </button>
+    </div>
+  );
+}
 
 function openDonationPage() {
   if (typeof window === "undefined") return;
@@ -799,6 +868,7 @@ export default function UserMenu({
                         <div className="adminUserMain">
                           <div className="adminUserNameRow">
                             <div className="adminUserName">{u.username}</div>
+                            <UserTagBadge tag={u.tag} tagColor={u.tagColor} tagStyle={u.tagStyle} />
                             <div className={u.is_online ? "presenceDot online" : "presenceDot"} />
                           </div>
                           <div className="adminUserMeta muted small">
@@ -856,6 +926,15 @@ export default function UserMenu({
                             {u.banned ? t("adminUnban") : t("adminBan")}
                           </button>
                         </div>
+                        <AdminUserTagEditor
+                          user={u}
+                          t={t}
+                          onUpdate={(updated) => {
+                            setAdminUsers((prev) =>
+                              prev.map((x) => (x.id === updated.id ? { ...x, ...updated } : x))
+                            );
+                          }}
+                        />
                       </div>
                     ))}
                   </div>
@@ -1211,6 +1290,7 @@ export default function UserMenu({
                       <div className="adminUserMain">
                         <div className="adminUserNameRow">
                           <div className="adminUserName">{u.username}</div>
+                          <UserTagBadge tag={u.tag} tagColor={u.tagColor} tagStyle={u.tagStyle} />
                           <div className={u.is_online ? "presenceDot online" : "presenceDot"} />
                         </div>
                         <div className="adminUserMeta muted small">
@@ -1268,6 +1348,15 @@ export default function UserMenu({
                           {u.banned ? t("adminUnban") : t("adminBan")}
                         </button>
                       </div>
+                      <AdminUserTagEditor
+                        user={u}
+                        t={t}
+                        onUpdate={(updated) => {
+                          setAdminUsers((prev) =>
+                            prev.map((x) => (x.id === updated.id ? { ...x, ...updated } : x))
+                          );
+                        }}
+                      />
                     </div>
                   ))}
                 </div>

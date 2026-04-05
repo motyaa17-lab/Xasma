@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { localeForLang } from "../i18n.js";
 import { addGroupMember, getGroup, patchGroupAvatar, removeGroupMember, searchUsers } from "../api.js";
 import ActivityBadge from "./ActivityBadge.jsx";
+import UserTagBadge from "./UserTagBadge.jsx";
 
 export default function GroupInfoModal({
   open,
@@ -271,6 +272,7 @@ export default function GroupInfoModal({
                         <div className="groupMemberNameRow">
                           <span className="groupMemberName">
                             {m.username}
+                            <UserTagBadge tag={m.tag} tagColor={m.tagColor} tagStyle={m.tagStyle} />
                             <ActivityBadge messageCount={m.messageCount} t={t} />
                           </span>
                           {m.isCreator ? <span className="creatorBadge">{t("groupCreator")}</span> : null}
@@ -315,7 +317,10 @@ export default function GroupInfoModal({
                           <div className="avatarSm">
                             {u.avatar ? <img src={u.avatar} alt="" /> : <span>{initials(u.username)}</span>}
                           </div>
-                          <div className="searchUser">{u.username}</div>
+                          <div className="searchUser">
+                            {u.username}
+                            <UserTagBadge tag={u.tag} tagColor={u.tagColor} tagStyle={u.tagStyle} />
+                          </div>
                         </button>
                       ))}
                     </div>
