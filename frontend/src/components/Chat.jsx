@@ -1890,9 +1890,19 @@ export default function Chat({
     composerCanSend && !(voiceRecording || voiceArming || videoRecording || videoArming);
   const sendBlockedByRateLimit = Boolean(sendRateLimitNotice);
 
+  const themeAnimatedClass =
+    !chatBackgroundImageUrl && chatTheme === "darkGradient"
+      ? "theme-dark-animated"
+      : !chatBackgroundImageUrl && chatTheme === "night"
+        ? "theme-night-animated"
+        : !chatBackgroundImageUrl && chatTheme === "softBlur"
+          ? "theme-soft-animated"
+          : "";
+
   const chatMainClass = [
     "chatMain",
     chatBackgroundImageUrl ? "chatTheme-custom" : chatTheme && `chatTheme-${chatTheme}`,
+    themeAnimatedClass,
     /* Desktop: full chat enter. Mobile: shell slide is on .mobileChatShell (avoids double motion). */
     chatId && chatOpening && !isMobileChat ? "chatMain--opening" : "",
   ]

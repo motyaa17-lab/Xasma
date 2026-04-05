@@ -1301,7 +1301,17 @@ export default function UserMenu({
                       }}
                       title={theme.label}
                     >
-                      <div className={`themePreview theme-${theme.id}`} />
+                      <div
+                        className={`themePreview theme-${theme.id} ${
+                          theme.id === "darkGradient"
+                            ? "theme-dark-animated"
+                            : theme.id === "night"
+                              ? "theme-night-animated"
+                              : theme.id === "softBlur"
+                                ? "theme-soft-animated"
+                                : ""
+                        }`}
+                      />
                       <div className="themeLabel">{theme.label}</div>
                     </button>
                   ))}
