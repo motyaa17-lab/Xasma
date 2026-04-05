@@ -166,6 +166,8 @@ async function initDb() {
     REFERENCES messages(id) ON DELETE SET NULL
   `);
 
+  await query(`ALTER TABLE chat_members ADD COLUMN IF NOT EXISTS list_pinned_at TIMESTAMPTZ`);
+
   // Backfill message counts from existing text messages (system messages excluded).
   await query(`
     UPDATE users u

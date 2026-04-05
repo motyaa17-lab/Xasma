@@ -4242,6 +4242,69 @@ body.body--mobileConversationOpen {
   color: rgba(148, 163, 184, 0.85);
 }
 
+.mobileChatRowSwipe {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  margin-bottom: 3px;
+  border-radius: 14px;
+  flex-shrink: 0;
+}
+
+.mobileChatRowSwipeUnder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: stretch;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.mobileChatRowSwipePad {
+  flex: 0 0 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.mobileChatRowSwipePad--pin {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.95), rgba(217, 119, 6, 0.98));
+}
+
+.mobileChatRowSwipePad--delete {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.98), rgba(185, 28, 28, 0.98));
+}
+
+.mobileChatRowSwipeIcon {
+  font-size: 20px;
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+}
+
+.mobileChatRowSwipeFront {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobileChatRowSwipeFront.mobileChatRow {
+  margin-bottom: 0;
+}
+
+.mobileChatRowSwipe--pinned .mobileChatRowSwipePad--pin {
+  filter: brightness(1.08);
+}
+
+.mobileChatDeleteConfirmBtn {
+  background: linear-gradient(135deg, #dc2626, #991b1b) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
 .mobileChatRow {
   display: flex;
   align-items: stretch;

@@ -16,6 +16,8 @@ import {
   getMe,
   getMessages,
   patchChatPin,
+  patchChatListPin,
+  deleteChatMembership,
   login,
   register,
   adminDeleteMessage,
@@ -591,6 +593,20 @@ export default function App() {
     }
   }
 
+  async function handleChatListPinToggle(chatId, nextPinned) {
+    await patchChatListPin(chatId, nextPinned);
+    await refreshChatsList();
+  }
+
+  async function handleChatMembershipDelete(chatId) {
+    await deleteChatMembership(chatId);
+    setChats((prev) => prev.filter((c) => Number(c.id) !== Number(chatId)));
+    if (Number(selectedChatId) === Number(chatId)) {
+      setSelectedChatId(null);
+      setMessages([]);
+    }
+  }
+
   function handleSend(payload) {
     const isObj = payload && typeof payload === "object" && !Array.isArray(payload);
     const text = isObj ? String(payload.text ?? "").trim() : String(payload ?? "").trim();
@@ -737,6 +753,8 @@ export default function App() {
     onStartChat: startChat,
     onCreateGroup: handleCreateGroup,
     onCreateChannel: handleCreateChannel,
+    onChatListPinToggle: handleChatListPinToggle,
+    onChatDelete: handleChatMembershipDelete,
     t,
     lang: settings.lang,
   };

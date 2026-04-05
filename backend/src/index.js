@@ -995,6 +995,7 @@ app.get("/api/chats", authRequired, (req, res) => {
     const chats = await query(
       `
       SELECT
+        mym.list_pinned_at,
         c.id AS chat_id,
         c.type AS chat_type,
         c.title AS chat_title,
@@ -1070,6 +1071,8 @@ app.get("/api/chats", authRequired, (req, res) => {
       ) lm ON true
       WHERE mym.user_id = $1
       ORDER BY
+        CASE WHEN mym.list_pinned_at IS NOT NULL THEN 0 ELSE 1 END ASC,
+        mym.list_pinned_at DESC NULLS LAST,
         CASE WHEN c.type = 'official' THEN 0 WHEN c.type = 'channel' THEN 1 WHEN c.type = 'group' THEN 2 ELSE 3 END ASC,
         lm.created_at DESC NULLS LAST,
         c.id DESC
@@ -1136,9 +1139,48 @@ app.get("/api/chats", authRequired, (req, res) => {
           unreadCount: Number(c.unread_count) || 0,
           pinnedMessageId: c.pinned_message_id != null ? Number(c.pinned_message_id) : null,
           pinnedPreview: pinnedPreviewFromPinnedJoinRow(c),
+          listPinned: c.list_pinned_at != null,
+          listPinnedAt: c.list_pinned_at,
         };
       }),
     });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
+/** Pin/unpin this chat in the user's inbox list (per-user, not the in-chat pinned message). */
+app.patch("/api/chats/:chatId/list-pin", authRequired, (req, res) => {
+  const chatId = Number(req.params.chatId);
+  if (!chatId) return res.status(400).json({ error: "Invalid chat id" });
+  const pinned = Boolean(req.body?.pinned);
+
+  (async () => {
+    const uid = Number(req.user.id);
+    if (!(await isUserChatMember(chatId, uid))) return res.status(403).json({ error: "Not a member of this chat" });
+    if (pinned) {
+      await query(`UPDATE chat_members SET list_pinned_at = now() WHERE chat_id = $1 AND user_id = $2`, [
+        chatId,
+        uid,
+      ]);
+    } else {
+      await query(`UPDATE chat_members SET list_pinned_at = NULL WHERE chat_id = $1 AND user_id = $2`, [chatId, uid]);
+    }
+    return res.json({ ok: true, listPinned: pinned });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
+/** Remove current user from the chat (hide / leave). Official chat cannot be removed. */
+app.delete("/api/chats/:chatId/membership", authRequired, (req, res) => {
+  const chatId = Number(req.params.chatId);
+  if (!chatId) return res.status(400).json({ error: "Invalid chat id" });
+
+  (async () => {
+    const uid = Number(req.user.id);
+    const chat = await getChatById(chatId);
+    if (!chat) return res.status(404).json({ error: "Chat not found" });
+    if (chat.type === "official") return res.status(400).json({ error: "Cannot remove the official chat" });
+    if (!(await isUserChatMember(chatId, uid))) return res.status(403).json({ error: "Not a member of this chat" });
+    await query(`DELETE FROM chat_members WHERE chat_id = $1 AND user_id = $2`, [chatId, uid]);
+    return res.json({ ok: true });
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });
 

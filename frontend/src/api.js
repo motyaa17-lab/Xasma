@@ -121,6 +121,21 @@ export async function patchChatPin(chatId, messageId) {
   return data;
 }
 
+/** Pin / unpin chat in the inbox list (per user). */
+export async function patchChatListPin(chatId, pinned) {
+  return apiFetch(`/api/chats/${chatId}/list-pin`, {
+    method: "PATCH",
+    body: { pinned: Boolean(pinned) },
+  });
+}
+
+/** Leave / hide chat for the current user (removes membership). */
+export async function deleteChatMembership(chatId) {
+  return apiFetch(`/api/chats/${chatId}/membership`, {
+    method: "DELETE",
+  });
+}
+
 export async function createGroup({ title, memberUserIds }) {
   const data = await apiFetch("/api/groups", {
     method: "POST",

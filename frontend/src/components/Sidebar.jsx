@@ -1,5 +1,6 @@
-import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import AvatarAura from "./AvatarAura.jsx";
+import MobileChatRowSwipe from "./MobileChatRowSwipe.jsx";
 import { localeForLang } from "../i18n.js";
 import { formatUserStatusLine } from "../userStatusLine.js";
 import ActivityBadge from "./ActivityBadge.jsx";
@@ -13,6 +14,8 @@ const Sidebar = forwardRef(function Sidebar(
     onStartChat,
     onCreateGroup,
     onCreateChannel,
+    onChatListPinToggle,
+    onChatDelete,
     t,
     lang,
     mobileLayout = false,
@@ -43,6 +46,14 @@ const Sidebar = forwardRef(function Sidebar(
   const [channelError, setChannelError] = useState("");
   const [channelSubmitting, setChannelSubmitting] = useState(false);
   const [channelAvatarDraft, setChannelAvatarDraft] = useState(null);
+
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+  const [swipeOpenId, setSwipeOpenId] = useState(null);
+
+  const handleSwipePhase = useCallback((id, phase) => {
+    if (phase === "lock") setSwipeOpenId(id);
+    if (phase === "end") setSwipeOpenId(null);
+  }, []);
 
   const canSearch = useMemo(() => query.trim().length >= 1, [query]);
   const canGroupSearch = useMemo(() => groupQuery.trim().length >= 1, [groupQuery]);
@@ -499,6 +510,54 @@ const Sidebar = forwardRef(function Sidebar(
   if (mobileLayout) {
     const mobileChatsToShow = query.trim() ? mobileFilteredChats : chats;
 
+    const deleteConfirmModal =
+      deleteConfirmId != null ? (
+        <div className="modalBackdrop" role="presentation" onClick={() => setDeleteConfirmId(null)}>
+          <div
+            className="modalCard modalCard--mobileFriendly"
+            role="alertdialog"
+            aria-labelledby="chatDeleteConfirmHeading"
+            aria-describedby="chatDeleteConfirmDesc"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modalHeader">
+              <div className="modalTitle" id="chatDeleteConfirmHeading">
+                {t("chatDeleteConfirmTitle")}
+              </div>
+              <button
+                type="button"
+                className="iconCloseBtn"
+                onClick={() => setDeleteConfirmId(null)}
+                aria-label={t("close")}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modalBody">
+              <p id="chatDeleteConfirmDesc" className="muted">
+                {t("chatDeleteConfirmBody")}
+              </p>
+              <div className="groupModalActions">
+                <button type="button" className="ghostBtn" onClick={() => setDeleteConfirmId(null)}>
+                  {t("chatDeleteCancelButton")}
+                </button>
+                <button
+                  type="button"
+                  className="primaryBtn mobileChatDeleteConfirmBtn"
+                  onClick={() => {
+                    const id = deleteConfirmId;
+                    setDeleteConfirmId(null);
+                    if (id != null && onChatDelete) void onChatDelete(id);
+                  }}
+                >
+                  {t("chatDeleteConfirmButton")}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null;
+
     return (
       <>
         <div className="mobileChatSearchWrap">
@@ -552,13 +611,9 @@ const Sidebar = forwardRef(function Sidebar(
             const unreadLabel = unreadN > 0 ? (unreadN > 99 ? "99+" : String(unreadN)) : null;
             const statusSubtitle =
               !isRoom && !isOfficial && other ? formatUserStatusLine(other, t, lang) : "";
-            return (
-              <button
-                key={c.id}
-                type="button"
-                className={isOfficial ? "mobileChatRow mobileChatRow--official" : "mobileChatRow"}
-                onClick={() => onSelectChat(c.id)}
-              >
+            const rowClass = isOfficial ? "mobileChatRow mobileChatRow--official" : "mobileChatRow";
+            const rowBody = (
+              <>
                 <div className="mobileChatRowAvatarWrap">
                   <AvatarAura skip={isRoom || isOfficial} auraColor={other?.auraColor}>
                     <div className={online ? "mobileChatRowAvatar presence online" : "mobileChatRowAvatar presence"}>
@@ -622,6 +677,32 @@ const Sidebar = forwardRef(function Sidebar(
                     ) : null}
                   </div>
                 </div>
+              </>
+            );
+
+            if (onChatListPinToggle && onChatDelete) {
+              return (
+                <MobileChatRowSwipe
+                  key={c.id}
+                  chatId={c.id}
+                  rowClassName={rowClass}
+                  canDelete={!isOfficial}
+                  listPinned={Boolean(c.listPinned)}
+                  onOpenChat={() => onSelectChat(c.id)}
+                  onRequestDelete={() => setDeleteConfirmId(c.id)}
+                  onToggleListPin={() => onChatListPinToggle(c.id, !c.listPinned)}
+                  shouldCollapse={swipeOpenId !== null && swipeOpenId !== c.id}
+                  onSwipeActiveChange={handleSwipePhase}
+                  t={t}
+                >
+                  {rowBody}
+                </MobileChatRowSwipe>
+              );
+            }
+
+            return (
+              <button key={c.id} type="button" className={rowClass} onClick={() => onSelectChat(c.id)}>
+                {rowBody}
               </button>
             );
           })}
@@ -658,6 +739,7 @@ const Sidebar = forwardRef(function Sidebar(
         </div>
         {groupModal}
         {channelModal}
+        {deleteConfirmModal}
       </>
     );
   }
