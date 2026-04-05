@@ -4477,6 +4477,7 @@ body.body--mobileConversationOpen {
   align-items: center;
   justify-content: center;
   min-width: 0;
+  color: rgba(255, 255, 255, 0.96);
 }
 
 .mobileChatRowSwipePad--pin {
@@ -4488,8 +4489,16 @@ body.body--mobileConversationOpen {
 }
 
 .mobileChatRowSwipeIcon {
-  font-size: 20px;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.mobileChatRowSwipeGlyph {
+  display: block;
+  flex-shrink: 0;
+  opacity: 0.98;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
 }
 
@@ -4499,6 +4508,7 @@ body.body--mobileConversationOpen {
   width: 100%;
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
+  touch-action: pan-y;
 }
 
 /* Swipe rows: opaque card — base .mobileChatRow uses rgba(..., 0.55) which lets pin/delete pads show through at rest. */
