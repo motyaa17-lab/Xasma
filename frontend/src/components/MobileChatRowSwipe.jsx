@@ -1,10 +1,15 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 
 /**
- * Emergency / rollout switch: touch chat rows use plain buttons when false.
- * Keeps full swipe implementation in this file; set to true after iOS rendering is verified.
+ * Master switch: touch chat rows use plain buttons when false (same as desktop).
  */
-export const MOBILE_CHAT_SWIPE_ENABLED = false;
+export const MOBILE_CHAT_SWIPE_ENABLED = true;
+
+/**
+ * Rollout step: when false, only horizontal drag + snap-back (no pin/delete rails or commits).
+ * Set to true when drag-only is stable on device.
+ */
+export const MOBILE_SWIPE_ACTIONS_ENABLED = false;
 
 /** Reveal width (px) — slightly softer than a full 76px rail. */
 const ACTION_PX = 62;
@@ -65,9 +70,10 @@ function SwipeTrashIcon() {
 /**
  * Touch-only swipe row (mobile inbox). Structure:
  * - .mobileChatRowSwipe: rounded clip (overflow:hidden), holds under + front
- * - .mobileChatRowSwipeUnder: absolute pin | delete pads (z-index 0)
+ * - .mobileChatRowSwipeUnder: action pads or neutral drag-only (z-index 0)
  * - .mobileChatRowSwipeFront: solid opaque card (z-index 1) + translate3d for swipe
  * Scroll-first gesture: vertical movement wins unless dx clearly dominates after threshold.
+ * When MOBILE_SWIPE_ACTIONS_ENABLED is false: drag + snap-back only (no commits).
  */
 export default function MobileChatRowSwipe({
   chatId,
@@ -94,8 +100,9 @@ export default function MobileChatRowSwipe({
   const rafRef = useRef(0);
 
   const isTouch = isTouchDevice();
-  /** Touch without swipe flag → same plain row as desktop (avoids iOS white-screen / compositor issues). */
+  /** Touch without master flag → same plain row as desktop. */
   const useSwipeUi = isTouch && MOBILE_CHAT_SWIPE_ENABLED;
+  const actionsEnabled = MOBILE_SWIPE_ACTIONS_ENABLED;
 
   const applyOffset = useCallback((x, withTransition) => {
     const isRest = withTransition && Math.abs(x) < 0.5;
@@ -143,7 +150,7 @@ export default function MobileChatRowSwipe({
 
   const onTouchStart = useCallback(
     (e) => {
-      if (!touchEnabled) return;
+      if (!useSwipeUi) return;
       if (e.touches.length !== 1) return;
       const tch = e.touches[0];
       touchIdRef.current = tch.identifier;
@@ -189,7 +196,7 @@ export default function MobileChatRowSwipe({
 
       e.preventDefault();
 
-      const minX = canDelete ? -ACTION_PX * 1.2 : 0;
+      const minX = actionsEnabled ? (canDelete ? -ACTION_PX * 1.2 : 0) : -ACTION_PX * 1.2;
       const maxX = ACTION_PX * 1.2;
       let raw = startOffRef.current + dx;
       raw = clamp(raw, minX, maxX);
@@ -200,7 +207,7 @@ export default function MobileChatRowSwipe({
         applyOffset(next, false);
       });
     },
-    [applyOffset, canDelete, chatId, onSwipeActiveChange, useSwipeUi]
+    [actionsEnabled, applyOffset, canDelete, chatId, onSwipeActiveChange, useSwipeUi]
   );
 
   const touchMoveRef = useRef(onTouchMove);
@@ -240,6 +247,12 @@ export default function MobileChatRowSwipe({
         applyOffset(offsetRef.current, false);
       }
 
+      if (!actionsEnabled) {
+        snapTo(0);
+        onSwipeActiveChange?.(chatId, "end");
+        return;
+      }
+
       const w = typeof window !== "undefined" ? window.innerWidth : 400;
       const fullSwipePx = w * FULL_SWIPE_FRAC;
       const o = offsetRef.current;
@@ -256,7 +269,7 @@ export default function MobileChatRowSwipe({
 
       onSwipeActiveChange?.(chatId, "end");
     },
-    [canDelete, chatId, onRequestDelete, onSwipeActiveChange, onToggleListPin, snapTo, useSwipeUi, applyOffset]
+    [actionsEnabled, canDelete, chatId, onRequestDelete, onSwipeActiveChange, onToggleListPin, snapTo, useSwipeUi, applyOffset]
   );
 
   const onTouchCancel = useCallback(() => {
@@ -296,17 +309,26 @@ export default function MobileChatRowSwipe({
       className={`mobileChatRowSwipe${listPinned ? " mobileChatRowSwipe--pinned" : ""}`}
       data-chat-swipe-id={chatId}
     >
-      <div className="mobileChatRowSwipeUnder" aria-hidden>
-        <div className="mobileChatRowSwipePad mobileChatRowSwipePad--pin">
-          <span className="mobileChatRowSwipeIcon" title={t("chatListSwipePin")}>
-            <SwipePinIcon />
-          </span>
-        </div>
-        <div className="mobileChatRowSwipePad mobileChatRowSwipePad--delete">
-          <span className="mobileChatRowSwipeIcon" title={t("chatListSwipeDelete")}>
-            <SwipeTrashIcon />
-          </span>
-        </div>
+      <div
+        className={`mobileChatRowSwipeUnder${actionsEnabled ? "" : " mobileChatRowSwipeUnder--dragOnly"}`}
+        aria-hidden
+      >
+        {actionsEnabled ? (
+          <>
+            <div className="mobileChatRowSwipePad mobileChatRowSwipePad--pin">
+              <span className="mobileChatRowSwipeIcon" title={t("chatListSwipePin")}>
+                <SwipePinIcon />
+              </span>
+            </div>
+            <div className="mobileChatRowSwipePad mobileChatRowSwipePad--delete">
+              <span className="mobileChatRowSwipeIcon" title={t("chatListSwipeDelete")}>
+                <SwipeTrashIcon />
+              </span>
+            </div>
+          </>
+        ) : (
+          <div className="mobileChatRowSwipeUnderNeutral" />
+        )}
       </div>
       <div
         ref={frontRef}

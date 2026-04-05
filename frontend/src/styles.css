@@ -4471,6 +4471,17 @@ body.body--mobileConversationOpen {
   /* Only visible where the front layer has moved away (swipe); never “through” an opaque card */
 }
 
+.mobileChatRowSwipeUnder--dragOnly {
+  justify-content: stretch;
+}
+
+.mobileChatRowSwipeUnderNeutral {
+  flex: 1;
+  min-width: 0;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgb(14, 22, 38), rgb(10, 16, 28));
+}
+
 .mobileChatRowSwipePad {
   flex: 0 0 64px;
   display: flex;
