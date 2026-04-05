@@ -1,13 +1,32 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 
-const ACTION_PX = 76;
-/** Release past this offset (px) commits an action (Telegram-like). */
-const RELEASE_COMMIT_PX = 44;
+/** Reveal width (px) — slightly softer than a full 76px rail. */
+const ACTION_PX = 62;
+/** Horizontal movement (px) before swipe can activate (12–18px range). */
+const HORIZONTAL_LOCK_PX = 15;
+/** Early vertical scroll detection (px): beats weak diagonals. */
+const VERTICAL_BIAS_PX = 8;
+/** |dx| must exceed |dy| * this to count as horizontal swipe. */
+const HORIZONTAL_DOMINANCE = 1.55;
+/** |dy| > |dx| * this → scroll wins while still undecided. */
+const VERTICAL_DOMINANCE = 1.12;
+/** Release past this offset (px) commits an action. */
+const RELEASE_COMMIT_PX = 48;
 /** Treat as “full” swipe (fraction of viewport width). */
-const FULL_SWIPE_FRAC = 0.38;
+const FULL_SWIPE_FRAC = 0.36;
+/** Extra pull beyond max uses rubber-band (fraction of overshoot). */
+const RUBBER_BAND = 0.3;
+const MAX_DRAG_PX = ACTION_PX * 1.12;
 
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
+}
+
+function rubberBandX(raw) {
+  const ax = Math.abs(raw);
+  if (ax <= MAX_DRAG_PX) return raw;
+  const sign = raw >= 0 ? 1 : -1;
+  return sign * (MAX_DRAG_PX + (ax - MAX_DRAG_PX) * RUBBER_BAND);
 }
 
 function isTouchDevice() {
@@ -41,8 +60,8 @@ function SwipeTrashIcon() {
  * Touch-only swipe row (mobile inbox). Structure:
  * - .mobileChatRowSwipe: rounded clip (overflow:hidden), holds under + front
  * - .mobileChatRowSwipeUnder: absolute pin | delete pads (z-index 0)
- * - .mobileChatRowSwipeFront: solid opaque card (z-index 1) + translateX for swipe
- * Left: delete (caller confirms). Right: pin/unpin. Desktop uses plain <button> rows.
+ * - .mobileChatRowSwipeFront: solid opaque card (z-index 1) + translate3d for swipe
+ * Scroll-first gesture: vertical movement wins unless dx clearly dominates after threshold.
  */
 export default function MobileChatRowSwipe({
   chatId,
@@ -55,6 +74,7 @@ export default function MobileChatRowSwipe({
   onToggleListPin,
   onSwipeActiveChange,
   shouldCollapse,
+  scrollCloseNonce = 0,
   t,
 }) {
   const frontRef = useRef(null);
@@ -62,18 +82,23 @@ export default function MobileChatRowSwipe({
   const startXRef = useRef(0);
   const startYRef = useRef(0);
   const startOffRef = useRef(0);
-  const horizontalRef = useRef(false);
+  /** 'pending' | 'vertical' | 'horizontal' */
+  const gestureRef = useRef("pending");
   const touchIdRef = useRef(null);
   const rafRef = useRef(0);
 
   const touchEnabled = isTouchDevice();
 
   const applyOffset = useCallback((x, withTransition) => {
-    offsetRef.current = x;
+    const isRest = withTransition && Math.abs(x) < 0.5;
+    const px = isRest ? 0 : x;
+    offsetRef.current = px;
     const el = frontRef.current;
     if (!el) return;
-    el.style.transition = withTransition ? "transform 0.22s ease-out" : "none";
-    el.style.transform = `translateX(${x}px)`;
+    el.style.transition = withTransition
+      ? "transform 0.24s cubic-bezier(0.25, 0.82, 0.2, 1)"
+      : "none";
+    el.style.transform = `translate3d(${px}px,0,0)`;
   }, []);
 
   const snapTo = useCallback(
@@ -86,6 +111,19 @@ export default function MobileChatRowSwipe({
   useEffect(() => {
     if (shouldCollapse && touchIdRef.current == null) snapTo(0);
   }, [shouldCollapse, snapTo]);
+
+  /** List scroll closes any peek / in-progress row (parent also clears swipeOpenId). */
+  useEffect(() => {
+    if (scrollCloseNonce === 0) return;
+    touchIdRef.current = null;
+    gestureRef.current = "pending";
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+    }
+    applyOffset(0, true);
+    onSwipeActiveChange?.(chatId, "end");
+  }, [scrollCloseNonce, applyOffset, chatId, onSwipeActiveChange]);
 
   useEffect(() => {
     return () => {
@@ -102,7 +140,7 @@ export default function MobileChatRowSwipe({
       startXRef.current = tch.clientX;
       startYRef.current = tch.clientY;
       startOffRef.current = offsetRef.current;
-      horizontalRef.current = false;
+      gestureRef.current = "pending";
     },
     [touchEnabled]
   );
@@ -116,24 +154,36 @@ export default function MobileChatRowSwipe({
 
       const dx = tch.clientX - startXRef.current;
       const dy = tch.clientY - startYRef.current;
+      const absDx = Math.abs(dx);
+      const absDy = Math.abs(dy);
 
-      if (!horizontalRef.current) {
-        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
-        if (Math.abs(dy) > Math.abs(dx) * 1.15) {
-          touchIdRef.current = null;
-          horizontalRef.current = false;
+      if (gestureRef.current === "pending") {
+        // Scroll priority: clear vertical intent before horizontal can lock.
+        if (absDy >= VERTICAL_BIAS_PX && absDy > absDx * VERTICAL_DOMINANCE) {
+          gestureRef.current = "vertical";
           return;
         }
-        horizontalRef.current = true;
-        onSwipeActiveChange?.(chatId, "lock");
+        // Wait until we have enough signal (avoid jitter).
+        if (absDx < HORIZONTAL_LOCK_PX && absDy < HORIZONTAL_LOCK_PX) return;
+        // Horizontal swipe requires both threshold and dominance over vertical.
+        if (absDx >= HORIZONTAL_LOCK_PX && absDx > absDy * HORIZONTAL_DOMINANCE) {
+          gestureRef.current = "horizontal";
+          onSwipeActiveChange?.(chatId, "lock");
+        } else {
+          gestureRef.current = "vertical";
+          return;
+        }
       }
+
+      if (gestureRef.current === "vertical") return;
 
       e.preventDefault();
 
-      const minX = canDelete ? -ACTION_PX * 1.25 : 0;
-      const maxX = ACTION_PX * 1.25;
-      let next = startOffRef.current + dx;
-      next = clamp(next, minX, maxX);
+      const minX = canDelete ? -ACTION_PX * 1.2 : 0;
+      const maxX = ACTION_PX * 1.2;
+      let raw = startOffRef.current + dx;
+      raw = clamp(raw, minX, maxX);
+      const next = rubberBandX(raw);
 
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = requestAnimationFrame(() => {
@@ -163,10 +213,22 @@ export default function MobileChatRowSwipe({
       if (still) return;
 
       touchIdRef.current = null;
-      if (!horizontalRef.current) {
+      const mode = gestureRef.current;
+      gestureRef.current = "pending";
+
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = 0;
+      }
+
+      if (mode === "vertical" || mode === "pending") {
         return;
       }
-      horizontalRef.current = false;
+
+      const el = frontRef.current;
+      if (el) {
+        applyOffset(offsetRef.current, false);
+      }
 
       const w = typeof window !== "undefined" ? window.innerWidth : 400;
       const fullSwipePx = w * FULL_SWIPE_FRAC;
@@ -181,14 +243,19 @@ export default function MobileChatRowSwipe({
       } else {
         snapTo(0);
       }
+
       onSwipeActiveChange?.(chatId, "end");
     },
-    [canDelete, chatId, onRequestDelete, onSwipeActiveChange, onToggleListPin, snapTo, touchEnabled]
+    [canDelete, chatId, onRequestDelete, onSwipeActiveChange, onToggleListPin, snapTo, touchEnabled, applyOffset]
   );
 
   const onTouchCancel = useCallback(() => {
     touchIdRef.current = null;
-    horizontalRef.current = false;
+    gestureRef.current = "pending";
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+    }
     snapTo(0);
     onSwipeActiveChange?.(chatId, "end");
   }, [chatId, onSwipeActiveChange, snapTo]);

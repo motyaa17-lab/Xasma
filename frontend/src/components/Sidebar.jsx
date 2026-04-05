@@ -49,10 +49,21 @@ const Sidebar = forwardRef(function Sidebar(
 
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [swipeOpenId, setSwipeOpenId] = useState(null);
+  const [swipeScrollNonce, setSwipeScrollNonce] = useState(0);
+  const chatListScrollCloseRaf = useRef(null);
 
   const handleSwipePhase = useCallback((id, phase) => {
     if (phase === "lock") setSwipeOpenId(id);
     if (phase === "end") setSwipeOpenId(null);
+  }, []);
+
+  const onMobileChatListScroll = useCallback(() => {
+    if (chatListScrollCloseRaf.current != null) return;
+    chatListScrollCloseRaf.current = requestAnimationFrame(() => {
+      chatListScrollCloseRaf.current = null;
+      setSwipeOpenId(null);
+      setSwipeScrollNonce((n) => n + 1);
+    });
   }, []);
 
   const canSearch = useMemo(() => query.trim().length >= 1, [query]);
@@ -572,7 +583,7 @@ const Sidebar = forwardRef(function Sidebar(
             aria-label={t("searchUnifiedPlaceholder")}
           />
         </div>
-        <div className="mobileChatListScroll">
+        <div className="mobileChatListScroll" onScroll={onMobileChatListScroll}>
           {canSearch && searching ? (
             <div className="mobileSearchStatus muted" role="status">
               {t("searching")}
@@ -692,6 +703,7 @@ const Sidebar = forwardRef(function Sidebar(
                   onRequestDelete={() => setDeleteConfirmId(c.id)}
                   onToggleListPin={() => onChatListPinToggle(c.id, !c.listPinned)}
                   shouldCollapse={swipeOpenId !== null && swipeOpenId !== c.id}
+                  scrollCloseNonce={swipeScrollNonce}
                   onSwipeActiveChange={handleSwipePhase}
                   t={t}
                 >

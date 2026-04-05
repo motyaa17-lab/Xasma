@@ -4472,7 +4472,7 @@ body.body--mobileConversationOpen {
 }
 
 .mobileChatRowSwipePad {
-  flex: 0 0 72px;
+  flex: 0 0 64px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4508,7 +4508,9 @@ body.body--mobileConversationOpen {
   width: 100%;
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
-  touch-action: pan-y;
+  /* Gesture direction is decided in JS; manipulation avoids 300ms tap delay without forcing pan-y (which can fight horizontal swipe). */
+  touch-action: manipulation;
+  backface-visibility: hidden;
 }
 
 /* Swipe rows: opaque card — base .mobileChatRow uses rgba(..., 0.55) which lets pin/delete pads show through at rest. */
