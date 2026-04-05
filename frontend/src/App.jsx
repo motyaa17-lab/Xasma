@@ -55,13 +55,22 @@ export default function App() {
       };
       const rawTheme = typeof parsed.chatTheme === "string" ? parsed.chatTheme : "darkGradient";
       const chatTheme = allowed.has(rawTheme) ? rawTheme : legacy[rawTheme] || "darkGradient";
+      const rawBg = typeof parsed.chatBackgroundImageUrl === "string" ? parsed.chatBackgroundImageUrl : "";
+      const chatBackgroundImageUrl =
+        rawBg.startsWith("data:image/") && rawBg.length <= 2_200_000 ? rawBg : null;
       return {
         lang: normalizeLang(parsed.lang),
         chatTheme,
+        chatBackgroundImageUrl,
         messageNotificationsEnabled: Boolean(parsed.messageNotificationsEnabled),
       };
     } catch {
-      return { lang: "en", chatTheme: "darkGradient", messageNotificationsEnabled: false };
+      return {
+        lang: "en",
+        chatTheme: "darkGradient",
+        chatBackgroundImageUrl: null,
+        messageNotificationsEnabled: false,
+      };
     }
   });
 
@@ -768,6 +777,7 @@ export default function App() {
     meAvatar: me.avatar,
     meUsername: me.username,
     chatTheme: settings.chatTheme,
+    chatBackgroundImageUrl: settings.chatBackgroundImageUrl || null,
     onSend: handleSend,
     onEditMessage: handleEditMessage,
     onToggleReaction: handleToggleReaction,

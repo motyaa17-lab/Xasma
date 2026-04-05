@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   adminBroadcastOfficial,
   adminListFlaggedMessages,
@@ -8,6 +8,7 @@ import {
   adminSetUserBanned,
   adminSetUserRole,
 } from "../api.js";
+import { compressImageFileToJpegDataUrl } from "../chatBackgroundImage.js";
 import { currentLanguageLabel, localeForLang } from "../i18n.js";
 import { DONATION_ALERTS_URL } from "../config/donation.js";
 import { DEFAULT_AURA_COLOR } from "../avatarAura.js";
@@ -99,6 +100,11 @@ function chatThemeLabel(t, id) {
       noise: "themeDarkGradient",
     }[id] || "themeDarkGradient";
   return t(key);
+}
+
+function chatBackgroundDisplayLabel(t, settings) {
+  if (settings?.chatBackgroundImageUrl) return t("chatBackgroundCustomActive");
+  return chatThemeLabel(t, settings?.chatTheme || "darkGradient");
 }
 
 function AdminMessageReportsSection({ t, items, loading, onRefresh }) {
@@ -291,6 +297,8 @@ export default function UserMenu({
   const [profileAuraColor, setProfileAuraColor] = useState(DEFAULT_AURA_COLOR);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaveError, setProfileSaveError] = useState("");
+  const chatBgFileInputRef = useRef(null);
+  const [chatBgError, setChatBgError] = useState("");
   const [adminUsers, setAdminUsers] = useState([]);
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminError, setAdminError] = useState("");
@@ -436,6 +444,26 @@ export default function UserMenu({
     }
   }
 
+  const pickChatBackgroundFile = useCallback(
+    async (e) => {
+      const f = e.target.files?.[0];
+      e.target.value = "";
+      if (!f) return;
+      if (!f.type.startsWith("image/")) {
+        setChatBgError(t("chatBackgroundImageError"));
+        return;
+      }
+      setChatBgError("");
+      try {
+        const dataUrl = await compressImageFileToJpegDataUrl(f);
+        onChangeSettings?.({ chatBackgroundImageUrl: dataUrl });
+      } catch {
+        setChatBgError(t("chatBackgroundImageError"));
+      }
+    },
+    [onChangeSettings, t]
+  );
+
   const modalCardClass = variant === "mobilePage" ? "modalCard--mobileFriendly" : "";
 
   if (variant === "mobilePage") {
@@ -526,7 +554,7 @@ export default function UserMenu({
           <div className="settingsSection">
             <SettingsRow
               label={t("settingsCurrentBackground")}
-              right={chatThemeLabel(t, settings?.chatTheme || "darkGradient")}
+              right={chatBackgroundDisplayLabel(t, settings)}
               onClick={() => setPanel("chatBackground")}
             />
           </div>
@@ -803,6 +831,9 @@ export default function UserMenu({
               </div>
             ) : panel === "chatBackground" ? (
               <div className="settingsModalList">
+                <div className="settingsSection settingsSection--padded">
+                  <p className="muted small">{t("chatBackgroundGalleryHint")}</p>
+                </div>
                 <div className="settingsSection">
                   {[
                     { id: "darkGradient", label: t("themeDarkGradient") },
@@ -812,13 +843,43 @@ export default function UserMenu({
                     <SettingsChoiceRow
                       key={theme.id}
                       label={theme.label}
-                      selected={settings?.chatTheme === theme.id}
+                      selected={!settings?.chatBackgroundImageUrl && settings?.chatTheme === theme.id}
                       onClick={() => {
-                        onChangeSettings?.({ chatTheme: theme.id });
+                        onChangeSettings?.({ chatTheme: theme.id, chatBackgroundImageUrl: null });
+                        setChatBgError("");
                         setPanel(null);
                       }}
                     />
                   ))}
+                </div>
+                <div className="settingsSection settingsSection--padded settingsChatBgUpload">
+                  <input
+                    ref={chatBgFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="fileInput"
+                    onChange={pickChatBackgroundFile}
+                  />
+                  <button
+                    type="button"
+                    className="primaryBtn settingsChatBgUploadBtn"
+                    onClick={() => chatBgFileInputRef.current?.click()}
+                  >
+                    {t("chatBackgroundChooseGallery")}
+                  </button>
+                  {settings?.chatBackgroundImageUrl ? (
+                    <button
+                      type="button"
+                      className="ghostBtn"
+                      onClick={() => {
+                        setChatBgError("");
+                        onChangeSettings?.({ chatBackgroundImageUrl: null });
+                      }}
+                    >
+                      {t("chatBackgroundRemoveCustom")}
+                    </button>
+                  ) : null}
+                  {chatBgError ? <div className="authError settingsChatBgErr">{chatBgError}</div> : null}
                 </div>
               </div>
             ) : panel === "support" ? (
@@ -1219,6 +1280,7 @@ export default function UserMenu({
 
               <div className="settingsSection">
                 <div className="settingsTitle">{t("chatBackground")}</div>
+                <p className="muted small settingsChatBgHint">{t("chatBackgroundGalleryHint")}</p>
                 <div className="themeGrid">
                   {[
                     { id: "darkGradient", label: t("themeDarkGradient") },
@@ -1229,9 +1291,14 @@ export default function UserMenu({
                       key={theme.id}
                       type="button"
                       className={
-                        settings?.chatTheme === theme.id ? "themeCard active" : "themeCard"
+                        !settings?.chatBackgroundImageUrl && settings?.chatTheme === theme.id
+                          ? "themeCard active"
+                          : "themeCard"
                       }
-                      onClick={() => onChangeSettings?.({ chatTheme: theme.id })}
+                      onClick={() => {
+                        setChatBgError("");
+                        onChangeSettings?.({ chatTheme: theme.id, chatBackgroundImageUrl: null });
+                      }}
                       title={theme.label}
                     >
                       <div className={`themePreview theme-${theme.id}`} />
@@ -1239,6 +1306,35 @@ export default function UserMenu({
                     </button>
                   ))}
                 </div>
+                <div className="settingsChatBgActions">
+                  <input
+                    ref={chatBgFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="fileInput"
+                    onChange={pickChatBackgroundFile}
+                  />
+                  <button
+                    type="button"
+                    className="primaryBtn"
+                    onClick={() => chatBgFileInputRef.current?.click()}
+                  >
+                    {t("chatBackgroundChooseGallery")}
+                  </button>
+                  {settings?.chatBackgroundImageUrl ? (
+                    <button
+                      type="button"
+                      className="ghostBtn"
+                      onClick={() => {
+                        setChatBgError("");
+                        onChangeSettings?.({ chatBackgroundImageUrl: null });
+                      }}
+                    >
+                      {t("chatBackgroundRemoveCustom")}
+                    </button>
+                  ) : null}
+                </div>
+                {chatBgError ? <div className="authError settingsChatBgErr">{chatBgError}</div> : null}
               </div>
 
               <div className="settingsSection">

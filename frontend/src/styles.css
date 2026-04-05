@@ -938,17 +938,32 @@ body.body--mobileConversationOpen {
 
 .themePreview.theme-darkGradient {
   background: linear-gradient(155deg, #0c1222 0%, #1e293b 45%, #0f172a 100%);
+  background-size: 200% 200%;
+  animation: chatThemeDarkGradientMove 18s ease-in-out infinite alternate;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
 .themePreview.theme-softBlur {
   background: linear-gradient(180deg, rgba(148, 163, 184, 0.38) 0%, rgba(30, 41, 59, 0.9) 100%);
+  background-size: 180% 180%;
+  animation: chatThemeDarkGradientMove 22s ease-in-out infinite alternate;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 .themePreview.theme-night {
   background: linear-gradient(168deg, #0a0f1e 0%, #312e81 48%, #5b21b6 100%);
-    box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.18);
+  background-size: 200% 200%;
+  animation: chatThemeNightMove 20s ease-in-out infinite alternate;
+  box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.18);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .themePreview.theme-darkGradient,
+  .themePreview.theme-softBlur,
+  .themePreview.theme-night {
+    animation: none !important;
+    background-size: auto !important;
+  }
 }
 
 .themeLabel {
@@ -1650,8 +1665,61 @@ body.body--mobileConversationOpen {
 }
 
 /* Chat column only — backgrounds are decorative; message bubbles keep their own contrast */
+@keyframes chatThemeDarkGradientMove {
+  0% {
+    background-position: 8% 42%;
+  }
+  100% {
+    background-position: 92% 58%;
+  }
+}
+
+@keyframes chatThemeDarkSheen {
+  0% {
+    opacity: 0.82;
+    transform: translate3d(-1.2%, 0, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(1.2%, 0.6%, 0);
+  }
+}
+
+@keyframes chatThemeSoftBlurGlow {
+  0% {
+    opacity: 0.78;
+    transform: translate3d(-2%, -1%, 0) scale(1.03);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(2%, 1.2%, 0) scale(1);
+  }
+}
+
+@keyframes chatThemeNightMove {
+  0% {
+    background-position: 12% 38%;
+  }
+  100% {
+    background-position: 88% 62%;
+  }
+}
+
+@keyframes chatThemeNightMist {
+  0% {
+    opacity: 0.88;
+    transform: translate3d(-1.5%, 0, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(1.5%, 0.8%, 0);
+  }
+}
+
 .chatTheme-darkGradient.chatMain {
   background: linear-gradient(165deg, #0a0f1c 0%, #0f172a 28%, #1e293b 52%, #0f172a 78%, #020617 100%);
+  background-size: 220% 220%;
+  animation: chatThemeDarkGradientMove 56s ease-in-out infinite alternate;
 }
 
 .chatTheme-darkGradient.chatMain::before {
@@ -1663,6 +1731,7 @@ body.body--mobileConversationOpen {
   background: radial-gradient(ellipse 120% 70% at 50% -15%, rgba(59, 130, 246, 0.14), transparent 52%),
     radial-gradient(ellipse 90% 55% at 100% 100%, rgba(15, 23, 42, 0.75), transparent 55%),
     radial-gradient(ellipse 80% 50% at 0% 80%, rgba(30, 41, 59, 0.35), transparent 50%);
+  animation: chatThemeDarkSheen 44s ease-in-out infinite alternate;
 }
 
 .chatTheme-darkGradient.chatMain > * {
@@ -1684,8 +1753,9 @@ body.body--mobileConversationOpen {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, transparent 48%, rgba(96, 165, 250, 0.07) 100%);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, transparent 48%, rgba(96, 165, 250, 0.09) 100%);
   border-radius: inherit;
+  animation: chatThemeSoftBlurGlow 48s ease-in-out infinite alternate;
 }
 
 .chatTheme-softBlur.chatMain > * {
@@ -1696,6 +1766,8 @@ body.body--mobileConversationOpen {
 /* Night — blue / violet / purple depth */
 .chatTheme-night.chatMain {
   background: linear-gradient(168deg, #0a0f1e 0%, #1e1b4b 38%, #312e81 72%, #4c1d95 92%, #1e1033 100%);
+  background-size: 200% 200%;
+  animation: chatThemeNightMove 60s ease-in-out infinite alternate;
 }
 
 .chatTheme-night.chatMain::before {
@@ -1706,11 +1778,64 @@ body.body--mobileConversationOpen {
   pointer-events: none;
   background: radial-gradient(ellipse 100% 60% at 50% 0%, rgba(139, 92, 246, 0.22), transparent 58%),
     radial-gradient(ellipse 70% 45% at 85% 90%, rgba(59, 130, 246, 0.12), transparent 50%);
+  animation: chatThemeNightMist 42s ease-in-out infinite alternate;
 }
 
 .chatTheme-night.chatMain > * {
   position: relative;
   z-index: 1;
+}
+
+/* User photo — data URL via --chat-custom-bg; dark veil for bubble contrast */
+.chatTheme-custom.chatMain {
+  background: #050a14;
+  animation: none;
+}
+
+.chatTheme-custom.chatMain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: var(--chat-custom-bg);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.chatTheme-custom.chatMain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(2, 6, 23, 0.78) 0%,
+    rgba(2, 6, 23, 0.52) 42%,
+    rgba(2, 6, 23, 0.62) 100%
+  );
+}
+
+.chatTheme-custom.chatMain > * {
+  position: relative;
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chatTheme-darkGradient.chatMain,
+  .chatTheme-night.chatMain {
+    animation: none !important;
+    background-size: auto !important;
+  }
+
+  .chatTheme-darkGradient.chatMain::before,
+  .chatTheme-softBlur.chatMain::before,
+  .chatTheme-night.chatMain::before {
+    animation: none !important;
+    transform: none !important;
+  }
 }
 
 /* Legacy theme IDs (older cached settings / HTML) */
@@ -5082,6 +5207,33 @@ body.body--mobileConversationOpen {
 
 .settingsSection--padded {
   padding: 12px 12px;
+}
+
+.settingsChatBgHint {
+  margin: 0 0 10px;
+}
+
+.settingsChatBgActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.settingsChatBgUpload {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.settingsChatBgUploadBtn {
+  width: 100%;
+}
+
+.settingsChatBgErr {
+  margin-top: 6px;
 }
 
 .settingsRow {

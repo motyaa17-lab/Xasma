@@ -215,6 +215,7 @@ export default function Chat({
   meAvatar,
   meUsername,
   chatTheme,
+  chatBackgroundImageUrl = null,
   onSend,
   onEditMessage,
   onToggleReaction,
@@ -1891,16 +1892,22 @@ export default function Chat({
 
   const chatMainClass = [
     "chatMain",
-    chatTheme && `chatTheme-${chatTheme}`,
+    chatBackgroundImageUrl ? "chatTheme-custom" : chatTheme && `chatTheme-${chatTheme}`,
     /* Desktop: full chat enter. Mobile: shell slide is on .mobileChatShell (avoids double motion). */
     chatId && chatOpening && !isMobileChat ? "chatMain--opening" : "",
   ]
     .filter(Boolean)
     .join(" ");
 
+  const chatMainStyle =
+    chatBackgroundImageUrl && String(chatBackgroundImageUrl).startsWith("data:image/")
+      ? { "--chat-custom-bg": `url(${JSON.stringify(String(chatBackgroundImageUrl))})` }
+      : undefined;
+
   return (
     <main
       className={chatMainClass}
+      style={chatMainStyle}
       onTouchStart={onChatTouchStart}
       onTouchMove={onChatTouchMove}
       onTouchEnd={onChatTouchEnd}

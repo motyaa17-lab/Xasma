@@ -250,6 +250,12 @@ export const translations = {
     sendRateLimited:
       "You're sending too fast. Please wait {seconds}s before sending again.",
     settingsCurrentBackground: "Current background",
+    chatBackgroundChooseGallery: "Choose photo from gallery",
+    chatBackgroundRemoveCustom: "Remove custom background",
+    chatBackgroundCustomActive: "Custom photo",
+    chatBackgroundGalleryHint:
+      "Built-in themes are animated. A gallery photo is saved in this browser only (localStorage). Choosing a theme clears the photo.",
+    chatBackgroundImageError: "Could not use this image. Try a smaller or different file.",
     settingsEmpty: "Empty",
     settingsFilled: "Filled",
 
@@ -558,6 +564,12 @@ export const translations = {
     sendRateLimited:
       "Слишком частые сообщения. Подождите {seconds} с. перед следующей отправкой.",
     settingsCurrentBackground: "Текущий фон",
+    chatBackgroundChooseGallery: "Выбрать фото из галереи",
+    chatBackgroundRemoveCustom: "Убрать свой фон",
+    chatBackgroundCustomActive: "Своё фото",
+    chatBackgroundGalleryHint:
+      "Встроенные темы анимированы. Фото из галереи хранится только в этом браузере (localStorage). Выбор темы сбрасывает фото.",
+    chatBackgroundImageError: "Не удалось использовать изображение. Попробуйте файл меньше или другой.",
     settingsEmpty: "Пусто",
     settingsFilled: "Заполнено",
 
@@ -866,6 +878,12 @@ export const translations = {
     sendRateLimited:
       "Занадто часті повідомлення. Зачекайте {seconds} с. перед наступним надсиланням.",
     settingsCurrentBackground: "Поточний фон",
+    chatBackgroundChooseGallery: "Обрати фото з галереї",
+    chatBackgroundRemoveCustom: "Прибрати власний фон",
+    chatBackgroundCustomActive: "Власне фото",
+    chatBackgroundGalleryHint:
+      "Вбудовані теми анімовані. Фото з галереї зберігається лише в цьому браузері (localStorage). Вибір теми скидає фото.",
+    chatBackgroundImageError: "Не вдалося використати зображення. Спробуйте менший або інший файл.",
     settingsEmpty: "Порожньо",
     settingsFilled: "Заповнено",
 
