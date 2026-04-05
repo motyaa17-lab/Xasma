@@ -4257,6 +4257,9 @@ body.body--mobileConversationOpen {
   margin-bottom: 3px;
   border-radius: 14px;
   flex-shrink: 0;
+  /* Clip underlay to rounded rect; isolate stacking for WebKit */
+  isolation: isolate;
+  contain: paint;
 }
 
 .mobileChatRowSwipeUnder {
@@ -4268,6 +4271,7 @@ body.body--mobileConversationOpen {
   align-items: stretch;
   pointer-events: none;
   z-index: 0;
+  /* Only visible where the front layer has moved away (swipe); never “through” an opaque card */
 }
 
 .mobileChatRowSwipePad {
@@ -4300,8 +4304,16 @@ body.body--mobileConversationOpen {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Swipe rows: opaque card — base .mobileChatRow uses rgba(..., 0.55) which lets pin/delete pads show through at rest. */
 .mobileChatRowSwipeFront.mobileChatRow {
   margin-bottom: 0;
+  background: linear-gradient(180deg, rgb(17, 27, 46), rgb(11, 18, 32));
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.mobileChatRowSwipeFront.mobileChatRow:active {
+  background: linear-gradient(180deg, rgb(19, 31, 52), rgb(12, 20, 36));
+  border-color: rgba(59, 130, 246, 0.25);
 }
 
 .mobileChatRowSwipe--pinned .mobileChatRowSwipePad--pin {
