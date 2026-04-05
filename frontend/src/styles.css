@@ -32,6 +32,8 @@
   --glow-active: 0 0 8px rgba(37, 99, 235, 0.16);
   --shadow-avatar: 0 2px 10px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(255, 255, 255, 0.05);
   --composer-radius: 22px;
+  /* Icon buttons in composer row (attach / video / mic / send slot); mobile overrides in .appShell--mobile */
+  --composer-control-size: 44px;
 }
 
 * {
@@ -40,6 +42,10 @@
 
 html {
   height: 100%;
+  min-height: 100%;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+  background: var(--bg);
 }
 
 body {
@@ -4046,10 +4052,12 @@ body.body--mobileConversationOpen {
 
 /* ----- Mobile shell (Telegram-inspired, Xasma theme) ----- */
 .appShell--mobile {
+  --composer-control-size: 48px;
+  flex: 1;
+  min-height: 0;
   height: 100%;
   display: flex;
   flex-direction: column;
-  min-height: 0;
   background: var(--bg);
 }
 
@@ -4518,8 +4526,8 @@ body.body--mobileConversationOpen {
   width: 100%;
   z-index: 30;
   top: var(--vv-offset-top, 0px);
-  height: var(--vv-height, 100%);
-  max-height: var(--vv-height, 100%);
+  height: var(--vv-height, 100dvh);
+  max-height: var(--vv-height, 100dvh);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -4616,42 +4624,51 @@ body.body--mobileConversationOpen {
 }
 
 .appShell--mobile .composer {
-  padding: 10px 10px 12px;
+  padding: 10px 10px max(12px, env(safe-area-inset-bottom, 0px));
   gap: 8px;
+}
+
+.appShell--mobile .composerMain {
+  gap: 8px;
+  align-items: center;
+}
+
+/* Same vertical center line as attach / video / send; desktop uses flex-end for multi-line baseline. */
+.appShell--mobile .composerMain .composerInputShell {
+  align-self: center;
+  min-height: var(--composer-control-size);
+}
+
+.appShell--mobile .composerInputShell {
+  border-radius: var(--composer-radius);
+}
+
+.appShell--mobile .composerInputShell .composerInput,
+.appShell--mobile .composerInputShell .composerInputGhost {
+  padding: 11px 14px;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.appShell--mobile .composerInputShell .composerInput {
+  min-height: calc(var(--composer-control-size) - 2px);
 }
 
 .appShell--mobile .attachPhotoBtn,
 .appShell--mobile .voiceMicBtn,
 .appShell--mobile .videoCamBtn,
 .appShell--mobile .sendBtn {
-  min-width: 42px;
-  min-height: 42px;
+  width: var(--composer-control-size);
+  height: var(--composer-control-size);
+  min-width: var(--composer-control-size);
+  min-height: var(--composer-control-size);
+  box-sizing: border-box;
 }
 
 .appShell--mobile .composerActionSlot {
-  width: 42px;
-  height: 42px;
-}
-
-.appShell--mobile .composerMain {
-  gap: 6px;
-  align-items: flex-end;
-}
-
-.appShell--mobile .composerInputShell {
-  border-radius: var(--composer-radius);
-  min-height: 48px;
-}
-
-.appShell--mobile .composerInputShell .composerInput,
-.appShell--mobile .composerInputShell .composerInputGhost {
-  padding: 12px 15px;
-  font-size: 16px;
-  line-height: 1.45;
-}
-
-.appShell--mobile .composerInputShell .composerInput {
-  min-height: 46px;
+  width: var(--composer-control-size);
+  height: var(--composer-control-size);
+  flex-shrink: 0;
 }
 
 .appShell--mobile .voiceMsgPill {
@@ -5318,23 +5335,6 @@ body.body--mobileConversationOpen {
     align-items: flex-end;
     padding: 0;
   }
-}
-
-.appShell--mobile .composer {
-  padding-bottom: max(14px, env(safe-area-inset-bottom));
-}
-
-.appShell--mobile .composerMain {
-  align-items: flex-end;
-  gap: 8px;
-}
-
-.appShell--mobile .attachPhotoBtn,
-.appShell--mobile .voiceMicBtn,
-.appShell--mobile .videoCamBtn,
-.appShell--mobile .sendBtn {
-  min-width: 48px;
-  min-height: 48px;
 }
 
 .appShell--mobile .messages {

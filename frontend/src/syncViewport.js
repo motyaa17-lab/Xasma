@@ -7,7 +7,7 @@
 /** Added to document.body while mobile open-chat is active (locks document scroll). */
 export const MOBILE_CHAT_OPEN_BODY_CLASS = "body--mobileConversationOpen";
 
-/** #root / .appRoot height: full layout viewport while chat is open, else visual viewport height. */
+/** #root / .appRoot height: full layout viewport while chat is open, else visible viewport height. */
 export function syncAppRootHeight() {
   if (typeof window === "undefined" || typeof document === "undefined") return;
   try {
@@ -15,7 +15,16 @@ export function syncAppRootHeight() {
       document.documentElement.style.setProperty("--app-height", `${Math.round(window.innerHeight)}px`);
       return;
     }
-    const h = window.visualViewport?.height ?? window.innerHeight;
+    const vv = window.visualViewport;
+    const inner = window.innerHeight;
+    // Prefer visual viewport when available (mobile Chrome / Safari). Clamp with innerHeight to avoid
+    // oversized values before layout; avoids extra “chin” when bars show/hide on Android.
+    let h = inner;
+    if (vv && typeof vv.height === "number" && vv.height > 0) {
+      h = Math.min(vv.height, inner);
+    } else {
+      h = Math.min(inner, document.documentElement?.clientHeight || inner);
+    }
     document.documentElement.style.setProperty("--app-height", `${Math.round(h)}px`);
   } catch {
     // ignore
@@ -28,6 +37,11 @@ export function syncMobileChatVisualViewport() {
   try {
     const vv = window.visualViewport;
     if (!vv) {
+      document.documentElement.style.setProperty("--vv-offset-top", "0px");
+      document.documentElement.style.setProperty("--vv-height", `${Math.round(window.innerHeight)}px`);
+      return;
+    }
+    if (vv.height <= 0) {
       document.documentElement.style.setProperty("--vv-offset-top", "0px");
       document.documentElement.style.setProperty("--vv-height", `${Math.round(window.innerHeight)}px`);
       return;

@@ -11,6 +11,7 @@ function setAppHeightVar() {
 setAppHeightVar();
 window.addEventListener("resize", setAppHeightVar);
 window.addEventListener("orientationchange", setAppHeightVar);
+window.addEventListener("pageshow", setAppHeightVar);
 window.visualViewport?.addEventListener?.("resize", setAppHeightVar);
 window.visualViewport?.addEventListener?.("scroll", setAppHeightVar);
 
