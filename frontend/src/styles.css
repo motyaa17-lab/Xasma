@@ -15,8 +15,12 @@
   --ease-tg-snappy: cubic-bezier(0.2, 0.88, 0.28, 1);
   --ease-tg-pop: cubic-bezier(0.34, 1.2, 0.42, 1);
   --ease-ui: ease;
+  /* Prefer transform/opacity (GPU); avoid `transition: all` for fewer repaints */
+  --transition-ui-standard: opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  --ease-msg-in: cubic-bezier(0.25, 0.82, 0.22, 1);
+  --ease-chat-open: cubic-bezier(0.25, 0.82, 0.22, 1);
   --dur-ui: 0.2s;
-  --dur-chat-shell: 0.32s;
+  --dur-chat-shell: 0.28s;
   --dur-msg-in: 0.2s;
   --dur-msg-own: 0.2s;
   --dur-menu: 0.24s;
@@ -90,13 +94,10 @@ body.body--mobileConversationOpen {
   max-height: 100%;
 }
 
-/* Subtle press on most buttons (excludes composer/media — they keep their own :active) */
+/* Tap feedback: scale 0.98 + 0.2s ease on transform (composer icons use dedicated rules below) */
 .appRoot button:not(:disabled):not(.noTapScale):not(.sendBtn):not(.videoCamBtn):not(.voiceMicBtn):not(.attachPhotoBtn):not(.msgMenuReactionBtn):not(.msgMenuBtn):not(.composerActionBtn),
 .appRoot [role="button"]:not([aria-disabled="true"]):not(.noTapScale) {
-  transition:
-    transform var(--dur-ui) var(--ease-ui),
-    opacity var(--dur-ui) var(--ease-ui),
-    box-shadow 0.2s var(--ease-ui);
+  transition: var(--transition-ui-standard);
 }
 
 .appRoot button:not(:disabled):not(.noTapScale):not(.sendBtn):not(.videoCamBtn):not(.voiceMicBtn):not(.attachPhotoBtn):not(.msgMenuReactionBtn):not(.msgMenuBtn):not(.composerActionBtn):active,
@@ -209,7 +210,11 @@ body.body--mobileConversationOpen {
   background: var(--primary);
   color: white;
   font-weight: 600;
-  transition: background 0.15s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.15s ease;
+  transition: var(--transition-ui-standard), background 0.15s ease, opacity 0.15s ease;
+}
+
+.primaryBtn:not(:disabled):active {
+  transform: scale(0.98);
 }
 
 .primaryBtn:disabled {
@@ -303,7 +308,11 @@ body.body--mobileConversationOpen {
   border-radius: 10px;
   padding: 8px 12px;
   cursor: pointer;
-  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  transition: var(--transition-ui-standard), border-color 0.2s ease, background 0.2s ease;
+}
+
+.ghostBtn:not(:disabled):active {
+  transform: scale(0.98);
 }
 
 .userMenu {
@@ -1729,7 +1738,7 @@ body.body--mobileConversationOpen {
 @keyframes chatShellIn {
   from {
     opacity: 0;
-    transform: translate3d(0, 10px, 0);
+    transform: translate3d(0, 12px, 0);
   }
   to {
     opacity: 1;
@@ -1740,7 +1749,7 @@ body.body--mobileConversationOpen {
 @keyframes chatMessagesShellIn {
   from {
     opacity: 0;
-    transform: translate3d(0, 6px, 0);
+    transform: translate3d(0, 8px, 0);
   }
   to {
     opacity: 1;
@@ -1751,7 +1760,7 @@ body.body--mobileConversationOpen {
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translate3d(0, 8px, 0);
+    transform: translate3d(0, 12px, 0);
   }
   to {
     opacity: 1;
@@ -1763,7 +1772,7 @@ body.body--mobileConversationOpen {
 @keyframes fadeInUpOwn {
   from {
     opacity: 0;
-    transform: translate3d(10px, 4px, 0);
+    transform: translate3d(12px, 6px, 0);
   }
   to {
     opacity: 1;
@@ -1842,27 +1851,27 @@ body.body--mobileConversationOpen {
 }
 
 .chatMain--opening .chatHeader {
-  animation: chatShellIn var(--dur-chat-shell) var(--ease-ui) both;
+  animation: chatShellIn var(--dur-chat-shell) var(--ease-chat-open) both;
 }
 
 .chatMain--opening .messages {
-  animation: chatMessagesShellIn calc(var(--dur-chat-shell) * 0.88) var(--ease-ui) 0.04s both;
+  animation: chatMessagesShellIn calc(var(--dur-chat-shell) * 0.9) var(--ease-chat-open) 0.04s both;
 }
 
 .chatMain--opening .composer {
-  animation: chatShellIn var(--dur-chat-shell) var(--ease-ui) 0.06s both;
+  animation: chatShellIn var(--dur-chat-shell) var(--ease-chat-open) 0.06s both;
 }
 
 .bubbleRow--enter {
-  animation: fadeInUp var(--dur-ui) var(--ease-ui) both;
+  animation: fadeInUp var(--dur-msg-in) var(--ease-msg-in) both;
 }
 
 .bubbleRow.me.bubbleRow--enterOwn {
-  animation: fadeInUpOwn var(--dur-ui) var(--ease-ui) both;
+  animation: fadeInUpOwn var(--dur-msg-own) var(--ease-msg-in) both;
 }
 
 .systemMessageRow--enter {
-  animation: fadeInUp var(--dur-ui) var(--ease-ui) both;
+  animation: fadeInUp var(--dur-msg-in) var(--ease-msg-in) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3075,13 +3084,13 @@ body.body--mobileConversationOpen {
   align-items: center;
   justify-content: center;
   transition:
-    transform var(--dur-tap) var(--ease-tg-snappy),
+    transform 0.2s ease,
     border-color 0.14s ease,
     background 0.14s ease;
 }
 
 .attachPhotoBtn:not(:disabled):active {
-  transform: scale(0.9);
+  transform: scale(0.98);
 }
 
 .attachPhotoBtn:disabled {
@@ -3134,7 +3143,7 @@ body.body--mobileConversationOpen {
 }
 
 .voiceMicBtn:not(:disabled):not(.voiceMicBtn--pressing):not(.voiceMicBtn--recording):active {
-  transform: scale(0.9);
+  transform: scale(0.98);
 }
 
 .voiceMicBtn--recording:disabled {
@@ -3205,7 +3214,7 @@ body.body--mobileConversationOpen {
 }
 
 .videoCamBtn:not(:disabled):not(.videoCamBtn--pressing):active {
-  transform: scale(0.9);
+  transform: scale(0.98);
 }
 
 .videoCamBtn:disabled {
@@ -3438,15 +3447,11 @@ body.body--mobileConversationOpen {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition:
-    transform var(--dur-tap) var(--ease-tg-snappy),
-    opacity 0.12s ease,
-    background 0.14s ease,
-    box-shadow 0.2s ease;
+  transition: var(--transition-ui-standard), opacity 0.12s ease, background 0.14s ease;
 }
 
 .sendBtn:not(:disabled):active {
-  transform: scale(0.9);
+  transform: scale(0.98);
   box-shadow: var(--glow-active);
 }
 
@@ -3487,7 +3492,7 @@ body.body--mobileConversationOpen {
 }
 
 .composerActionSlot .composerActionBtn.sendBtn:not(:disabled):not(.isHidden):active {
-  transform: scale(0.9);
+  transform: scale(0.98);
 }
 
 .sidebarChatsRow {
@@ -4416,7 +4421,7 @@ body.body--mobileConversationOpen {
 }
 
 .appShell--mobile .mobileChatShell {
-  animation: mobileChatShellIn var(--dur-chat-shell) var(--ease-ui) both;
+  animation: mobileChatShellIn var(--dur-chat-shell) var(--ease-chat-open) both;
 }
 
 .mobileChatShell .chatMain {
@@ -4725,15 +4730,12 @@ body.body--mobileConversationOpen {
   justify-content: center;
   font-size: 18px;
   line-height: 1;
-  transition:
-    transform var(--dur-tap) var(--ease-tg-snappy),
-    background 0.14s ease,
-    border-color 0.14s ease;
+  transition: var(--transition-ui-standard), background 0.14s ease, border-color 0.14s ease;
   -webkit-tap-highlight-color: transparent;
 }
 
 .mobileChatBackBtn:active {
-  transform: scale(0.9);
+  transform: scale(0.98);
   background: rgba(37, 99, 235, 0.22);
 }
 
@@ -4771,16 +4773,12 @@ body.body--mobileConversationOpen {
   font-size: 11px;
   font-weight: 700;
   cursor: pointer;
-  transition:
-    transform var(--dur-tap) var(--ease-tg-snappy),
-    color 0.16s ease,
-    background 0.16s ease,
-    box-shadow 0.2s ease;
+  transition: var(--transition-ui-standard), color 0.16s ease, background 0.16s ease;
   -webkit-tap-highlight-color: transparent;
 }
 
 .mobileNavItem:active {
-  transform: scale(0.92);
+  transform: scale(0.98);
 }
 
 .mobileNavItem--active {
