@@ -287,6 +287,9 @@ export default function Chat({
   const [profileUserId, setProfileUserId] = useState(null);
   const [replyToMessage, setReplyToMessage] = useState(null); // { id, senderUsername, preview }
   const listRef = useRef(null);
+  const chatBgParallaxRef = useRef(null);
+  const parallaxRafRef = useRef(0);
+  const parallaxMotionOkRef = useRef(true);
   const scrollToMessageById = useCallback((mid) => {
     const id = Number(mid);
     if (!id || !listRef.current) return;
@@ -736,6 +739,62 @@ export default function Chat({
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
   }, [chatId, isMobileChat, clearBubbleLongPress]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    parallaxMotionOkRef.current = !mq.matches;
+    const onChange = () => {
+      parallaxMotionOkRef.current = !mq.matches;
+      if (mq.matches && chatBgParallaxRef.current) {
+        chatBgParallaxRef.current.style.transform = "";
+      }
+    };
+    if (typeof mq.addEventListener === "function") mq.addEventListener("change", onChange);
+    else mq.addListener(onChange);
+    return () => {
+      if (typeof mq.removeEventListener === "function") mq.removeEventListener("change", onChange);
+      else mq.removeListener(onChange);
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    const bg = chatBgParallaxRef.current;
+    if (!bg) return;
+    if (!chatId || !parallaxMotionOkRef.current) {
+      bg.style.transform = "";
+      return;
+    }
+    const scrollEl = listRef.current;
+    if (!scrollEl) {
+      bg.style.transform = "";
+      return;
+    }
+    const maxPx = () => Math.min(28, Math.max(14, Math.round(window.innerHeight * 0.028)));
+    const factor = isMobileChat ? 0.055 : 0.072;
+    const apply = () => {
+      const st = scrollEl.scrollTop;
+      const raw = -st * factor;
+      const m = maxPx();
+      const y = Math.max(-m, Math.min(m, raw));
+      bg.style.transform = `translate3d(0, ${y}px, 0)`;
+    };
+    const onScroll = () => {
+      if (parallaxRafRef.current) return;
+      parallaxRafRef.current = requestAnimationFrame(() => {
+        parallaxRafRef.current = 0;
+        apply();
+      });
+    };
+    apply();
+    scrollEl.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      scrollEl.removeEventListener("scroll", onScroll);
+      if (parallaxRafRef.current) cancelAnimationFrame(parallaxRafRef.current);
+      parallaxRafRef.current = 0;
+      bg.style.transform = "";
+    };
+  }, [chatId, isMobileChat]);
 
   useEffect(() => {
     if (!chatId) {
@@ -1923,6 +1982,7 @@ export default function Chat({
       onTouchEnd={onChatTouchEnd}
       onTouchCancel={onChatTouchEnd}
     >
+      <div className="chatBgParallax" ref={chatBgParallaxRef} aria-hidden />
       <UserProfileModal
         open={Boolean(profileUserId)}
         userId={profileUserId}

@@ -1661,7 +1661,29 @@ body.body--mobileConversationOpen {
   flex-direction: column;
   position: relative;
   isolation: isolate;
-  /* Fallback if theme class missing */
+  background: transparent;
+}
+
+/* Decorative themes + parallax: all paints live on .chatBgParallax (transform from Chat.jsx) */
+.chatMain > .chatBgParallax {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -56px;
+  bottom: -56px;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  transform: translateZ(0);
+  border-radius: inherit;
+}
+
+.chatMain > *:not(.chatBgParallax) {
+  position: relative;
+  z-index: 1;
+}
+
+.chatMain:not(.chatTheme-custom) > .chatBgParallax {
   background: linear-gradient(165deg, #0c1222 0%, #0f172a 40%, #020617 100%);
 }
 
@@ -1718,11 +1740,11 @@ body.body--mobileConversationOpen {
 }
 
 /* Base paints (static). Motion toggled via .theme-dark-animated | .theme-night-animated | .theme-soft-animated */
-.chatTheme-darkGradient.chatMain {
+.chatTheme-darkGradient.chatMain > .chatBgParallax {
   background: linear-gradient(165deg, #0a0f1c 0%, #0f172a 28%, #1e293b 52%, #0f172a 78%, #020617 100%);
 }
 
-.chatTheme-darkGradient.chatMain::before {
+.chatTheme-darkGradient.chatMain > .chatBgParallax::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -1733,29 +1755,24 @@ body.body--mobileConversationOpen {
     radial-gradient(ellipse 80% 50% at 0% 80%, rgba(30, 41, 59, 0.35), transparent 50%);
 }
 
-.chatMain.chatTheme-darkGradient.theme-dark-animated {
+.chatMain.chatTheme-darkGradient.theme-dark-animated > .chatBgParallax {
   background-size: 220% 220%;
   animation: chatThemeDarkGradientMove 24s ease-in-out infinite alternate;
 }
 
-.chatMain.chatTheme-darkGradient.theme-dark-animated::before {
+.chatMain.chatTheme-darkGradient.theme-dark-animated > .chatBgParallax::before {
   animation: chatThemeDarkSheen 26s ease-in-out infinite alternate;
 }
 
-.chatTheme-darkGradient.chatMain > * {
-  position: relative;
-  z-index: 1;
-}
-
 /* Frosted glass — keeps message text readable */
-.chatTheme-softBlur.chatMain {
+.chatTheme-softBlur.chatMain > .chatBgParallax {
   background: linear-gradient(180deg, rgba(30, 41, 59, 0.55) 0%, rgba(15, 23, 42, 0.82) 100%);
   backdrop-filter: blur(26px) saturate(1.18);
   -webkit-backdrop-filter: blur(26px) saturate(1.18);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
-.chatTheme-softBlur.chatMain::before {
+.chatTheme-softBlur.chatMain > .chatBgParallax::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -1765,21 +1782,16 @@ body.body--mobileConversationOpen {
   border-radius: inherit;
 }
 
-.chatMain.chatTheme-softBlur.theme-soft-animated::before {
+.chatMain.chatTheme-softBlur.theme-soft-animated > .chatBgParallax::before {
   animation: chatThemeSoftBlurGlow 22s ease-in-out infinite alternate;
 }
 
-.chatTheme-softBlur.chatMain > * {
-  position: relative;
-  z-index: 1;
-}
-
 /* Night — blue / violet / purple depth */
-.chatTheme-night.chatMain {
+.chatTheme-night.chatMain > .chatBgParallax {
   background: linear-gradient(168deg, #0a0f1e 0%, #1e1b4b 38%, #312e81 72%, #4c1d95 92%, #1e1033 100%);
 }
 
-.chatTheme-night.chatMain::before {
+.chatTheme-night.chatMain > .chatBgParallax::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -1789,18 +1801,13 @@ body.body--mobileConversationOpen {
     radial-gradient(ellipse 70% 45% at 85% 90%, rgba(59, 130, 246, 0.12), transparent 50%);
 }
 
-.chatMain.chatTheme-night.theme-night-animated {
+.chatMain.chatTheme-night.theme-night-animated > .chatBgParallax {
   background-size: 200% 200%;
   animation: chatThemeNightMove 22s ease-in-out infinite alternate;
 }
 
-.chatMain.chatTheme-night.theme-night-animated::before {
+.chatMain.chatTheme-night.theme-night-animated > .chatBgParallax::before {
   animation: chatThemeNightMist 24s ease-in-out infinite alternate;
-}
-
-.chatTheme-night.chatMain > * {
-  position: relative;
-  z-index: 1;
 }
 
 /*
@@ -1824,41 +1831,45 @@ body.body--mobileConversationOpen {
   isolation: auto;
 }
 
-.appShell--mobile .chatTheme-softBlur.chatMain {
+.appShell--mobile .chatTheme-softBlur.chatMain > .chatBgParallax {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   background: linear-gradient(180deg, rgba(30, 41, 59, 0.94) 0%, rgba(15, 23, 42, 0.98) 100%);
 }
 
 /* Safer motion: no background-position animation on main; subtle opacity drift on overlay only */
-.appShell--mobile .chatMain.chatTheme-darkGradient.theme-dark-animated,
-.appShell--mobile .chatMain.chatTheme-night.theme-night-animated {
+.appShell--mobile .chatMain.chatTheme-darkGradient.theme-dark-animated > .chatBgParallax,
+.appShell--mobile .chatMain.chatTheme-night.theme-night-animated > .chatBgParallax {
   background-size: auto;
   animation: none;
 }
 
-.appShell--mobile .chatMain.chatTheme-darkGradient.theme-dark-animated::before {
+.appShell--mobile .chatMain.chatTheme-darkGradient.theme-dark-animated > .chatBgParallax::before {
   animation: chatThemeMobileOverlayPulse 24s ease-in-out infinite alternate;
   transform: none;
 }
 
-.appShell--mobile .chatMain.chatTheme-night.theme-night-animated::before {
+.appShell--mobile .chatMain.chatTheme-night.theme-night-animated > .chatBgParallax::before {
   animation: chatThemeMobileOverlayPulse 26s ease-in-out infinite alternate;
   transform: none;
 }
 
-.appShell--mobile .chatMain.chatTheme-softBlur.theme-soft-animated::before {
+.appShell--mobile .chatMain.chatTheme-softBlur.theme-soft-animated > .chatBgParallax::before {
   animation: chatThemeMobileOverlayPulse 22s ease-in-out infinite alternate;
   transform: none;
 }
 
 /* User photo — data URL via --chat-custom-bg; dark veil for bubble contrast */
 .chatTheme-custom.chatMain {
-  background: #050a14;
+  background: transparent;
   animation: none;
 }
 
-.chatTheme-custom.chatMain::before {
+.chatTheme-custom.chatMain > .chatBgParallax {
+  background: #050a14;
+}
+
+.chatTheme-custom.chatMain > .chatBgParallax::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -1870,7 +1881,7 @@ body.body--mobileConversationOpen {
   background-repeat: no-repeat;
 }
 
-.chatTheme-custom.chatMain::after {
+.chatTheme-custom.chatMain > .chatBgParallax::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -1884,39 +1895,34 @@ body.body--mobileConversationOpen {
   );
 }
 
-.chatTheme-custom.chatMain > * {
-  position: relative;
-  z-index: 1;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .chatMain.chatTheme-darkGradient.theme-dark-animated,
-  .chatMain.chatTheme-night.theme-night-animated {
+  .chatMain.chatTheme-darkGradient.theme-dark-animated > .chatBgParallax,
+  .chatMain.chatTheme-night.theme-night-animated > .chatBgParallax {
     animation: none !important;
     background-size: auto !important;
   }
 
-  .chatMain.chatTheme-darkGradient.theme-dark-animated::before,
-  .chatMain.chatTheme-softBlur.theme-soft-animated::before,
-  .chatMain.chatTheme-night.theme-night-animated::before {
+  .chatMain.chatTheme-darkGradient.theme-dark-animated > .chatBgParallax::before,
+  .chatMain.chatTheme-softBlur.theme-soft-animated > .chatBgParallax::before,
+  .chatMain.chatTheme-night.theme-night-animated > .chatBgParallax::before {
     animation: none !important;
     transform: none !important;
   }
 }
 
 /* Legacy theme IDs (older cached settings / HTML) */
-.chatTheme-dark.chatMain,
-.chatTheme-noise.chatMain,
-.chatTheme-ocean.chatMain,
-.chatTheme-slate.chatMain {
+.chatTheme-dark.chatMain > .chatBgParallax,
+.chatTheme-noise.chatMain > .chatBgParallax,
+.chatTheme-ocean.chatMain > .chatBgParallax,
+.chatTheme-slate.chatMain > .chatBgParallax {
   background: linear-gradient(165deg, #0c1222 0%, #0f172a 40%, #020617 100%);
 }
 
-.chatTheme-midnight.chatMain {
+.chatTheme-midnight.chatMain > .chatBgParallax {
   background: linear-gradient(168deg, #0a0f1e 0%, #1e1b4b 38%, #312e81 72%, #4c1d95 92%, #1e1033 100%);
 }
 
-.chatTheme-glass.chatMain {
+.chatTheme-glass.chatMain > .chatBgParallax {
   background: linear-gradient(180deg, rgba(30, 41, 59, 0.55) 0%, rgba(15, 23, 42, 0.82) 100%);
   backdrop-filter: blur(26px) saturate(1.18);
   -webkit-backdrop-filter: blur(26px) saturate(1.18);
