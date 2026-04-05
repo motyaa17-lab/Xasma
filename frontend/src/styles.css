@@ -418,6 +418,130 @@ body.body--mobileConversationOpen {
   padding: 14px;
 }
 
+.modalCard--userProfile {
+  width: min(100vw - 24px, 440px);
+}
+
+.modalBody--userProfile {
+  padding: 18px 18px 22px;
+}
+
+.userProfileLoading {
+  text-align: center;
+  padding: 24px 8px;
+}
+
+.userProfileCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.userProfileHero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.userProfileAvatar.userProfileAvatar--xl {
+  width: 112px;
+  height: 112px;
+}
+
+.userProfileAvatar.userProfileAvatar--xl span {
+  font-size: 2.25rem;
+}
+
+.userProfileEarlyBadge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.4), rgba(168, 85, 247, 0.28));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(241, 245, 249, 0.98);
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.15);
+}
+
+.userProfileNameBlock {
+  width: 100%;
+  text-align: center;
+  margin-bottom: 20px;
+  padding: 0 4px;
+}
+
+.userProfileDisplayName {
+  margin: 0 0 12px;
+  font-size: 1.4rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: rgba(248, 250, 252, 0.98);
+  word-break: break-word;
+}
+
+.userProfileBadgesRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 1.5em;
+}
+
+.userProfileSections {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+.userProfileSection {
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(11, 18, 32, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+}
+
+.userProfileSection--meta {
+  background: rgba(11, 18, 32, 0.35);
+}
+
+.userProfileSectionLabel {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.userProfileSectionValue {
+  font-size: 14px;
+  line-height: 1.45;
+  color: rgba(226, 232, 240, 0.96);
+}
+
+.userProfileSectionValue--muted {
+  color: rgba(203, 213, 225, 0.9);
+  font-size: 13px;
+}
+
+.userProfileAbout {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .profilePanel {
   display: flex;
   gap: 14px;

@@ -72,6 +72,22 @@ function buildOtherUserTagsFromChatRow(c) {
   };
 }
 
+function registrationDateIso(createdAt) {
+  if (createdAt == null) return null;
+  const d = new Date(createdAt);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+/** Early adopters: first accounts by id, or joined before public launch window. */
+function isEarlyTesterUser(userId, createdAt) {
+  const uid = Number(userId);
+  if (uid > 0 && uid <= 5000) return true;
+  if (!createdAt) return false;
+  const d = new Date(createdAt);
+  if (Number.isNaN(d.getTime())) return false;
+  return d < new Date("2027-01-01T00:00:00.000Z");
+}
+
 const PORT = process.env.PORT || 4000;
 const uploadsDir = path.join(__dirname, "..", "uploads");
 fs.mkdirSync(uploadsDir, { recursive: true });
@@ -623,7 +639,7 @@ app.post("/api/register", async (req, res) => {
 
   const password_hash = await bcrypt.hash(password, 10);
   const inserted = await query(
-    `INSERT INTO users (username, password_hash, avatar_url) VALUES ($1, $2, $3) RETURNING id, username, avatar_url, role, banned, aura_color`,
+    `INSERT INTO users (username, password_hash, avatar_url) VALUES ($1, $2, $3) RETURNING id, username, avatar_url, role, banned, aura_color, created_at`,
     [uname, password_hash, avatar_url]
   );
   const user = inserted.rows[0];
@@ -646,6 +662,8 @@ app.post("/api/register", async (req, res) => {
       tag: null,
       tagColor: DEFAULT_TAG_COLOR,
       tagStyle: "solid",
+      registrationDate: registrationDateIso(user.created_at),
+      isEarlyTester: isEarlyTesterUser(Number(user.id), user.created_at),
     },
   });
 });
@@ -656,7 +674,7 @@ app.post("/api/login", async (req, res) => {
 
   const r = await query(
     `SELECT id, username, password_hash, avatar_url, role, banned, aura_color, messages_sent_count,
-            user_tag, tag_color, tag_style
+            user_tag, tag_color, tag_style, created_at
      FROM users WHERE username = $1`,
     [username.trim()]
   );
@@ -688,6 +706,8 @@ app.post("/api/login", async (req, res) => {
       tag: tags.tag,
       tagColor: tags.tagColor,
       tagStyle: tags.tagStyle,
+      registrationDate: registrationDateIso(user.created_at),
+      isEarlyTester: isEarlyTesterUser(Number(user.id), user.created_at),
     },
   });
 });
@@ -696,7 +716,7 @@ app.get("/api/me", authRequired, (req, res) => {
   const uid = Number(req.user.id);
   return query(
     `SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about, aura_color, messages_sent_count,
-            user_tag, tag_color, tag_style
+            user_tag, tag_color, tag_style, created_at
      FROM users WHERE id = $1`,
     [uid]
   ).then((r) => {
@@ -720,6 +740,8 @@ app.get("/api/me", authRequired, (req, res) => {
       tag: tags.tag,
       tagColor: tags.tagColor,
       tagStyle: tags.tagStyle,
+      registrationDate: registrationDateIso(user.created_at),
+      isEarlyTester: isEarlyTesterUser(Number(user.id), user.created_at),
     },
   });
   });
@@ -758,7 +780,7 @@ app.put("/api/me/profile", authRequired, (req, res) => {
     }
     const r = await query(
       `SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about, aura_color, messages_sent_count,
-              user_tag, tag_color, tag_style
+              user_tag, tag_color, tag_style, created_at
        FROM users WHERE id = $1`,
       [uid]
     );
@@ -789,6 +811,8 @@ app.put("/api/me/profile", authRequired, (req, res) => {
         tag: tags.tag,
         tagColor: tags.tagColor,
         tagStyle: tags.tagStyle,
+        registrationDate: registrationDateIso(user.created_at),
+        isEarlyTester: isEarlyTesterUser(Number(user.id), user.created_at),
       },
     });
   })().catch(() => res.status(500).json({ error: "Server error" }));
@@ -912,12 +936,14 @@ app.get("/api/users/:userId", authRequired, (req, res) => {
           tag: null,
           tagColor: DEFAULT_TAG_COLOR,
           tagStyle: "solid",
+          registrationDate: null,
+          isEarlyTester: false,
         },
       });
     }
     const r = await query(
       `SELECT id, username, avatar_url, aura_color, is_online, last_seen_at, status_kind, status_text, about, messages_sent_count,
-              user_tag, tag_color, tag_style
+              user_tag, tag_color, tag_style, created_at
        FROM users
        WHERE id = $1`,
       [uid]
@@ -940,6 +966,8 @@ app.get("/api/users/:userId", authRequired, (req, res) => {
         tag: tg.tag,
         tagColor: tg.tagColor,
         tagStyle: tg.tagStyle,
+        registrationDate: registrationDateIso(u.created_at),
+        isEarlyTester: isEarlyTesterUser(Number(u.id), u.created_at),
       },
     });
   })().catch(() => res.status(500).json({ error: "Server error" }));
