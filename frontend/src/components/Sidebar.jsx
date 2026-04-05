@@ -1,4 +1,4 @@
-import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
+import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import AvatarAura from "./AvatarAura.jsx";
 import { localeForLang } from "../i18n.js";
 import { formatUserStatusLine } from "../userStatusLine.js";
@@ -12,6 +12,7 @@ const Sidebar = forwardRef(function Sidebar(
     onSelectChat,
     onStartChat,
     onCreateGroup,
+    onCreateChannel,
     t,
     lang,
     mobileLayout = false,
@@ -32,8 +33,20 @@ const Sidebar = forwardRef(function Sidebar(
   const [groupError, setGroupError] = useState("");
   const [groupSubmitting, setGroupSubmitting] = useState(false);
 
+  const channelFileRef = useRef(null);
+  const [showChannelModal, setShowChannelModal] = useState(false);
+  const [channelTitle, setChannelTitle] = useState("");
+  const [channelQuery, setChannelQuery] = useState("");
+  const [channelResults, setChannelResults] = useState([]);
+  const [channelSearching, setChannelSearching] = useState(false);
+  const [channelSelectedMembers, setChannelSelectedMembers] = useState([]);
+  const [channelError, setChannelError] = useState("");
+  const [channelSubmitting, setChannelSubmitting] = useState(false);
+  const [channelAvatarDraft, setChannelAvatarDraft] = useState(null);
+
   const canSearch = useMemo(() => query.trim().length >= 1, [query]);
   const canGroupSearch = useMemo(() => groupQuery.trim().length >= 1, [groupQuery]);
+  const canChannelSearch = useMemo(() => channelQuery.trim().length >= 1, [channelQuery]);
 
   const mobileFilteredChats = useMemo(() => {
     if (!mobileLayout) return chats;
@@ -41,9 +54,14 @@ const Sidebar = forwardRef(function Sidebar(
     if (!q) return chats;
     return chats.filter((c) => {
       const isGroup = c.type === "group";
+      const isChannel = c.type === "channel";
       const isOfficial = c.type === "official";
       const label =
-        (isGroup ? c.title : isOfficial ? c.title || c.other?.username : c.other?.username) || "";
+        (isGroup || isChannel
+          ? c.title
+          : isOfficial
+            ? c.title || c.other?.username
+            : c.other?.username) || "";
       return label.toLowerCase().includes(q);
     });
   }, [chats, query, mobileLayout]);
@@ -54,8 +72,11 @@ const Sidebar = forwardRef(function Sidebar(
       openCreateGroup: () => {
         if (onCreateGroup) setShowGroupModal(true);
       },
+      openCreateChannel: () => {
+        if (onCreateChannel) setShowChannelModal(true);
+      },
     }),
-    [onCreateGroup]
+    [onCreateGroup, onCreateChannel]
   );
 
   useEffect(() => {
@@ -111,6 +132,28 @@ const Sidebar = forwardRef(function Sidebar(
     return () => clearTimeout(timer);
   }, [groupQuery, canGroupSearch]);
 
+  useEffect(() => {
+    let timer = null;
+    async function run() {
+      if (!canChannelSearch) {
+        setChannelResults([]);
+        return;
+      }
+      setChannelSearching(true);
+      try {
+        const mod = await import("../api.js");
+        const users = await mod.searchUsers(channelQuery.trim());
+        setChannelResults(users);
+      } catch {
+        setChannelResults([]);
+      } finally {
+        setChannelSearching(false);
+      }
+    }
+    timer = setTimeout(run, 250);
+    return () => clearTimeout(timer);
+  }, [channelQuery, canChannelSearch]);
+
   function toggleMember(user) {
     setSelectedMembers((prev) => {
       const exists = prev.find((x) => x.id === user.id);
@@ -121,6 +164,68 @@ const Sidebar = forwardRef(function Sidebar(
 
   function memberSelected(id) {
     return selectedMembers.some((x) => x.id === id);
+  }
+
+  function toggleChannelMember(user) {
+    setChannelSelectedMembers((prev) => {
+      const exists = prev.find((x) => x.id === user.id);
+      if (exists) return prev.filter((x) => x.id !== user.id);
+      return [...prev, user];
+    });
+  }
+
+  function channelMemberSelected(id) {
+    return channelSelectedMembers.some((x) => x.id === id);
+  }
+
+  function onPickChannelAvatar(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !file.type.startsWith("image/")) {
+      setChannelError(t("groupAvatarChooseImage"));
+      return;
+    }
+    if (file.size > 380 * 1024) {
+      setChannelError(t("groupAvatarFileTooLarge"));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result || "");
+      if (dataUrl.startsWith("data:image/")) {
+        setChannelAvatarDraft(dataUrl);
+        setChannelError("");
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function submitChannel() {
+    setChannelError("");
+    const title = channelTitle.trim();
+    if (!title) {
+      setChannelError(t("channelErrorTitle"));
+      return;
+    }
+    if (!onCreateChannel) return;
+    setChannelSubmitting(true);
+    try {
+      await onCreateChannel({
+        title,
+        avatar: channelAvatarDraft || undefined,
+        memberUserIds: channelSelectedMembers.map((u) => u.id),
+      });
+      setShowChannelModal(false);
+      setChannelTitle("");
+      setChannelQuery("");
+      setChannelResults([]);
+      setChannelSelectedMembers([]);
+      setChannelAvatarDraft(null);
+    } catch (e) {
+      setChannelError(e.message || t("errorGeneric"));
+    } finally {
+      setChannelSubmitting(false);
+    }
   }
 
   async function submitGroup() {
@@ -256,6 +361,141 @@ const Sidebar = forwardRef(function Sidebar(
       </div>
     ) : null;
 
+  const channelModal =
+    showChannelModal ? (
+      <div
+        className="modalBackdrop"
+        role="presentation"
+        onClick={() => !channelSubmitting && setShowChannelModal(false)}
+      >
+        <div
+          className="modalCard groupModalCard modalCard--mobileFriendly"
+          role="dialog"
+          aria-labelledby="channelModalTitle"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="modalHeader">
+            <div className="modalTitle" id="channelModalTitle">
+              {t("createChannel")}
+            </div>
+            <button
+              type="button"
+              className="iconCloseBtn"
+              onClick={() => !channelSubmitting && setShowChannelModal(false)}
+              aria-label={t("close")}
+            >
+              ×
+            </button>
+          </div>
+          <div className="modalBody groupModalBody">
+            <label className="groupFieldLabel">{t("channelTitleLabel")}</label>
+            <input
+              className="searchInput"
+              value={channelTitle}
+              onChange={(e) => setChannelTitle(e.target.value)}
+              placeholder={t("channelTitleLabel")}
+            />
+            <div className="muted small groupHint">{t("channelPickMembersOptional")}</div>
+            <div className="channelAvatarRow">
+              <input
+                ref={channelFileRef}
+                type="file"
+                accept="image/*"
+                className="fileInput"
+                onChange={onPickChannelAvatar}
+              />
+              <button type="button" className="ghostBtn" onClick={() => channelFileRef.current?.click()}>
+                {t("groupChangeAvatar")}
+              </button>
+              {channelAvatarDraft ? (
+                <button type="button" className="ghostBtn" onClick={() => setChannelAvatarDraft(null)}>
+                  {t("remove")}
+                </button>
+              ) : null}
+            </div>
+            {channelAvatarDraft ? (
+              <div className="channelAvatarPreview">
+                <img src={channelAvatarDraft} alt="" />
+              </div>
+            ) : null}
+            <div className="muted small">{t("groupAvatarHint")}</div>
+            <input
+              className="searchInput"
+              value={channelQuery}
+              onChange={(e) => setChannelQuery(e.target.value)}
+              placeholder={t("searchUsernamePlaceholder")}
+            />
+            {channelSearching ? <div className="muted small">{t("searching")}</div> : null}
+
+            {channelResults.length > 0 ? (
+              <div className="searchResults groupSearchResults">
+                {channelResults.map((u) => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    className={channelMemberSelected(u.id) ? "searchResult selectedPick" : "searchResult"}
+                    onClick={() => toggleChannelMember(u)}
+                  >
+                    <AvatarAura auraColor={u.auraColor}>
+                      <div className="avatarSm">
+                        {u.avatar ? <img src={u.avatar} alt="" /> : <span>{initials(u.username)}</span>}
+                      </div>
+                    </AvatarAura>
+                    <div className="searchResultMain">
+                      <div className="searchUser">
+                        {u.username}
+                        <UserTagBadge tag={u.tag} tagColor={u.tagColor} tagStyle={u.tagStyle} />
+                      </div>
+                      <div className="muted small">{channelMemberSelected(u.id) ? "✓" : ""}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {channelSelectedMembers.length > 0 ? (
+              <div className="selectedChips">
+                {channelSelectedMembers.map((u) => (
+                  <span key={u.id} className="memberChip">
+                    {u.username}
+                    <button
+                      type="button"
+                      className="chipRemove"
+                      onClick={() => toggleChannelMember(u)}
+                      aria-label={t("remove")}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : null}
+
+            {channelError ? <div className="authError">{channelError}</div> : null}
+
+            <div className="groupModalActions">
+              <button
+                type="button"
+                className="ghostBtn"
+                disabled={channelSubmitting}
+                onClick={() => setShowChannelModal(false)}
+              >
+                {t("cancel")}
+              </button>
+              <button
+                type="button"
+                className="primaryBtn"
+                disabled={channelSubmitting || !channelTitle.trim()}
+                onClick={submitChannel}
+              >
+                {channelSubmitting ? t("saving") : t("channelCreateSubmit")}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    ) : null;
+
   if (mobileLayout) {
     const mobileChatsToShow = query.trim() ? mobileFilteredChats : chats;
 
@@ -291,14 +531,18 @@ const Sidebar = forwardRef(function Sidebar(
 
           {mobileChatsToShow.map((c) => {
             const isGroup = c.type === "group";
+            const isChannel = c.type === "channel";
+            const isRoom = isGroup || isChannel;
             const isOfficial = c.type === "official";
             const other = c.other;
-            const label = isGroup
-              ? c.title || t("groupChat")
-              : isOfficial
-                ? c.title || t("appTitle")
-                : other?.username || "";
-            const online = !isGroup && !isOfficial && Boolean(other?.isOnline);
+            const label = isChannel
+              ? c.title || t("channelInfoTitle")
+              : isGroup
+                ? c.title || t("groupChat")
+                : isOfficial
+                  ? c.title || t("appTitle")
+                  : other?.username || "";
+            const online = !isRoom && !isOfficial && Boolean(other?.isOnline);
             const preview = c.last?.text
               ? String(c.last.text).replace(/\s+/g, " ").trim()
               : t("noMessages");
@@ -307,7 +551,7 @@ const Sidebar = forwardRef(function Sidebar(
             const unreadN = Math.max(0, Number(c.unreadCount) || 0);
             const unreadLabel = unreadN > 0 ? (unreadN > 99 ? "99+" : String(unreadN)) : null;
             const statusSubtitle =
-              !isGroup && !isOfficial && other ? formatUserStatusLine(other, t, lang) : "";
+              !isRoom && !isOfficial && other ? formatUserStatusLine(other, t, lang) : "";
             return (
               <button
                 key={c.id}
@@ -316,18 +560,18 @@ const Sidebar = forwardRef(function Sidebar(
                 onClick={() => onSelectChat(c.id)}
               >
                 <div className="mobileChatRowAvatarWrap">
-                  <AvatarAura skip={isGroup || isOfficial} auraColor={other?.auraColor}>
+                  <AvatarAura skip={isRoom || isOfficial} auraColor={other?.auraColor}>
                     <div className={online ? "mobileChatRowAvatar presence online" : "mobileChatRowAvatar presence"}>
-                      {isGroup && c.avatar ? (
+                      {isRoom && c.avatar ? (
                         <img src={c.avatar} alt="" />
-                      ) : !isGroup && other?.avatar ? (
+                      ) : !isRoom && other?.avatar ? (
                         <img src={other.avatar} alt="" />
                       ) : (
-                        <span>{initials(isGroup || isOfficial ? label : other?.username || "")}</span>
+                        <span>{initials(isRoom || isOfficial ? label : other?.username || "")}</span>
                       )}
                     </div>
                   </AvatarAura>
-                  {!isGroup && !isOfficial ? (
+                  {!isRoom && !isOfficial ? (
                     <span
                       className={online ? "avatarPresenceDot avatarPresenceDot--on" : "avatarPresenceDot"}
                       aria-hidden
@@ -342,18 +586,19 @@ const Sidebar = forwardRef(function Sidebar(
                         {isOfficial ? (
                           <span className="officialChatListBadge">{t("officialChatBadge")}</span>
                         ) : null}
-                        {!isGroup && !isOfficial ? (
+                        {isChannel ? <span className="channelChatListBadge">{t("channelBadge")}</span> : null}
+                        {!isRoom && !isOfficial ? (
                           <UserTagBadge
                             tag={other?.tag}
                             tagColor={other?.tagColor}
                             tagStyle={other?.tagStyle}
                           />
                         ) : null}
-                        {!isGroup && !isOfficial ? (
+                        {!isRoom && !isOfficial ? (
                           <ActivityBadge messageCount={other?.messageCount} t={t} />
                         ) : null}
                       </span>
-                      {!isGroup && !isOfficial && statusSubtitle ? (
+                      {!isRoom && !isOfficial && statusSubtitle ? (
                         <span className="mobileChatRowStatus muted" title={statusSubtitle}>
                           {statusSubtitle}
                         </span>
@@ -412,6 +657,7 @@ const Sidebar = forwardRef(function Sidebar(
           ) : null}
         </div>
         {groupModal}
+        {channelModal}
       </>
     );
   }
@@ -436,11 +682,18 @@ const Sidebar = forwardRef(function Sidebar(
       <div className="sidebarSection">
         <div className="sidebarChatsRow">
           <div className="sectionTitle">{t("chats")}</div>
-          {onCreateGroup ? (
-            <button type="button" className="sidebarMiniBtn" onClick={() => setShowGroupModal(true)}>
-              {t("createGroup")}
-            </button>
-          ) : null}
+          <div className="sidebarChatsRowActions">
+            {onCreateGroup ? (
+              <button type="button" className="sidebarMiniBtn" onClick={() => setShowGroupModal(true)}>
+                {t("createGroup")}
+              </button>
+            ) : null}
+            {onCreateChannel ? (
+              <button type="button" className="sidebarMiniBtn" onClick={() => setShowChannelModal(true)}>
+                {t("createChannel")}
+              </button>
+            ) : null}
+          </div>
         </div>
 
         {chats.length === 0 ? <div className="muted">{t("noChatsYet")}</div> : null}
@@ -448,19 +701,23 @@ const Sidebar = forwardRef(function Sidebar(
         <div className="chatList">
           {chats.map((c) => {
             const isGroup = c.type === "group";
+            const isChannel = c.type === "channel";
+            const isRoom = isGroup || isChannel;
             const isOfficial = c.type === "official";
             const other = c.other;
-            const label = isGroup
-              ? c.title || t("groupChat")
-              : isOfficial
-                ? c.title || t("appTitle")
-                : other?.username || "";
-            const online = !isGroup && !isOfficial && Boolean(other?.isOnline);
+            const label = isChannel
+              ? c.title || t("channelInfoTitle")
+              : isGroup
+                ? c.title || t("groupChat")
+                : isOfficial
+                  ? c.title || t("appTitle")
+                  : other?.username || "";
+            const online = !isRoom && !isOfficial && Boolean(other?.isOnline);
             const unreadN = Math.max(0, Number(c.unreadCount) || 0);
             const unreadLabel = unreadN > 0 ? (unreadN > 99 ? "99+" : String(unreadN)) : null;
             const timeLabel = c.last?.createdAt ? formatListTime(c.last.createdAt, lang) : "";
             const statusSubtitle =
-              !isGroup && !isOfficial && other ? formatUserStatusLine(other, t, lang) : "";
+              !isRoom && !isOfficial && other ? formatUserStatusLine(other, t, lang) : "";
             return (
               <button
                 key={c.id}
@@ -470,18 +727,18 @@ const Sidebar = forwardRef(function Sidebar(
               >
                 <div className="chatItemTop">
                   <div className="chatAvatarWrap">
-                    <AvatarAura skip={isGroup || isOfficial} auraColor={other?.auraColor}>
-                      <div className={!isGroup && online ? "avatarSm presence online" : "avatarSm presence"}>
-                        {isGroup && c.avatar ? (
+                    <AvatarAura skip={isRoom || isOfficial} auraColor={other?.auraColor}>
+                      <div className={!isRoom && online ? "avatarSm presence online" : "avatarSm presence"}>
+                        {isRoom && c.avatar ? (
                           <img src={c.avatar} alt="" />
-                        ) : !isGroup && other?.avatar ? (
+                        ) : !isRoom && other?.avatar ? (
                           <img src={other.avatar} alt="" />
                         ) : (
-                          <span>{initials(isGroup || isOfficial ? label : other?.username || "")}</span>
+                          <span>{initials(isRoom || isOfficial ? label : other?.username || "")}</span>
                         )}
                       </div>
                     </AvatarAura>
-                    {!isGroup && !isOfficial ? (
+                    {!isRoom && !isOfficial ? (
                       <span
                         className={online ? "avatarPresenceDot avatarPresenceDot--on" : "avatarPresenceDot"}
                         title={presenceText(other, t, lang)}
@@ -496,19 +753,20 @@ const Sidebar = forwardRef(function Sidebar(
                         {isOfficial ? (
                           <span className="officialChatListBadge">{t("officialChatBadge")}</span>
                         ) : null}
-                        {!isGroup && !isOfficial ? (
+                        {isChannel ? <span className="channelChatListBadge">{t("channelBadge")}</span> : null}
+                        {!isRoom && !isOfficial ? (
                           <UserTagBadge
                             tag={other?.tag}
                             tagColor={other?.tagColor}
                             tagStyle={other?.tagStyle}
                           />
                         ) : null}
-                        {!isGroup && !isOfficial ? (
+                        {!isRoom && !isOfficial ? (
                           <ActivityBadge messageCount={other?.messageCount} t={t} />
                         ) : null}
                       </div>
                     </div>
-                    {!isGroup && !isOfficial && statusSubtitle ? (
+                    {!isRoom && !isOfficial && statusSubtitle ? (
                       <div className="chatOtherStatus muted" title={statusSubtitle}>
                         {statusSubtitle}
                       </div>
@@ -578,6 +836,7 @@ const Sidebar = forwardRef(function Sidebar(
       </div>
 
       {groupModal}
+      {channelModal}
     </aside>
   );
 });

@@ -10,6 +10,7 @@ export default function GroupInfoModal({
   chatId,
   chatTitle,
   listGroupAvatar,
+  isChannel: isChannelFromList,
   onMetaChanged,
   presenceTick,
   t,
@@ -174,7 +175,8 @@ export default function GroupInfoModal({
 
   if (!open) return null;
 
-  const title = group?.title || chatTitle || t("groupChat");
+  const isChannelRoom = Boolean(isChannelFromList ?? group?.channel);
+  const title = group?.title || chatTitle || (isChannelRoom ? t("channelInfoTitle") : t("groupChat"));
   const count = group?.memberCount ?? members.length;
   const canManage = Boolean(group?.canManage);
   const displayAvatar = avatarDraft || listGroupAvatar || group?.avatar || "";
@@ -190,7 +192,7 @@ export default function GroupInfoModal({
       >
         <div className="modalHeader">
           <div className="modalTitle" id="groupInfoHeading">
-            {t("groupInfoTitle")}
+            {isChannelRoom ? t("channelInfoTitle") : t("groupInfoTitle")}
           </div>
           <button type="button" className="iconCloseBtn" onClick={onClose} aria-label={t("close")}>
             ×

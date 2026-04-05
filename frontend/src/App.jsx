@@ -11,6 +11,7 @@ import { t as tr, normalizeLang } from "./i18n.js";
 import {
   createChat,
   createGroup,
+  createChannel,
   getChats,
   getMe,
   getMessages,
@@ -393,7 +394,9 @@ export default function App() {
       if (!cid) return;
       const av = String(avatar || "");
       setChats((prev) =>
-        prev.map((c) => (c.id === cid && c.type === "group" ? { ...c, avatar: av } : c))
+        prev.map((c) =>
+          c.id === cid && (c.type === "group" || c.type === "channel") ? { ...c, avatar: av } : c
+        )
       );
     });
 
@@ -572,6 +575,13 @@ export default function App() {
     await selectChat(chatId);
   }
 
+  async function handleCreateChannel({ title, avatar, memberUserIds }) {
+    const chatId = await createChannel({ title, avatar, memberUserIds });
+    const list = await getChats();
+    setChats(list);
+    await selectChat(chatId);
+  }
+
   async function refreshChatsList() {
     try {
       const list = await getChats();
@@ -592,6 +602,8 @@ export default function App() {
     if (!socketRef.current || !socketReady) return;
     if (!selectedChatId) return;
     if (me?.banned) return;
+    const activeChat = chats.find((c) => Number(c.id) === Number(selectedChatId));
+    if (activeChat && activeChat.canPostMessage === false) return;
     // Sending implies typing stopped.
     socketRef.current.emit("chat:typing", { chatId: selectedChatId, isTyping: false });
     socketRef.current.emit("chat:send", {
@@ -608,6 +620,8 @@ export default function App() {
     if (!socketRef.current || !socketReady) return;
     if (!selectedChatId) return;
     if (me?.banned) return;
+    const activeChat = chats.find((c) => Number(c.id) === Number(selectedChatId));
+    if (activeChat && activeChat.canPostMessage === false) return;
     socketRef.current.emit("chat:typing", { chatId: selectedChatId, isTyping: Boolean(isTyping) });
   }
 
@@ -722,6 +736,7 @@ export default function App() {
     onSelectChat: selectChat,
     onStartChat: startChat,
     onCreateGroup: handleCreateGroup,
+    onCreateChannel: handleCreateChannel,
     t,
     lang: settings.lang,
   };
@@ -827,6 +842,19 @@ export default function App() {
                   >
                     <span className="mobileHeaderIconPlus" aria-hidden>
                       +
+                    </span>
+                  </button>
+                ) : null}
+                {sidebarProps.onCreateChannel ? (
+                  <button
+                    type="button"
+                    className="mobileHeaderIconBtn"
+                    onClick={() => mobileInboxSidebarRef.current?.openCreateChannel?.()}
+                    aria-label={t("createChannel")}
+                    title={t("createChannel")}
+                  >
+                    <span className="mobileHeaderIconChannel" aria-hidden>
+                      #
                     </span>
                   </button>
                 ) : null}

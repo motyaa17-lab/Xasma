@@ -129,6 +129,16 @@ export async function createGroup({ title, memberUserIds }) {
   return data.chatId;
 }
 
+export async function createChannel({ title, avatar, memberUserIds }) {
+  const body = { title, memberUserIds: memberUserIds || [] };
+  if (avatar) body.avatar = avatar;
+  const data = await apiFetch("/api/channels", {
+    method: "POST",
+    body,
+  });
+  return data.chatId;
+}
+
 export async function getGroup(chatId) {
   return apiFetch(`/api/groups/${chatId}`);
 }

@@ -238,14 +238,17 @@ export default function Chat({
 
   // NOTE: Must be declared before any hooks that reference it in deps to avoid TDZ crashes in production builds.
   const isGroup = chat?.type === "group";
+  const isChannel = chat?.type === "channel";
+  const isRoom = isGroup || isChannel;
   const isOfficial = chat?.type === "official";
   const isMobileChat = Boolean(onMobileBack);
+  const channelReadOnly = Boolean(isChannel && chat?.canPostMessage === false);
 
   const canPinForUser = useMemo(() => {
     if (!chat || isOfficial) return false;
     if (isBanned && !isAdmin) return false;
     if (chat.type === "direct") return true;
-    if (chat.type === "group") {
+    if (chat.type === "group" || chat.type === "channel") {
       return (
         (chat.createdBy != null && Number(chat.createdBy) === Number(meId)) || Boolean(isAdmin)
       );
@@ -2001,7 +2004,7 @@ export default function Chat({
                   </span>
                 </button>
               ) : null}
-              {isGroup ? (
+              {isRoom ? (
                 <button type="button" className="chatHeaderGroupTap" onClick={() => setGroupInfoOpen(true)}>
                   <AvatarAura skip>
                     <div className="avatarSm">
@@ -2014,7 +2017,9 @@ export default function Chat({
                   </AvatarAura>
                   <div className="chatHeaderInfo">
                     <div className="chatHeaderName">
-                      <span className="chatHeaderTitleText">{chat?.title || t("groupChat")}</span>
+                      <span className="chatHeaderTitleText">
+                        {chat?.title || (isChannel ? t("channelInfoTitle") : t("groupChat"))}
+                      </span>
                       {typeof chat?.memberCount === "number" ? (
                         <span className="chatHeaderMembersMeta">
                           {" · "}
@@ -2032,7 +2037,13 @@ export default function Chat({
                         </span>
                       ) : null}
                     </div>
-                    <div className="chatHeaderStatus">{otherTyping ? t("typing") : t("groupChat")}</div>
+                    <div className="chatHeaderStatus">
+                      {otherTyping
+                        ? t("typing")
+                        : isChannel
+                          ? t("channelSubtitle")
+                          : t("groupChat")}
+                    </div>
                   </div>
                 </button>
               ) : isOfficial ? (
@@ -2075,12 +2086,12 @@ export default function Chat({
                 </div>
               )}
             </div>
-            {isGroup ? (
+            {isRoom ? (
               <button
                 type="button"
                 className="chatHeaderInfoBtn"
-                title={t("groupInfo")}
-                aria-label={t("groupInfo")}
+                title={isChannel ? t("channelInfo") : t("groupInfo")}
+                aria-label={isChannel ? t("channelInfo") : t("groupInfo")}
                 onClick={() => setGroupInfoOpen(true)}
               >
                 ⓘ
@@ -2116,13 +2127,14 @@ export default function Chat({
             </div>
           ) : null}
 
-          {isGroup && chatId ? (
+          {isRoom && chatId ? (
             <GroupInfoModal
               open={groupInfoOpen}
               onClose={() => setGroupInfoOpen(false)}
               chatId={chatId}
               chatTitle={chat?.title}
               listGroupAvatar={chat?.avatar ?? ""}
+              isChannel={isChannel}
               onMetaChanged={onGroupMetaChanged}
               presenceTick={presenceTick}
               t={t}
@@ -2324,7 +2336,7 @@ export default function Chat({
                         ) : null}
                       </div>
                     ) : null}
-                    {isGroup ? (
+                    {isRoom ? (
                       <div className="msgSenderName">
                         {m.sender?.username || "?"}
                         <UserTagBadge
@@ -2460,6 +2472,11 @@ export default function Chat({
             <div className="officialChatComposerPlaceholder" ref={composerRef}>
               {isBanned ? <div className="banBanner banBanner--compact">{t("authBanned")}</div> : null}
               <div className="officialChatReadOnlyInner">{t("officialChatReadOnly")}</div>
+            </div>
+          ) : channelReadOnly ? (
+            <div className="officialChatComposerPlaceholder" ref={composerRef}>
+              {isBanned ? <div className="banBanner banBanner--compact">{t("authBanned")}</div> : null}
+              <div className="officialChatReadOnlyInner">{t("channelReadOnly")}</div>
             </div>
           ) : (
           <div className="composer" ref={composerRef}>
@@ -3091,6 +3108,8 @@ function formatSystemLine(m, t) {
       return String(m.text || "").trim() || "—";
     case "group_created":
       return t("systemGroupCreated").replace("{actor}", actor);
+    case "channel_created":
+      return t("systemChannelCreated").replace("{actor}", actor);
     case "member_added":
       return t("systemMemberAdded").replace("{actor}", actor).replace("{target}", target);
     case "member_removed":

@@ -3507,6 +3507,13 @@ body.body--mobileConversationOpen {
   margin-bottom: 0;
 }
 
+.sidebarChatsRowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
 .sidebarMiniBtn {
   font-size: 12px;
   font-weight: 700;
@@ -3771,6 +3778,35 @@ body.body--mobileConversationOpen {
   color: rgba(147, 197, 253, 0.95);
   border: 1px solid rgba(59, 130, 246, 0.35);
   background: rgba(37, 99, 235, 0.14);
+}
+
+.channelChatListBadge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  vertical-align: middle;
+  color: rgba(167, 243, 208, 0.95);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  background: rgba(5, 150, 105, 0.18);
+}
+
+.channelAvatarRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0 4px;
+}
+
+.channelAvatarPreview img {
+  display: block;
+  max-height: 72px;
+  border-radius: 10px;
+  margin-top: 4px;
 }
 
 .mobileChatRow--official .mobileChatRowName {
@@ -4109,6 +4145,13 @@ body.body--mobileConversationOpen {
   font-weight: 300;
   line-height: 1;
   margin-top: -2px;
+}
+
+.mobileHeaderIconChannel {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  color: rgba(167, 243, 208, 0.95);
 }
 
 .mobileBrandRow {

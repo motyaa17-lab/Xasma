@@ -227,9 +227,13 @@ function requireAdmin(req, res, next) {
   return next();
 }
 
-/** Group creator or app admin may add/remove members (admin cannot remove the group creator). */
+function isGroupLikeChat(chat) {
+  return Boolean(chat && (chat.type === "group" || chat.type === "channel"));
+}
+
+/** Group/channel creator or app admin may add/remove members (admin cannot remove the creator). */
 function canManageGroupMembers(req, chat) {
-  if (!chat || chat.type !== "group") return false;
+  if (!isGroupLikeChat(chat)) return false;
   return Number(chat.created_by) === Number(req.user.id) || req.user.role === "admin";
 }
 
@@ -241,10 +245,17 @@ function canPinMessage(req, chat) {
   if (chat.type === "direct") {
     return Number(chat.user1_id) === uid || Number(chat.user2_id) === uid;
   }
-  if (chat.type === "group") {
+  if (chat.type === "group" || chat.type === "channel") {
     return Number(chat.created_by) === uid || req.user.role === "admin";
   }
   return false;
+}
+
+async function canSenderPostToChannel(chat, senderId) {
+  if (!chat || chat.type !== "channel") return true;
+  if (Number(chat.created_by) === Number(senderId)) return true;
+  const r = await query(`SELECT role FROM users WHERE id = $1`, [senderId]);
+  return r.rows[0]?.role === "admin";
 }
 
 /** Short preview for pinned bar (aligned with chat list last-message hints). */
@@ -563,6 +574,9 @@ async function insertChatMessageAndBroadcast(chatId, senderId, bodyText, imageUr
   if (chat?.type === "official") {
     const bot = getOfficialAnnounceUserId();
     if (!bot || Number(senderId) !== Number(bot)) return null;
+  }
+  if (chat?.type === "channel" && !(await canSenderPostToChannel(chat, senderId))) {
+    return null;
   }
 
   const text = String(bodyText || "").trim();
@@ -1037,6 +1051,7 @@ app.get("/api/chats", authRequired, (req, res) => {
               CASE COALESCE(m.system_kind, '')
                 WHEN 'official_broadcast' THEN LEFT(TRIM(COALESCE(m.text, '')), 200)
                 WHEN 'group_created' THEN '[Group created]'
+                WHEN 'channel_created' THEN '[Channel created]'
                 WHEN 'member_added' THEN '[Member added]'
                 WHEN 'member_removed' THEN '[Member removed]'
                 ELSE '[Event]'
@@ -1055,7 +1070,7 @@ app.get("/api/chats", authRequired, (req, res) => {
       ) lm ON true
       WHERE mym.user_id = $1
       ORDER BY
-        CASE WHEN c.type = 'official' THEN 0 WHEN c.type = 'group' THEN 1 ELSE 2 END ASC,
+        CASE WHEN c.type = 'official' THEN 0 WHEN c.type = 'channel' THEN 1 WHEN c.type = 'group' THEN 2 ELSE 3 END ASC,
         lm.created_at DESC NULLS LAST,
         c.id DESC
     `,
@@ -1067,16 +1082,26 @@ app.get("/api/chats", authRequired, (req, res) => {
     return res.json({
       chats: chats.rows.map((c) => {
         const isGroup = c.chat_type === "group";
+        const isChannel = c.chat_type === "channel";
+        const isRoom = isGroup || isChannel;
         const isOfficial = c.chat_type === "official";
+        const createdBy = c.chat_created_by != null ? Number(c.chat_created_by) : null;
+        const canPostMessage =
+          isOfficial
+            ? false
+            : isChannel
+              ? createdBy === uid || req.user.role === "admin"
+              : true;
         return {
           id: Number(c.chat_id),
-          type: isGroup ? "group" : isOfficial ? "official" : "direct",
-          title: isGroup ? c.chat_title : isOfficial ? c.chat_title || "Xasma" : null,
-          createdBy: c.chat_created_by != null ? Number(c.chat_created_by) : null,
-          memberCount: isGroup ? Number(c.member_count) : undefined,
-          onlineMemberCount: isGroup ? Number(c.online_member_count) : undefined,
-          avatar: isGroup ? c.chat_avatar_url || "" : undefined,
-          other: isGroup
+          type: isChannel ? "channel" : isGroup ? "group" : isOfficial ? "official" : "direct",
+          title: isRoom ? c.chat_title : isOfficial ? c.chat_title || "Xasma" : null,
+          createdBy,
+          memberCount: isRoom ? Number(c.member_count) : undefined,
+          onlineMemberCount: isRoom ? Number(c.online_member_count) : undefined,
+          avatar: isRoom ? c.chat_avatar_url || "" : undefined,
+          canPostMessage,
+          other: isRoom
             ? null
             : isOfficial
               ? {
@@ -1233,6 +1258,62 @@ app.post("/api/groups", authRequired, (req, res) => {
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });
 
+app.post("/api/channels", authRequired, (req, res) => {
+  const title = typeof req.body?.title === "string" ? req.body.title.trim() : "";
+  const rawIds = Array.isArray(req.body?.memberUserIds) ? req.body.memberUserIds : [];
+  const avatar =
+    typeof req.body?.avatar === "string" && req.body.avatar.trim()
+      ? req.body.avatar.trim()
+      : null;
+  if (!title) return res.status(400).json({ error: "title is required" });
+  if (title.length > 200) return res.status(400).json({ error: "title too long" });
+  if (avatar) {
+    const isDataUrl = avatar.startsWith("data:image/");
+    if (!isDataUrl) return res.status(400).json({ error: "Avatar must be an image data URL" });
+    if (avatar.length > 400_000) return res.status(400).json({ error: "Avatar too large" });
+  }
+
+  const creatorId = Number(req.user.id);
+  const memberIds = [...new Set(rawIds.map((x) => Number(x)).filter((n) => n > 0 && n !== creatorId))];
+
+  (async () => {
+    for (const mid of memberIds) {
+      const u = await query(`SELECT id FROM users WHERE id = $1`, [mid]);
+      if (!u.rows[0]) return res.status(404).json({ error: `User ${mid} not found` });
+    }
+
+    const client = await pool.connect();
+    let chatId;
+    try {
+      await client.query("BEGIN");
+      const ins = await client.query(
+        `INSERT INTO chats (type, title, created_by, user1_id, user2_id, avatar_url) VALUES ('channel', $1, $2, NULL, NULL, $3) RETURNING id`,
+        [title, creatorId, avatar || null]
+      );
+      chatId = Number(ins.rows[0].id);
+      const allMembers = [...new Set([creatorId, ...memberIds])];
+      for (const uid of allMembers) {
+        await client.query(`INSERT INTO chat_members (chat_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [
+          chatId,
+          uid,
+        ]);
+      }
+      await client.query("COMMIT");
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
+    } finally {
+      client.release();
+    }
+
+    await insertSystemMessageAndBroadcast(chatId, creatorId, "channel_created", {
+      actorId: creatorId,
+      actorUsername: req.user.username,
+    });
+    return res.json({ chatId });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
 app.get("/api/groups/:chatId", authRequired, (req, res) => {
   const chatId = Number(req.params.chatId);
   if (!chatId) return res.status(400).json({ error: "Invalid chat id" });
@@ -1240,7 +1321,7 @@ app.get("/api/groups/:chatId", authRequired, (req, res) => {
   (async () => {
     const uid = Number(req.user.id);
     const chat = await getChatById(chatId);
-    if (!chat || chat.type !== "group") return res.status(404).json({ error: "Group not found" });
+    if (!chat || !isGroupLikeChat(chat)) return res.status(404).json({ error: "Group not found" });
     if (!(await isUserChatMember(chatId, uid))) return res.status(403).json({ error: "Not a member of this group" });
 
     const members = await query(
@@ -1266,6 +1347,7 @@ app.get("/api/groups/:chatId", authRequired, (req, res) => {
         memberCount: members.rows.length,
         canManage,
         avatar: chat.avatar_url || "",
+        channel: chat.type === "channel",
       },
       members: members.rows.map((u) => {
         const tg = buildSenderTagsFromRow(u, false);
@@ -1301,7 +1383,7 @@ app.patch("/api/groups/:chatId/avatar", authRequired, (req, res) => {
   (async () => {
     const uid = Number(req.user.id);
     const chat = await getChatById(chatId);
-    if (!chat || chat.type !== "group") return res.status(404).json({ error: "Group not found" });
+    if (!chat || !isGroupLikeChat(chat)) return res.status(404).json({ error: "Group not found" });
     if (!(await isUserChatMember(chatId, uid))) return res.status(403).json({ error: "Not a member of this group" });
     if (!canManageGroupMembers(req, chat)) {
       return res.status(403).json({ error: "Only the creator or an admin can change the group avatar" });
@@ -1323,6 +1405,7 @@ app.patch("/api/groups/:chatId/avatar", authRequired, (req, res) => {
         memberCount: Number(cnt.rows[0].n),
         canManage: canManageGroupMembers(req, chat),
         avatar: av,
+        channel: chat.type === "channel",
       },
     });
   })().catch(() => res.status(500).json({ error: "Server error" }));
@@ -1335,7 +1418,7 @@ app.post("/api/groups/:chatId/members", authRequired, (req, res) => {
 
   (async () => {
     const chat = await getChatById(chatId);
-    if (!chat || chat.type !== "group") return res.status(404).json({ error: "Group not found" });
+    if (!chat || !isGroupLikeChat(chat)) return res.status(404).json({ error: "Group not found" });
     if (!canManageGroupMembers(req, chat)) return res.status(403).json({ error: "Only the creator or an admin can add members" });
 
     const u = await query(`SELECT id, username FROM users WHERE id = $1`, [addUserId]);
@@ -1364,7 +1447,7 @@ app.delete("/api/groups/:chatId/members/:userId", authRequired, (req, res) => {
 
   (async () => {
     const chat = await getChatById(chatId);
-    if (!chat || chat.type !== "group") return res.status(404).json({ error: "Group not found" });
+    if (!chat || !isGroupLikeChat(chat)) return res.status(404).json({ error: "Group not found" });
     if (!canManageGroupMembers(req, chat)) return res.status(403).json({ error: "Only the creator or an admin can remove members" });
     if (targetUserId === Number(chat.created_by)) return res.status(400).json({ error: "Cannot remove the creator" });
 
@@ -1464,6 +1547,9 @@ app.post("/api/chats/:chatId/messages", authRequired, (req, res) => {
     if (!chat) return res.status(404).json({ error: "Chat not found" });
     if (chat.type === "official") return res.status(403).json({ error: "Cannot send messages in this chat" });
     if (!(await isUserChatMember(chatId, uid))) return res.status(403).json({ error: "Not a member of this chat" });
+    if (chat.type === "channel" && !(await canSenderPostToChannel(chat, uid))) {
+      return res.status(403).json({ error: "Only the channel owner or an admin can post messages" });
+    }
 
     const rate = checkSendRateLimit(uid);
     if (!rate.allowed) {
@@ -1767,6 +1853,7 @@ function formatChatLabelForFlagged(row) {
   const t = row.chat_type || "direct";
   if (t === "official") return "Xasma (official)";
   if (t === "group") return (row.chat_title && String(row.chat_title).trim()) || `Group #${row.chat_id}`;
+  if (t === "channel") return (row.chat_title && String(row.chat_title).trim()) || `Channel #${row.chat_id}`;
   const a = row.direct_u1 || "?";
   const b = row.direct_u2 || "?";
   return `${a} · ${b}`;
@@ -2146,6 +2233,7 @@ io.on("connection", (socket) => {
     if (!chat) return;
     if (chat.type === "official") return;
     if (!(await isUserChatMember(cid, Number(userId)))) return;
+    if (chat.type === "channel" && !(await canSenderPostToChannel(chat, Number(userId)))) return;
 
     const rate = checkSendRateLimit(Number(userId));
     if (!rate.allowed) {
