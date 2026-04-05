@@ -90,7 +90,14 @@ function openDonationPage() {
 
 function chatThemeLabel(t, id) {
   const key =
-    { dark: "themeDark", glass: "themeGlass", noise: "themeNoise", night: "themeNight" }[id] || "themeDark";
+    {
+      darkGradient: "themeDarkGradient",
+      softBlur: "themeSoftBlur",
+      night: "themeNight",
+      dark: "themeDarkGradient",
+      glass: "themeSoftBlur",
+      noise: "themeDarkGradient",
+    }[id] || "themeDarkGradient";
   return t(key);
 }
 
@@ -519,7 +526,7 @@ export default function UserMenu({
           <div className="settingsSection">
             <SettingsRow
               label={t("settingsCurrentBackground")}
-              right={chatThemeLabel(t, settings?.chatTheme || "dark")}
+              right={chatThemeLabel(t, settings?.chatTheme || "darkGradient")}
               onClick={() => setPanel("chatBackground")}
             />
           </div>
@@ -798,9 +805,8 @@ export default function UserMenu({
               <div className="settingsModalList">
                 <div className="settingsSection">
                   {[
-                    { id: "dark", label: t("themeDark") },
-                    { id: "glass", label: t("themeGlass") },
-                    { id: "noise", label: t("themeNoise") },
+                    { id: "darkGradient", label: t("themeDarkGradient") },
+                    { id: "softBlur", label: t("themeSoftBlur") },
                     { id: "night", label: t("themeNight") },
                   ].map((theme) => (
                     <SettingsChoiceRow
@@ -1214,9 +1220,8 @@ export default function UserMenu({
                 <div className="settingsTitle">{t("chatBackground")}</div>
                 <div className="themeGrid">
                   {[
-                    { id: "dark", label: t("themeDark") },
-                    { id: "glass", label: t("themeGlass") },
-                    { id: "noise", label: t("themeNoise") },
+                    { id: "darkGradient", label: t("themeDarkGradient") },
+                    { id: "softBlur", label: t("themeSoftBlur") },
                     { id: "night", label: t("themeNight") },
                   ].map((theme) => (
                     <button

@@ -241,10 +241,9 @@ export const translations = {
     lastSeenAt: "Last seen {time}",
     typing: "Typing...",
 
-    themeDark: "Dark",
-    themeGlass: "Glass",
-    themeNoise: "Noise",
-    themeNight: "Night",
+    themeDarkGradient: "Dark gradient",
+    themeSoftBlur: "Soft blur",
+    themeNight: "Night (blue / purple)",
 
     maxAvatarHint: "Max 3MB. (Stored in SQLite as base64 for now.)",
 
@@ -533,10 +532,9 @@ export const translations = {
     lastSeenAt: "Был(а) {time}",
     typing: "Печатает...",
 
-    themeDark: "Тёмный",
-    themeGlass: "Стекло",
-    themeNoise: "Зернистость",
-    themeNight: "Ночь",
+    themeDarkGradient: "Тёмный градиент",
+    themeSoftBlur: "Мягкое размытие",
+    themeNight: "Ночь (синий / фиолетовый)",
 
     maxAvatarHint: "До 3MB. (Сохраняется в SQLite в base64.)",
 
@@ -825,10 +823,9 @@ export const translations = {
     lastSeenAt: "Був(ла) {time}",
     typing: "Друкує…",
 
-    themeDark: "Темний",
-    themeGlass: "Скло",
-    themeNoise: "Зернистість",
-    themeNight: "Ніч",
+    themeDarkGradient: "Темний градієнт",
+    themeSoftBlur: "М'яке розмиття",
+    themeNight: "Ніч (синій / фіолетовий)",
 
     maxAvatarHint: "До 3 МБ. (Зберігається в SQLite як base64.)",
 

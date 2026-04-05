@@ -40,17 +40,25 @@ export default function App() {
     try {
       const raw = localStorage.getItem("settings");
       const parsed = raw ? JSON.parse(raw) : {};
-      const allowed = new Set(["dark", "glass", "noise", "night"]);
-      const legacy = { ocean: "dark", midnight: "night", slate: "dark" };
-      const rawTheme = typeof parsed.chatTheme === "string" ? parsed.chatTheme : "dark";
-      const chatTheme = allowed.has(rawTheme) ? rawTheme : legacy[rawTheme] || "dark";
+      const allowed = new Set(["darkGradient", "softBlur", "night"]);
+      const legacy = {
+        ocean: "darkGradient",
+        midnight: "night",
+        slate: "darkGradient",
+        dark: "darkGradient",
+        glass: "softBlur",
+        noise: "darkGradient",
+        night: "night",
+      };
+      const rawTheme = typeof parsed.chatTheme === "string" ? parsed.chatTheme : "darkGradient";
+      const chatTheme = allowed.has(rawTheme) ? rawTheme : legacy[rawTheme] || "darkGradient";
       return {
         lang: normalizeLang(parsed.lang),
         chatTheme,
         messageNotificationsEnabled: Boolean(parsed.messageNotificationsEnabled),
       };
     } catch {
-      return { lang: "en", chatTheme: "dark", messageNotificationsEnabled: false };
+      return { lang: "en", chatTheme: "darkGradient", messageNotificationsEnabled: false };
     }
   });
 
