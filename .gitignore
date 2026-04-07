@@ -1,0 +1,15 @@
+node_modules
+dist
+build
+.env
+*.sqlite
+db.sqlite
+
+# User-uploaded chat images (keep folder via .gitkeep)
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+

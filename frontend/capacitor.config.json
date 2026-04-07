@@ -1,0 +1,11 @@
+{
+  "appId": "com.xasma.app",
+  "appName": "Xasma",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}
