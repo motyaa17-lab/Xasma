@@ -1,5 +1,6 @@
 import { USER_STATUS_TEXT_MAX } from "./userStatusLine.js";
 
+<<<<<<< HEAD
 function normalizeBaseUrl(raw) {
   const v = String(raw || "").trim();
   if (!v) return "";
@@ -33,6 +34,9 @@ function computeApiBase() {
 }
 
 const API_BASE = computeApiBase();
+=======
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:4000";
+>>>>>>> 8ef4504c02cd580d6ec39c3d7d11aba6e6224cf1
 
 export function getApiBase() {
   return API_BASE;

@@ -181,6 +181,7 @@ const videoUpload = multer({
 });
 const JWT_SECRET = process.env.JWT_SECRET || "change_me";
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
+<<<<<<< HEAD
 const IS_PROD = process.env.NODE_ENV === "production";
 
 const app = express();
@@ -229,14 +230,26 @@ app.options(
     origin: (origin, cb) => cb(null, isOriginAllowed(origin)),
     credentials: true,
     optionsSuccessStatus: 200,
+=======
+
+const app = express();
+app.use(express.json());
+app.use(
+  cors({
+    origin: FRONTEND_ORIGIN,
+    credentials: true,
+>>>>>>> 8ef4504c02cd580d6ec39c3d7d11aba6e6224cf1
   })
 );
 app.use("/uploads", express.static(uploadsDir));
 
+<<<<<<< HEAD
 app.get("/", (req, res) => {
   res.send("Сервер работает 🚀");
 });
 
+=======
+>>>>>>> 8ef4504c02cd580d6ec39c3d7d11aba6e6224cf1
 function signToken(user) {
   return jwt.sign({ sub: user.id, username: user.username, role: user.role }, JWT_SECRET, {
     expiresIn: "7d",
@@ -444,7 +457,11 @@ async function getOrCreateChat(userA, userB) {
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
+<<<<<<< HEAD
     origin: (origin, cb) => cb(null, isOriginAllowed(origin)),
+=======
+    origin: FRONTEND_ORIGIN,
+>>>>>>> 8ef4504c02cd580d6ec39c3d7d11aba6e6224cf1
     credentials: true,
   },
 });
@@ -2425,7 +2442,11 @@ async function main() {
   await initDb();
   officialAnnounceUserId = await ensureOfficialAnnounceUser();
   await backfillOfficialChatsForAllUsers();
+<<<<<<< HEAD
   server.listen(PORT, "0.0.0.0", () => {
+=======
+  server.listen(PORT, () => {
+>>>>>>> 8ef4504c02cd580d6ec39c3d7d11aba6e6224cf1
     // eslint-disable-next-line no-console
     console.log(`Backend listening on http://localhost:${PORT}`);
   });

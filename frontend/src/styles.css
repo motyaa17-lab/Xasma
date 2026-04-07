@@ -333,7 +333,10 @@ body.body--mobileConversationOpen {
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(15, 23, 42, 0.6);
+<<<<<<< HEAD
   color: var(--text);
+=======
+>>>>>>> 8ef4504c02cd580d6ec39c3d7d11aba6e6224cf1
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -358,8 +361,12 @@ body.body--mobileConversationOpen {
   display: block;
   height: 2px;
   border-radius: 999px;
+<<<<<<< HEAD
   background: currentColor;
   opacity: 1;
+=======
+  background: rgba(229, 231, 235, 0.9);
+>>>>>>> 8ef4504c02cd580d6ec39c3d7d11aba6e6224cf1
 }
 
 .dropdown {
