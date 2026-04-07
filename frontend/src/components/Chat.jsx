@@ -8,6 +8,7 @@ import CircleVideoMessage from "./CircleVideoMessage.jsx";
 import UserProfileModal from "./UserProfileModal.jsx";
 import ActivityBadge from "./ActivityBadge.jsx";
 import UserTagBadge from "./UserTagBadge.jsx";
+import { IconEllipsis } from "./Icons.jsx";
 import { localeForLang } from "../i18n.js";
 import { formatUserStatusLine } from "../userStatusLine.js";
 
@@ -2387,7 +2388,7 @@ export default function Chat({
                             setMenuMessageId((id) => (id === m.id ? null : m.id));
                           }}
                         >
-                          ⋯
+                          <IconEllipsis size={18} />
                         </button>
                         {menuMessageId === m.id && !isMobileChat ? (
                           <MessageActionMenuPanel

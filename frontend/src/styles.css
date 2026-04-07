@@ -5152,6 +5152,10 @@ body.body--mobileConversationOpen {
   opacity: 0.92;
 }
 
+.mobileNavIcon svg {
+  display: block;
+}
+
 .mobileNavLabel {
   letter-spacing: 0.02em;
 }

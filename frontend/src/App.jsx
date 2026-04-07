@@ -6,6 +6,7 @@ import Sidebar from "./components/Sidebar.jsx";
 import Chat from "./components/Chat.jsx";
 import UserMenu from "./components/UserMenu.jsx";
 import InstallDownloadPanel from "./components/InstallDownloadPanel.jsx";
+import { IconChats, IconPhone, IconSettings } from "./components/Icons.jsx";
 import { useIsMobile } from "./hooks/useIsMobile.js";
 import { t as tr, normalizeLang } from "./i18n.js";
 import {
@@ -932,7 +933,7 @@ export default function App() {
             onClick={() => goMobileTab("chats")}
           >
             <span className="mobileNavIcon" aria-hidden>
-              💬
+              <IconChats size={20} />
             </span>
             <span className="mobileNavLabel">{t("navChats")}</span>
           </button>
@@ -942,7 +943,7 @@ export default function App() {
             onClick={() => goMobileTab("calls")}
           >
             <span className="mobileNavIcon" aria-hidden>
-              📞
+              <IconPhone size={20} />
             </span>
             <span className="mobileNavLabel">{t("navCalls")}</span>
           </button>
@@ -952,7 +953,7 @@ export default function App() {
             onClick={() => goMobileTab("settings")}
           >
             <span className="mobileNavIcon" aria-hidden>
-              ⚙
+              <IconSettings size={20} />
             </span>
             <span className="mobileNavLabel">{t("navSettings")}</span>
           </button>
