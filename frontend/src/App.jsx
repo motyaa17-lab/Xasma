@@ -89,6 +89,8 @@ export default function App() {
   const lastReadSentRef = useRef({}); // chatId -> messageId
   const readEmitTimerRef = useRef(null);
   const chatsRefreshAfterStatusTimerRef = useRef(null);
+  const socketResyncTimerRef = useRef(null);
+  const lastSocketResyncAtRef = useRef(0);
   const mobileInboxSidebarRef = useRef(null);
   const settingsRef = useRef(settings);
   const openChatFromNotificationRef = useRef(() => {});
@@ -126,6 +128,12 @@ export default function App() {
   }, [mobileConversationOpen]);
 
   const t = useMemo(() => (key) => tr(settings.lang, key), [settings.lang]);
+
+  function debugLog(...args) {
+    if (!import.meta.env.DEV) return;
+    // eslint-disable-next-line no-console
+    console.log("[Xasma]", ...args);
+  }
 
   function markBanned() {
     setMe((prev) => (prev ? { ...prev, banned: true } : prev));
@@ -197,11 +205,63 @@ export default function App() {
     const socket = io(socketEndpoint, {
       auth: { token },
       transports: ["websocket"],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 600,
+      reconnectionDelayMax: 4_000,
     });
     socketRef.current = socket;
 
-    socket.on("connect", () => setSocketReady(true));
-    socket.on("disconnect", () => setSocketReady(false));
+    function scheduleSocketResync(reason) {
+      const now = Date.now();
+      // Avoid thundering herds on flaky networks.
+      if (now - lastSocketResyncAtRef.current < 900) return;
+      if (socketResyncTimerRef.current) window.clearTimeout(socketResyncTimerRef.current);
+      socketResyncTimerRef.current = window.setTimeout(async () => {
+        socketResyncTimerRef.current = null;
+        lastSocketResyncAtRef.current = Date.now();
+
+        debugLog("socket resync", { reason });
+        try {
+          const list = await getChats();
+          setChats(list);
+        } catch (e) {
+          debugLog("socket resync: getChats failed", e?.message || e);
+        }
+
+        const openChatId = Number(selectedChatIdRef.current || 0);
+        if (!openChatId) return;
+        try {
+          const list = await getMessages(openChatId, 50);
+          setMessages(list);
+          const lastId = list.length ? Number(list[list.length - 1].id) : 0;
+          if (lastId && socket.connected) {
+            socket.emit("chat:read", { chatId: openChatId, upToMessageId: lastId });
+          }
+        } catch (e) {
+          debugLog("socket resync: getMessages failed", e?.message || e);
+        }
+      }, 220);
+    }
+
+    socket.on("connect", () => {
+      setSocketReady(true);
+      scheduleSocketResync("connect");
+    });
+    socket.on("disconnect", (reason) => {
+      setSocketReady(false);
+      debugLog("socket disconnect", reason);
+    });
+    socket.on("connect_error", (err) => {
+      debugLog("socket connect_error", err?.message || err);
+    });
+    socket.io.on("reconnect", (attempt) => {
+      debugLog("socket reconnect", attempt);
+      scheduleSocketResync("reconnect");
+    });
+    socket.io.on("reconnect_error", (err) => {
+      debugLog("socket reconnect_error", err?.message || err);
+    });
 
     socket.on("chat:message", (msg) => {
       // Update open chat immediately; otherwise refresh chat list.
@@ -497,10 +557,17 @@ export default function App() {
     });
 
     return () => {
+      if (socketResyncTimerRef.current) {
+        window.clearTimeout(socketResyncTimerRef.current);
+        socketResyncTimerRef.current = null;
+      }
       if (chatsRefreshAfterStatusTimerRef.current) {
         clearTimeout(chatsRefreshAfterStatusTimerRef.current);
         chatsRefreshAfterStatusTimerRef.current = null;
       }
+      socket.off("connect_error");
+      socket.io?.off?.("reconnect");
+      socket.io?.off?.("reconnect_error");
       socket.off("chat:message");
       socket.off("user:avatar");
       socket.off("user:presence");
@@ -521,6 +588,29 @@ export default function App() {
       socket.disconnect();
     };
   }, [token, socketEndpoint, me?.id]);
+
+  useEffect(() => {
+    if (!token) return;
+    const onVis = () => {
+      if (document.visibilityState !== "visible") return;
+      const s = socketRef.current;
+      if (!s) return;
+      // On Android, background/foreground can stall the WebSocket; nudging connect helps.
+      if (!s.connected) {
+        try {
+          s.connect();
+        } catch {
+          // ignore
+        }
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", onVis);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", onVis);
+    };
+  }, [token]);
 
   useEffect(() => {
     if (!sendRateLimitNotice) return;
