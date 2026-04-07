@@ -199,6 +199,10 @@ const DEV_ALLOWED_ORIGINS = new Set([
   "capacitor://localhost",
   "ionic://localhost",
 ]);
+
+// Capacitor/Ionic WebView origins in native apps.
+// These are not regular web origins you’d serve your site from, but they are the origin of the app WebView.
+const NATIVE_APP_ALLOWED_ORIGINS = new Set(["https://localhost", "capacitor://localhost", "ionic://localhost"]);
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
 function isOriginAllowed(origin) {
@@ -206,6 +210,9 @@ function isOriginAllowed(origin) {
 
   // Always allow the explicitly configured frontend origin (prod-safe path).
   if (o && o === FRONTEND_ORIGIN) return true;
+
+  // Always allow native app WebView origins (APK / iOS build).
+  if (o && NATIVE_APP_ALLOWED_ORIGINS.has(o)) return true;
 
   // Local development: allow emulator/webview edge-cases and local origins.
   if (!IS_PROD) {
