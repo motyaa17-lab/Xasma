@@ -3243,6 +3243,26 @@ function formatSystemLine(m, t) {
       return t("systemMemberAdded").replace("{actor}", actor).replace("{target}", target);
     case "member_removed":
       return t("systemMemberRemoved").replace("{actor}", actor).replace("{target}", target);
+    case "call_log": {
+      const kind = String(p.kind || "audio");
+      const result = String(p.result || "");
+      const dur = typeof p.durationSeconds === "number" ? Math.max(0, Math.floor(p.durationSeconds)) : 0;
+      const mm = String(Math.floor(dur / 60)).padStart(2, "0");
+      const ss = String(dur % 60).padStart(2, "0");
+      const hasDur = result === "answered" && dur > 0;
+      const base =
+        kind === "audio"
+          ? hasDur
+            ? t("callEventAudioWithDuration").replace("{dur}", `${mm}:${ss}`)
+            : t("callEventAudio")
+          : hasDur
+            ? t("callEventCallWithDuration").replace("{dur}", `${mm}:${ss}`)
+            : t("callEventCall");
+      if (result === "missed") return t("callEventMissed");
+      if (result === "declined") return t("callEventDeclined");
+      if (result === "cancelled") return t("callEventCancelled");
+      return base;
+    }
     default:
       return m.text || "";
   }

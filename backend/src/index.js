@@ -475,6 +475,39 @@ function endCallInternal(callId, { reason = "ended", endedByUserId = null } = {}
   const call = activeCalls.get(id);
   if (!call) return;
 
+  // Insert a persisted system message into the direct chat (call log).
+  // Fire-and-forget to avoid blocking the signaling path.
+  (() => {
+    const chatId = Number(call.chatId);
+    const callerId = Number(call.callerId);
+    const calleeId = Number(call.calleeId);
+    const r = String(reason || "ended");
+    const acceptedAt = call.acceptedAt ? new Date(call.acceptedAt).getTime() : 0;
+    const createdAt = call.createdAt ? new Date(call.createdAt).getTime() : 0;
+    const endAt = Date.now();
+    const durationSeconds = acceptedAt ? Math.max(0, Math.floor((endAt - acceptedAt) / 1000)) : null;
+
+    let result = "answered";
+    if (r === "missed" || r === "offline") result = "missed";
+    else if (r === "cancelled") result = "cancelled";
+    else if (r === "rejected" || r === "busy") result = "declined";
+    else if (r === "disconnect") result = acceptedAt ? "answered" : "missed";
+
+    // Only meaningful for direct chats; call flow already restricts to direct chats.
+    const payload = {
+      kind: "audio",
+      callId: id,
+      callerId,
+      calleeId,
+      result,
+      durationSeconds,
+      createdAt: createdAt ? new Date(createdAt).toISOString() : null,
+      endedAt: new Date(endAt).toISOString(),
+    };
+
+    insertSystemMessageAndBroadcast(chatId, callerId, "call_log", payload, null).catch(() => {});
+  })();
+
   activeCalls.delete(id);
   callInviteTimers.get(id) && clearTimeout(callInviteTimers.get(id));
   callInviteTimers.delete(id);
@@ -1381,6 +1414,17 @@ app.get("/api/chats", authRequired, (req, res) => {
                 WHEN 'channel_created' THEN '[Channel created]'
                 WHEN 'member_added' THEN '[Member added]'
                 WHEN 'member_removed' THEN '[Member removed]'
+                WHEN 'call_log' THEN
+                  CASE COALESCE(m.system_payload->>'result', '')
+                    WHEN 'missed' THEN '[Missed call]'
+                    WHEN 'declined' THEN '[Call declined]'
+                    WHEN 'cancelled' THEN '[Call cancelled]'
+                    ELSE
+                      CASE
+                        WHEN COALESCE((m.system_payload->>'durationSeconds')::int, 0) > 0 THEN '[Audio call]'
+                        ELSE '[Audio call]'
+                      END
+                  END
                 ELSE '[Event]'
               END
             WHEN m.video_url IS NOT NULL AND TRIM(COALESCE(m.text, '')) = '' THEN '[Video message]'

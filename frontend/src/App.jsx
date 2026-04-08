@@ -535,7 +535,22 @@ export default function App() {
     if (msg?.videoUrl) return t("notifyPreviewVideo");
     if (msg?.audioUrl) return t("notifyPreviewVoice");
     if (msg?.imageUrl) return t("notifyPreviewPhoto");
-    if (msg?.type === "system") return "[Event]";
+    if (msg?.type === "system") {
+      const sk = String(msg?.systemKind || "");
+      const p = msg?.systemPayload && typeof msg.systemPayload === "object" ? msg.systemPayload : {};
+      if (sk === "call_log") {
+        const result = String(p.result || "");
+        const dur = typeof p.durationSeconds === "number" ? Math.max(0, Math.floor(p.durationSeconds)) : 0;
+        const mm = String(Math.floor(dur / 60)).padStart(2, "0");
+        const ss = String(dur % 60).padStart(2, "0");
+        if (result === "missed") return t("callEventMissed");
+        if (result === "declined") return t("callEventDeclined");
+        if (result === "cancelled") return t("callEventCancelled");
+        if (result === "answered" && dur > 0) return t("callEventAudioWithDuration").replace("{dur}", `${mm}:${ss}`);
+        return t("callEventAudio");
+      }
+      return "[Event]";
+    }
     return "…";
   }
 
