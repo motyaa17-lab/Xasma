@@ -1318,13 +1318,15 @@ export default function UserMenu({
               ? t("myProfile")
               : panel === "settings"
                 ? t("settings")
+                : panel === "premium"
+                  ? t("premiumTitle")
                 : panel === "support"
                   ? t("settingsSupportAuthors")
                   : t("adminPanelTitle")
           }
           onClose={() => setPanel(null)}
           t={t}
-          cardClassName="modalCard--mobileFriendly"
+          cardClassName={modalCardClass}
         >
           {panel === "profile" ? (
             <div>
@@ -1583,11 +1585,148 @@ export default function UserMenu({
               </div>
 
               <div className="settingsSection">
+                <div className="settingsTitle">{t("inviteFriendsTitle")}</div>
+                {me?.referralCode ? (
+                  (() => {
+                    const link =
+                      typeof window !== "undefined"
+                        ? `${window.location.origin}/invite/${String(me.referralCode)}`
+                        : `/invite/${String(me.referralCode)}`;
+                    const count = Math.max(0, Number(me?.referralsCount) || 0);
+                    return (
+                      <>
+                        <div className="muted small">
+                          {t("inviteFriendsCount").replace("{count}", String(count))}
+                        </div>
+                        <div className="inviteLinkRow">
+                          <div className="inviteLinkText" title={link}>
+                            {link}
+                          </div>
+                          <button
+                            type="button"
+                            className="ghostBtn"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard?.writeText?.(link);
+                                setInviteCopied(true);
+                                window.setTimeout(() => setInviteCopied(false), 1200);
+                              } catch {
+                                try {
+                                  const el = document.createElement("textarea");
+                                  el.value = link;
+                                  el.style.position = "fixed";
+                                  el.style.left = "-9999px";
+                                  document.body.appendChild(el);
+                                  el.focus();
+                                  el.select();
+                                  document.execCommand("copy");
+                                  document.body.removeChild(el);
+                                  setInviteCopied(true);
+                                  window.setTimeout(() => setInviteCopied(false), 1200);
+                                } catch {
+                                  // ignore
+                                }
+                              }
+                            }}
+                          >
+                            {inviteCopied ? t("inviteFriendsCopied") : t("inviteFriendsCopy")}
+                          </button>
+                        </div>
+                      </>
+                    );
+                  })()
+                ) : (
+                  <div className="muted small">{t("errorGeneric")}</div>
+                )}
+              </div>
+
+              <div className="settingsSection">
+                <div className="settingsTitle">{t("premiumTitleShort")}</div>
+                <button
+                  type="button"
+                  className="dropdownItem"
+                  onClick={() => {
+                    setPremiumNotice("");
+                    setPanel("premium");
+                  }}
+                >
+                  {t("premiumButton")} · {me?.isPremium ? t("premiumActive") : t("premiumInactive")}
+                </button>
+                <div className="muted small">
+                  {t("premiumTypeLabel")}:{" "}
+                  {me?.isPremium && me?.premiumType ? t(`premiumType_${me.premiumType}`) : t("premiumTypeNone")}
+                  <br />
+                  {t("premiumUntil")}: {me?.isPremium && me?.premiumExpiresAt ? formatShortDate(me.premiumExpiresAt) : "—"}
+                  <br />
+                  {t("premiumDaysLeft", { days: me?.isPremium ? me?.premiumDaysLeft || 0 : 0 })}
+                </div>
+              </div>
+
+              <div className="settingsSection">
                 <div className="settingsTitle">{t("settingsSupport")}</div>
                 <button type="button" className="dropdownItem" onClick={() => setPanel("support")}>
                   {t("settingsSupportAuthors")}
                 </button>
               </div>
+            </div>
+          ) : panel === "premium" ? (
+            <div className="settingsModalList">
+              <div className="premiumHero">
+                <div className="premiumTitleRow">{t("premiumTitle")}</div>
+                <p className="muted small premiumOfferText">{t("premiumOfferText")}</p>
+              </div>
+
+              <div className="settingsSection settingsSection--padded">
+                <div className="settingsTitle">{t("premiumStatusTitle")}</div>
+                <div className="muted small">
+                  {t("premiumStatusLabel")}: {me?.isPremium ? t("premiumActive") : t("premiumInactive")}
+                  <br />
+                  {t("premiumTypeLabel")}:{" "}
+                  {me?.isPremium && me?.premiumType ? t(`premiumType_${me.premiumType}`) : t("premiumTypeNone")}
+                  <br />
+                  {t("premiumUntil")}: {me?.isPremium && me?.premiumExpiresAt ? formatShortDate(me.premiumExpiresAt) : "—"}
+                  <br />
+                  {t("premiumDaysLeft", { days: me?.isPremium ? me?.premiumDaysLeft || 0 : 0 })}
+                </div>
+              </div>
+
+              <div className="settingsSection settingsSection--padded">
+                <div className="settingsTitle">{t("premiumPerksTitle")}</div>
+                <ul className="premiumPerks">
+                  <li>{t("premiumPerkBg")}</li>
+                  <li>{t("premiumPerkName")}</li>
+                  <li>{t("premiumPerkMessages")}</li>
+                  <li>{t("premiumPerkFuture")}</li>
+                </ul>
+              </div>
+
+              <div className="settingsSection settingsSection--padded">
+                <div className="settingsTitle">{t("premiumPricingTitle")}</div>
+                <div className="muted small">{t("premiumPricingMvp")}</div>
+              </div>
+
+              {premiumNotice ? <div className="realtimeBanner">{premiumNotice}</div> : null}
+
+              <button
+                type="button"
+                className="primaryBtn premiumCtaBtn"
+                disabled={premiumBusy}
+                onClick={async () => {
+                  setPremiumBusy(true);
+                  setPremiumNotice("");
+                  try {
+                    const u = await activatePremium();
+                    onUpdateMe?.(u);
+                    setPremiumNotice(t("premiumActivated"));
+                  } catch (e) {
+                    setPremiumNotice(e.message || t("errorGeneric"));
+                  } finally {
+                    setPremiumBusy(false);
+                  }
+                }}
+              >
+                {t("premiumCta")}
+              </button>
             </div>
           ) : panel === "support" ? (
             <div className="donateSupportModal donateSupportModal--desktop">

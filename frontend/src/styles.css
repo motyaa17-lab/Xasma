@@ -362,6 +362,22 @@ body.body--mobileConversationOpen {
   opacity: 1;
 }
 
+/* Desktop safety: ensure header/menu icons stay visible */
+.topBarRight .menuBtn {
+  color: var(--text);
+}
+
+.topBarRight .hamburger span {
+  background: currentColor !important;
+  opacity: 1 !important;
+}
+
+.msgMenuBtn svg,
+.chatHeaderInfoBtn svg,
+.chatHeaderCallBtn svg {
+  display: block;
+}
+
 .dropdown {
   position: absolute;
   top: 44px;
