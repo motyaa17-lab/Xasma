@@ -75,10 +75,10 @@ async function apiFetch(path, { method = "GET", body, token } = {}) {
   return data;
 }
 
-export async function register({ username, password, avatar }) {
+export async function register({ username, password, avatar, inviteCode }) {
   return apiFetch("/api/register", {
     method: "POST",
-    body: { username, password, avatar },
+    body: { username, password, avatar, inviteCode: inviteCode || "" },
     token: null,
   });
 }

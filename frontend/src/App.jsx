@@ -124,6 +124,26 @@ export default function App() {
   });
   const mobileConversationOpen = Boolean(isMobile && mobileTab === "chats" && selectedChatId);
 
+  // /invite/:code (simple route capture, no router).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const p = String(window.location?.pathname || "");
+    const m = p.match(/^\/invite\/([a-zA-Z0-9_-]{3,64})\/?$/);
+    if (!m) return;
+    const code = String(m[1] || "").trim();
+    if (!code) return;
+    try {
+      localStorage.setItem("inviteCode", code);
+    } catch {
+      // ignore
+    }
+    try {
+      window.history.replaceState({}, "", "/");
+    } catch {
+      // ignore
+    }
+  }, []);
+
   useEffect(() => {
     if (!mobileConversationOpen) {
       document.body.classList.remove(MOBILE_CHAT_OPEN_BODY_CLASS);
@@ -1605,10 +1625,21 @@ export default function App() {
   }
 
   async function handleRegister(data) {
-    const res = await register(data);
+    let inviteCode = "";
+    try {
+      inviteCode = String(localStorage.getItem("inviteCode") || "").trim();
+    } catch {
+      inviteCode = "";
+    }
+    const res = await register({ ...data, inviteCode });
     localStorage.setItem("token", res.token);
     setToken(res.token);
     setAuthError("");
+    try {
+      localStorage.removeItem("inviteCode");
+    } catch {
+      // ignore
+    }
   }
 
   function logout() {

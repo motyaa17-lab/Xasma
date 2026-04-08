@@ -1,4 +1,5 @@
 const { Pool } = require("pg");
+const crypto = require("crypto");
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
@@ -160,6 +161,60 @@ async function initDb() {
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS user_tag TEXT`);
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS tag_color TEXT`);
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS tag_style TEXT`);
+
+  // Referrals (MVP).
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code TEXT`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS invited_by BIGINT REFERENCES users(id) ON DELETE SET NULL`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS referrals_count BIGINT NOT NULL DEFAULT 0`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS has_custom_bg BOOLEAN NOT NULL DEFAULT FALSE`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS has_badge BOOLEAN NOT NULL DEFAULT FALSE`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS has_reactions BOOLEAN NOT NULL DEFAULT FALSE`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS has_premium_lite BOOLEAN NOT NULL DEFAULT FALSE`);
+  await query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS users_referral_code_uidx
+    ON users (referral_code)
+    WHERE referral_code IS NOT NULL
+  `);
+
+  function base62(bytes) {
+    const alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let n = 0n;
+    for (const b of bytes) n = (n << 8n) | BigInt(b);
+    let out = "";
+    while (n > 0n) {
+      out = alphabet[Number(n % 62n)] + out;
+      n = n / 62n;
+    }
+    return out || "0";
+  }
+
+  function generateReferralCode() {
+    // 6-10 chars typical; keep short but unique enough.
+    const raw = base62(crypto.randomBytes(6)).replace(/0/g, "a");
+    return raw.slice(0, 8);
+  }
+
+  // Backfill referral codes for existing users (idempotent, retries on rare collisions).
+  for (let rounds = 0; rounds < 50; rounds++) {
+    const r = await query(`SELECT id FROM users WHERE referral_code IS NULL LIMIT 200`);
+    if (!r.rows.length) break;
+    for (const row of r.rows) {
+      const uid = Number(row.id);
+      if (!uid) continue;
+      for (let attempt = 0; attempt < 8; attempt++) {
+        const code = generateReferralCode();
+        try {
+          await query(`UPDATE users SET referral_code = $1 WHERE id = $2 AND referral_code IS NULL`, [code, uid]);
+          break;
+        } catch (e) {
+          // Unique collision; retry.
+          const msg = String(e?.message || "");
+          if (msg.toLowerCase().includes("duplicate") || msg.toLowerCase().includes("unique")) continue;
+          break;
+        }
+      }
+    }
+  }
 
   await query(`
     ALTER TABLE chats ADD COLUMN IF NOT EXISTS pinned_message_id BIGINT

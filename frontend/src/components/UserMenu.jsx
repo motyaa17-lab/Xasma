@@ -297,6 +297,7 @@ export default function UserMenu({
   const [profileAuraColor, setProfileAuraColor] = useState(DEFAULT_AURA_COLOR);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaveError, setProfileSaveError] = useState("");
+  const [inviteCopied, setInviteCopied] = useState(false);
   const chatBgFileInputRef = useRef(null);
   const [chatBgError, setChatBgError] = useState("");
   const [adminUsers, setAdminUsers] = useState([]);
@@ -557,6 +558,60 @@ export default function UserMenu({
               right={chatBackgroundDisplayLabel(t, settings)}
               onClick={() => setPanel("chatBackground")}
             />
+          </div>
+
+          <div className="settingsSectionHeader">{t("inviteFriendsTitle")}</div>
+          <div className="settingsSection settingsSection--padded">
+            {me?.referralCode ? (
+              (() => {
+                const link =
+                  typeof window !== "undefined"
+                    ? `${window.location.origin}/invite/${String(me.referralCode)}`
+                    : `/invite/${String(me.referralCode)}`;
+                const count = Math.max(0, Number(me?.referralsCount) || 0);
+                return (
+                  <>
+                    <div className="settingsTitle">{t("inviteFriendsCount").replace("{count}", String(count))}</div>
+                    <div className="inviteLinkRow">
+                      <div className="inviteLinkText" title={link}>
+                        {link}
+                      </div>
+                      <button
+                        type="button"
+                        className="ghostBtn"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard?.writeText?.(link);
+                            setInviteCopied(true);
+                            window.setTimeout(() => setInviteCopied(false), 1200);
+                          } catch {
+                            try {
+                              const el = document.createElement("textarea");
+                              el.value = link;
+                              el.style.position = "fixed";
+                              el.style.left = "-9999px";
+                              document.body.appendChild(el);
+                              el.focus();
+                              el.select();
+                              document.execCommand("copy");
+                              document.body.removeChild(el);
+                              setInviteCopied(true);
+                              window.setTimeout(() => setInviteCopied(false), 1200);
+                            } catch {
+                              // ignore
+                            }
+                          }
+                        }}
+                      >
+                        {inviteCopied ? t("inviteFriendsCopied") : t("inviteFriendsCopy")}
+                      </button>
+                    </div>
+                  </>
+                );
+              })()
+            ) : (
+              <div className="muted small">{t("errorGeneric")}</div>
+            )}
           </div>
 
           {me?.role === "admin" ? (

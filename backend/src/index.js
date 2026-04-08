@@ -767,7 +767,7 @@ async function insertChatMessageAndBroadcast(
 }
 
 app.post("/api/register", async (req, res) => {
-  const { username, password, avatar } = req.body || {};
+  const { username, password, avatar, inviteCode } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: "username and password are required" });
 
   const uname = username.trim();
@@ -780,12 +780,94 @@ app.post("/api/register", async (req, res) => {
   const existing = await query(`SELECT id FROM users WHERE username = $1`, [uname]);
   if (existing.rows[0]) return res.status(409).json({ error: "Username already exists" });
 
+  function base62(bytes) {
+    const alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let n = 0n;
+    for (const b of bytes) n = (n << 8n) | BigInt(b);
+    let out = "";
+    while (n > 0n) {
+      out = alphabet[Number(n % 62n)] + out;
+      n = n / 62n;
+    }
+    return out || "0";
+  }
+
+  function generateReferralCode() {
+    const raw = base62(crypto.randomBytes(6)).replace(/0/g, "a");
+    return raw.slice(0, 8);
+  }
+
   const password_hash = await bcrypt.hash(password, 10);
-  const inserted = await query(
-    `INSERT INTO users (username, password_hash, avatar_url) VALUES ($1, $2, $3) RETURNING id, username, avatar_url, role, banned, aura_color, created_at`,
-    [uname, password_hash, avatar_url]
-  );
-  const user = inserted.rows[0];
+
+  const invCode = typeof inviteCode === "string" ? inviteCode.trim() : "";
+  const client = await pool.connect();
+  let user;
+  try {
+    await client.query("BEGIN");
+
+    let inviterId = null;
+    if (invCode) {
+      const inv = await client.query(`SELECT id FROM users WHERE referral_code = $1`, [invCode]);
+      if (inv.rows[0]?.id) inviterId = Number(inv.rows[0].id);
+    }
+
+    // Generate a unique referral code for the new user.
+    let myCode = null;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const c = generateReferralCode();
+      try {
+        const inserted = await client.query(
+          `INSERT INTO users (username, password_hash, avatar_url, referral_code, invited_by)
+           VALUES ($1, $2, $3, $4, $5)
+           RETURNING id, username, avatar_url, role, banned, aura_color, created_at,
+                     referral_code, invited_by, referrals_count,
+                     has_custom_bg, has_badge, has_reactions, has_premium_lite`,
+          [uname, password_hash, avatar_url, c, inviterId]
+        );
+        user = inserted.rows[0];
+        myCode = c;
+        break;
+      } catch (e) {
+        const msg = String(e?.message || "").toLowerCase();
+        if (msg.includes("referral") && (msg.includes("duplicate") || msg.includes("unique"))) continue;
+        if (msg.includes("users_username_key") || msg.includes("username")) throw e;
+        // Any other error: rethrow.
+        throw e;
+      }
+    }
+    if (!user) throw new Error("Failed to create user");
+
+    // Prevent self-invite (shouldn't happen, but keep it safe).
+    if (user.invited_by != null && Number(user.invited_by) === Number(user.id)) {
+      await client.query(`UPDATE users SET invited_by = NULL WHERE id = $1`, [Number(user.id)]);
+      user.invited_by = null;
+      inviterId = null;
+    }
+
+    if (inviterId) {
+      const up = await client.query(
+        `UPDATE users
+         SET referrals_count = referrals_count + 1,
+             has_custom_bg = has_custom_bg OR (referrals_count + 1) >= 1,
+             has_badge = has_badge OR (referrals_count + 1) >= 3,
+             has_reactions = has_reactions OR (referrals_count + 1) >= 5,
+             has_premium_lite = has_premium_lite OR (referrals_count + 1) >= 10
+         WHERE id = $1
+         RETURNING referrals_count, has_custom_bg, has_badge, has_reactions, has_premium_lite`,
+        [inviterId]
+      );
+      // (Optional future: emit realtime toast to inviter here.)
+      void up;
+    }
+
+    await client.query("COMMIT");
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+
   try {
     await ensureOfficialChatForUser(Number(user.id));
   } catch {
@@ -807,6 +889,13 @@ app.post("/api/register", async (req, res) => {
       tagStyle: "solid",
       registrationDate: registrationDateIso(user.created_at),
       isEarlyTester: isEarlyTesterUser(Number(user.id), user.created_at),
+      referralCode: user.referral_code || myCode || "",
+      invitedBy: user.invited_by != null ? Number(user.invited_by) : null,
+      referralsCount: Math.max(0, Number(user.referrals_count) || 0),
+      hasCustomBg: Boolean(user.has_custom_bg),
+      hasBadge: Boolean(user.has_badge),
+      hasReactions: Boolean(user.has_reactions),
+      hasPremiumLite: Boolean(user.has_premium_lite),
     },
   });
 });
@@ -817,7 +906,9 @@ app.post("/api/login", async (req, res) => {
 
   const r = await query(
     `SELECT id, username, password_hash, avatar_url, role, banned, aura_color, messages_sent_count,
-            user_tag, tag_color, tag_style, created_at
+            user_tag, tag_color, tag_style, created_at,
+            referral_code, invited_by, referrals_count,
+            has_custom_bg, has_badge, has_reactions, has_premium_lite
      FROM users WHERE username = $1`,
     [username.trim()]
   );
@@ -851,6 +942,13 @@ app.post("/api/login", async (req, res) => {
       tagStyle: tags.tagStyle,
       registrationDate: registrationDateIso(user.created_at),
       isEarlyTester: isEarlyTesterUser(Number(user.id), user.created_at),
+      referralCode: user.referral_code || "",
+      invitedBy: user.invited_by != null ? Number(user.invited_by) : null,
+      referralsCount: Math.max(0, Number(user.referrals_count) || 0),
+      hasCustomBg: Boolean(user.has_custom_bg),
+      hasBadge: Boolean(user.has_badge),
+      hasReactions: Boolean(user.has_reactions),
+      hasPremiumLite: Boolean(user.has_premium_lite),
     },
   });
 });
@@ -859,7 +957,9 @@ app.get("/api/me", authRequired, (req, res) => {
   const uid = Number(req.user.id);
   return query(
     `SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about, aura_color, messages_sent_count,
-            user_tag, tag_color, tag_style, created_at
+            user_tag, tag_color, tag_style, created_at,
+            referral_code, invited_by, referrals_count,
+            has_custom_bg, has_badge, has_reactions, has_premium_lite
      FROM users WHERE id = $1`,
     [uid]
   ).then((r) => {
@@ -885,6 +985,13 @@ app.get("/api/me", authRequired, (req, res) => {
         tagStyle: tags.tagStyle,
         registrationDate: registrationDateIso(user.created_at),
         isEarlyTester: isEarlyTesterUser(Number(user.id), user.created_at),
+        referralCode: user.referral_code || "",
+        invitedBy: user.invited_by != null ? Number(user.invited_by) : null,
+        referralsCount: Math.max(0, Number(user.referrals_count) || 0),
+        hasCustomBg: Boolean(user.has_custom_bg),
+        hasBadge: Boolean(user.has_badge),
+        hasReactions: Boolean(user.has_reactions),
+        hasPremiumLite: Boolean(user.has_premium_lite),
       },
     });
   });
