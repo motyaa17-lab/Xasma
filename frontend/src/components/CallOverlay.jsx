@@ -38,9 +38,10 @@ export default function CallOverlay({
 
   const title = useMemo(() => {
     if (!call) return "";
-    if (call.phase === "calling") return `${t("callCalling")}${".".repeat(dots)}`;
+    const dotsText = "…".repeat(dots);
+    if (call.phase === "calling") return `${t("callCalling")}${dotsText}`;
     if (call.phase === "ringing") return t("callIncoming");
-    if (call.phase === "connecting") return t("callConnecting");
+    if (call.phase === "connecting") return `${t("callConnecting")}${dotsText}`;
     if (call.phase === "connected") return t("callConnected");
     if (call.phase === "ended") return t("callEnded");
     return "";
@@ -55,35 +56,60 @@ export default function CallOverlay({
   const showCancel = call.phase === "calling";
   const showActiveControls = call.phase === "connecting" || call.phase === "connected";
   const showDuration = call.phase === "connected" && call?.connectedAtMs;
+  const isRinging = call.phase === "ringing";
+  const isConnected = call.phase === "connected";
+  const isEnding = call.phase === "ended";
 
   return (
-    <div className="callOverlay callOverlay--premium" role="dialog" aria-modal="true" aria-label={t("callOverlay")}>
-      <div className={`callCard callCard--premium${visible ? " callCard--in" : ""}`}>
-        <div className="callHero">
+    <div
+      className={`callOverlay callOverlay--premium${isEnding ? " callOverlay--out" : ""}`}
+      role="dialog"
+      aria-modal="true"
+      aria-label={t("callOverlay")}
+    >
+      <div className={`callCard callCard--premium callCard--alive callCard--in${isEnding ? " callCard--out" : ""}`}>
+        <div className="callCardGlow" aria-hidden />
+
+        <div className={`callHero${isConnected ? " callHero--connected" : ""}`}>
           <div className="callAvatar callAvatar--hero" aria-hidden>
-            <div className={call.phase === "connected" ? "callAvatarPulse" : ""} aria-hidden />
+            <div
+              className={
+                isConnected
+                  ? "callAvatarPulse callAvatarPulse--connected"
+                  : isRinging
+                    ? "callAvatarPulse callAvatarPulse--ringing"
+                    : "callAvatarPulse callAvatarPulse--idle"
+              }
+              aria-hidden
+            />
             {avatar ? <img src={avatar} alt="" /> : <span>{initials(name)}</span>}
           </div>
+
           <div className="callPeerName callPeerName--hero">{name || t("displayNameUser")}</div>
-          {username ? <div className="callPeerUsername muted">{username}</div> : null}
-          <div className="callSubtitle muted">
-            {call.phase === "ringing" ? t("callIncomingAudioSubtitle") : t("callAudioSubtitle")}
+          {username ? <div className="callPeerUsername">{username}</div> : null}
+
+          <div className="callMeta">
+            <div className="callSubtitle">
+              {call.phase === "ringing" ? t("callIncomingAudioSubtitle") : t("callAudioSubtitle")}
+            </div>
+            <div className="callStatus callStatus--hero">{title}</div>
           </div>
-          <div className="callStatus callStatus--hero">{title}</div>
+
           {showDuration ? (
-            <div className="callDuration" aria-label={t("callDuration")}>
-              {formatDur(Date.now() - Number(call.connectedAtMs || 0))}
+            <div className="callTimerBlock" aria-label={t("callDuration")}>
+              <div className="callTimer">{formatDur(Date.now() - Number(call.connectedAtMs || 0))}</div>
+              <div className="callTimerLabel">{t("callDuration")}</div>
             </div>
           ) : null}
         </div>
 
-        <div className="callActions">
+        <div className={`callActions${showAcceptReject ? " callActions--incoming" : ""}`}>
           {showAcceptReject ? (
             <>
-              <button type="button" className="callBtn callBtn--danger callBtn--pill" onClick={onReject}>
+              <button type="button" className="callBtn callBtn--danger callBtn--pill callBtn--xl" onClick={onReject}>
                 {t("callReject")}
               </button>
-              <button type="button" className="callBtn callBtn--primary callBtn--pill" onClick={onAccept}>
+              <button type="button" className="callBtn callBtn--primary callBtn--pill callBtn--xl callBtn--shine" onClick={onAccept}>
                 {t("callAccept")}
               </button>
             </>
@@ -91,23 +117,27 @@ export default function CallOverlay({
 
           {showActiveControls ? (
             <>
-              <button type="button" className="callBtn callBtn--ghost callBtn--pill" onClick={onToggleMute}>
+              <button
+                type="button"
+                className={`callBtn callBtn--ghost callBtn--pill callBtn--xl${call.muted ? " callBtn--muted" : ""}`}
+                onClick={onToggleMute}
+              >
                 {call.muted ? t("callUnmute") : t("callMute")}
               </button>
-              <button type="button" className="callBtn callBtn--danger callBtn--pill" onClick={onEnd}>
+              <button type="button" className="callBtn callBtn--danger callBtn--pill callBtn--xl" onClick={onEnd}>
                 {t("callEnd")}
               </button>
             </>
           ) : null}
 
           {showCancel ? (
-            <button type="button" className="callBtn callBtn--danger callBtn--pill" onClick={onEnd}>
+            <button type="button" className="callBtn callBtn--danger callBtn--pill callBtn--xl" onClick={onEnd}>
               {t("callCancel")}
             </button>
           ) : null}
 
           {call.phase === "ended" ? (
-            <button type="button" className="callBtn callBtn--ghost callBtn--pill" onClick={onEnd}>
+            <button type="button" className="callBtn callBtn--ghost callBtn--pill callBtn--xl" onClick={onEnd}>
               {t("close")}
             </button>
           ) : null}

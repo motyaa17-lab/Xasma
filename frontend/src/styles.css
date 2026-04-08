@@ -1421,6 +1421,16 @@ body.body--mobileConversationOpen {
     max(env(safe-area-inset-left), 16px);
 }
 
+.callOverlay--out {
+  animation: callOverlayFadeOut 0.18s ease both;
+}
+
+@keyframes callOverlayFadeOut {
+  to {
+    opacity: 0;
+  }
+}
+
 .callCard {
   width: min(520px, 96vw);
   border-radius: 16px;
@@ -1436,8 +1446,35 @@ body.body--mobileConversationOpen {
   padding: 18px 16px 16px;
 }
 
+.callCard--alive {
+  position: relative;
+  border-radius: 22px;
+  border-color: rgba(255, 255, 255, 0.12);
+  background:
+    radial-gradient(1200px 420px at 50% -10%, rgba(37, 99, 235, 0.22), rgba(17, 27, 46, 0) 58%),
+    linear-gradient(180deg, rgba(17, 27, 46, 0.92), rgba(17, 27, 46, 0.98));
+  box-shadow:
+    0 40px 120px rgba(0, 0, 0, 0.62),
+    0 2px 0 rgba(255, 255, 255, 0.06) inset;
+  overflow: hidden;
+}
+
+.callCardGlow {
+  position: absolute;
+  inset: -1px;
+  background:
+    radial-gradient(600px 220px at 20% 0%, rgba(59, 130, 246, 0.16), rgba(0, 0, 0, 0) 60%),
+    radial-gradient(520px 220px at 80% 0%, rgba(99, 102, 241, 0.10), rgba(0, 0, 0, 0) 62%);
+  pointer-events: none;
+  opacity: 0.9;
+}
+
 .callCard--in {
   animation: callPopIn 0.22s var(--ease-tg-pop) both;
+}
+
+.callCard--out {
+  animation: callPopOut 0.18s ease both;
 }
 
 @keyframes callPopIn {
@@ -1451,6 +1488,13 @@ body.body--mobileConversationOpen {
   }
 }
 
+@keyframes callPopOut {
+  to {
+    opacity: 0;
+    transform: scale(0.985) translateY(2px);
+  }
+}
+
 .callHero {
   display: flex;
   flex-direction: column;
@@ -1459,61 +1503,125 @@ body.body--mobileConversationOpen {
   margin-bottom: 14px;
 }
 
+.callHero--connected {
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
 .callAvatar--hero {
-  width: 92px;
-  height: 92px;
-  border-radius: 24px;
+  width: 124px;
+  height: 124px;
+  border-radius: 34px;
   position: relative;
 }
 
 .callAvatarPulse {
   position: absolute;
-  inset: -10px;
-  border-radius: 28px;
-  background: radial-gradient(circle, rgba(37, 99, 235, 0.16), rgba(37, 99, 235, 0) 60%);
-  animation: callPulse 1.6s ease-in-out infinite;
+  inset: -14px;
+  border-radius: 40px;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.14), rgba(59, 130, 246, 0) 62%);
   pointer-events: none;
 }
 
-@keyframes callPulse {
+.callAvatarPulse--idle {
+  display: none;
+}
+
+.callAvatarPulse--ringing {
+  display: block;
+  opacity: 0.9;
+  animation: callPulseRinging 1.15s ease-in-out infinite;
+}
+
+.callAvatarPulse--connected {
+  display: block;
+  opacity: 0.92;
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.20), rgba(37, 99, 235, 0) 62%);
+  animation: callPulseConnected 1.8s ease-in-out infinite;
+}
+
+@keyframes callPulseRinging {
   0% {
     transform: scale(0.98);
-    opacity: 0.55;
+    filter: blur(0px);
   }
   50% {
-    transform: scale(1.04);
-    opacity: 0.85;
+    transform: scale(1.06);
+    filter: blur(0.2px);
   }
   100% {
     transform: scale(0.98);
-    opacity: 0.55;
+    filter: blur(0px);
+  }
+}
+
+@keyframes callPulseConnected {
+  0% {
+    transform: scale(0.99);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(0.99);
+    opacity: 0.7;
   }
 }
 
 .callPeerName--hero {
-  font-size: 18px;
+  font-size: 20px;
+  letter-spacing: -0.01em;
 }
 
 .callPeerUsername {
-  font-size: 12px;
-  opacity: 0.85;
+  font-size: 13px;
+  opacity: 0.68;
+  margin-top: -2px;
 }
 
 .callSubtitle {
   font-size: 13px;
-  opacity: 0.9;
+  opacity: 0.78;
 }
 
 .callStatus--hero {
   font-size: 14px;
-  opacity: 0.95;
+  opacity: 0.9;
 }
 
-.callDuration {
-  margin-top: 2px;
+.callMeta {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.callTimerBlock {
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+}
+
+.callTimer {
+  font-size: 28px;
+  font-weight: 950;
+  letter-spacing: 0.06em;
   font-variant-numeric: tabular-nums;
-  font-weight: 900;
-  letter-spacing: 0.03em;
+  transform: translateZ(0);
+}
+
+.callTimerLabel {
+  margin-top: 4px;
+  font-size: 12px;
+  opacity: 0.68;
+  font-weight: 800;
 }
 
 .callStatus {
@@ -1567,6 +1675,10 @@ body.body--mobileConversationOpen {
   gap: 12px;
 }
 
+.callActions--incoming {
+  gap: 14px;
+}
+
 .callBtn {
   appearance: none;
   border: 1px solid rgba(255, 255, 255, 0.10);
@@ -1578,18 +1690,22 @@ body.body--mobileConversationOpen {
   cursor: pointer;
   transition:
     transform var(--dur-tap) var(--ease-tg-snappy),
-    background 0.14s ease;
+    background 0.14s ease,
+    box-shadow 0.14s ease,
+    border-color 0.14s ease;
   -webkit-tap-highlight-color: transparent;
 }
 
 .callBtn--primary {
   background: rgba(37, 99, 235, 0.22);
   border-color: rgba(37, 99, 235, 0.36);
+  box-shadow: 0 10px 26px rgba(37, 99, 235, 0.16);
 }
 
 .callBtn--danger {
   background: rgba(239, 68, 68, 0.18);
   border-color: rgba(239, 68, 68, 0.30);
+  box-shadow: 0 10px 26px rgba(239, 68, 68, 0.10);
 }
 
 .callBtn--ghost {
@@ -1609,13 +1725,65 @@ body.body--mobileConversationOpen {
 }
 
 .callBtn:active {
-  transform: scale(0.97);
+  transform: scale(0.98);
 }
 
 .callBtn--pill {
   min-width: 140px;
   border-radius: 999px;
   padding: 12px 18px;
+}
+
+.callBtn--xl {
+  min-width: 160px;
+  padding: 14px 20px;
+  font-size: 14px;
+}
+
+.callBtn--shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.callBtn--shine::after {
+  content: "";
+  position: absolute;
+  top: -40%;
+  left: -60%;
+  width: 120%;
+  height: 180%;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0));
+  transform: rotate(18deg);
+  opacity: 0.9;
+}
+
+.callBtn--shine:hover::after {
+  animation: callShine 0.7s var(--ease-tg-out) both;
+}
+
+@keyframes callShine {
+  from {
+    transform: translateX(-30%) rotate(18deg);
+  }
+  to {
+    transform: translateX(120%) rotate(18deg);
+  }
+}
+
+.callBtn--muted {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+@media (max-width: 520px) {
+  .callAvatar--hero {
+    width: 120px;
+    height: 120px;
+    border-radius: 32px;
+  }
+  .callBtn--xl {
+    min-width: 46vw;
+  }
 }
 
 .callsScreen {
@@ -1716,6 +1884,13 @@ body.body--mobileConversationOpen {
   align-items: baseline;
 }
 
+.callsRight {
+  display: inline-flex;
+  gap: 10px;
+  align-items: baseline;
+  flex: 0 0 auto;
+}
+
 .callsName {
   font-weight: 900;
   overflow: hidden;
@@ -1730,11 +1905,43 @@ body.body--mobileConversationOpen {
   font-variant-numeric: tabular-nums;
 }
 
+.callsDur {
+  font-size: 12px;
+  opacity: 0.62;
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
 .callsRowBottom {
   display: flex;
   gap: 8px;
   align-items: center;
   font-size: 12px;
+}
+
+.callsSubtitle {
+  opacity: 0.72;
+}
+
+.callsGroupHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 6px;
+}
+
+.callsGroupTitle {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  opacity: 0.82;
+  text-transform: uppercase;
+}
+
+.callsGroupSep {
+  height: 1px;
+  flex: 1;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .callsDir {
