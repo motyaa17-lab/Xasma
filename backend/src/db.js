@@ -170,6 +170,10 @@ async function initDb() {
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS has_badge BOOLEAN NOT NULL DEFAULT FALSE`);
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS has_reactions BOOLEAN NOT NULL DEFAULT FALSE`);
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS has_premium_lite BOOLEAN NOT NULL DEFAULT FALSE`);
+  // Premium (separate from Premium-lite rewards).
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_premium BOOLEAN NOT NULL DEFAULT FALSE`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_activated_at TIMESTAMPTZ`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_bg_url TEXT`);
   await query(`
     CREATE UNIQUE INDEX IF NOT EXISTS users_referral_code_uidx
     ON users (referral_code)

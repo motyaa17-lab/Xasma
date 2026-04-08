@@ -908,7 +908,8 @@ app.post("/api/login", async (req, res) => {
     `SELECT id, username, password_hash, avatar_url, role, banned, aura_color, messages_sent_count,
             user_tag, tag_color, tag_style, created_at,
             referral_code, invited_by, referrals_count,
-            has_custom_bg, has_badge, has_reactions, has_premium_lite
+            has_custom_bg, has_badge, has_reactions, has_premium_lite,
+            is_premium, premium_activated_at, profile_bg_url
      FROM users WHERE username = $1`,
     [username.trim()]
   );
@@ -949,6 +950,9 @@ app.post("/api/login", async (req, res) => {
       hasBadge: Boolean(user.has_badge),
       hasReactions: Boolean(user.has_reactions),
       hasPremiumLite: Boolean(user.has_premium_lite),
+      isPremium: Boolean(user.is_premium),
+      premiumActivatedAt: user.premium_activated_at,
+      profileBackground: user.profile_bg_url || "",
     },
   });
 });
@@ -959,7 +963,8 @@ app.get("/api/me", authRequired, (req, res) => {
     `SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about, aura_color, messages_sent_count,
             user_tag, tag_color, tag_style, created_at,
             referral_code, invited_by, referrals_count,
-            has_custom_bg, has_badge, has_reactions, has_premium_lite
+            has_custom_bg, has_badge, has_reactions, has_premium_lite,
+            is_premium, premium_activated_at, profile_bg_url
      FROM users WHERE id = $1`,
     [uid]
   ).then((r) => {
@@ -992,6 +997,9 @@ app.get("/api/me", authRequired, (req, res) => {
         hasBadge: Boolean(user.has_badge),
         hasReactions: Boolean(user.has_reactions),
         hasPremiumLite: Boolean(user.has_premium_lite),
+        isPremium: Boolean(user.is_premium),
+        premiumActivatedAt: user.premium_activated_at,
+        profileBackground: user.profile_bg_url || "",
       },
     });
   });
@@ -1001,6 +1009,8 @@ app.put("/api/me/profile", authRequired, (req, res) => {
   const statusKindRaw = typeof req.body?.statusKind === "string" ? req.body.statusKind.trim() : "";
   const statusTextRaw = typeof req.body?.statusText === "string" ? req.body.statusText.trim() : "";
   const aboutRaw = typeof req.body?.about === "string" ? req.body.about.trim() : "";
+  const profileBackgroundRaw =
+    typeof req.body?.profileBackground === "string" ? req.body.profileBackground.trim() : "";
 
   const allowedKinds = new Set(["", "online", "dnd", "away", "custom"]);
   const statusKind = allowedKinds.has(statusKindRaw) ? statusKindRaw : "";
@@ -1012,25 +1022,57 @@ app.put("/api/me/profile", authRequired, (req, res) => {
 
   (async () => {
     const uid = Number(req.user.id);
+    let profileBg = null;
+    if (profileBackgroundRaw) {
+      const isDataUrl = profileBackgroundRaw.startsWith("data:image/");
+      if (!isDataUrl) return res.status(400).json({ error: "Profile background must be an image data URL" });
+      if (profileBackgroundRaw.length > 1_200_000) {
+        return res.status(400).json({ error: "Profile background too large" });
+      }
+      const prem = await query(`SELECT is_premium FROM users WHERE id = $1`, [uid]);
+      if (!prem.rows[0]?.is_premium) return res.status(403).json({ error: "Premium required" });
+      profileBg = profileBackgroundRaw;
+    }
+
     if (auraParsed.skip) {
-      await query(`UPDATE users SET status_kind = $1, status_text = $2, about = $3 WHERE id = $4`, [
-        statusKind || null,
-        statusText || null,
-        about || null,
-        uid,
-      ]);
+      if (profileBg !== null) {
+        await query(`UPDATE users SET status_kind = $1, status_text = $2, about = $3, profile_bg_url = $4 WHERE id = $5`, [
+          statusKind || null,
+          statusText || null,
+          about || null,
+          profileBg,
+          uid,
+        ]);
+      } else {
+        await query(`UPDATE users SET status_kind = $1, status_text = $2, about = $3 WHERE id = $4`, [
+          statusKind || null,
+          statusText || null,
+          about || null,
+          uid,
+        ]);
+      }
     } else {
-      await query(`UPDATE users SET status_kind = $1, status_text = $2, about = $3, aura_color = $4 WHERE id = $5`, [
-        statusKind || null,
-        statusText || null,
-        about || null,
-        auraParsed.value,
-        uid,
-      ]);
+      if (profileBg !== null) {
+        await query(
+          `UPDATE users SET status_kind = $1, status_text = $2, about = $3, aura_color = $4, profile_bg_url = $5 WHERE id = $6`,
+          [statusKind || null, statusText || null, about || null, auraParsed.value, profileBg, uid]
+        );
+      } else {
+        await query(`UPDATE users SET status_kind = $1, status_text = $2, about = $3, aura_color = $4 WHERE id = $5`, [
+          statusKind || null,
+          statusText || null,
+          about || null,
+          auraParsed.value,
+          uid,
+        ]);
+      }
     }
     const r = await query(
       `SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about, aura_color, messages_sent_count,
-              user_tag, tag_color, tag_style, created_at
+              user_tag, tag_color, tag_style, created_at,
+              referral_code, invited_by, referrals_count,
+              has_custom_bg, has_badge, has_reactions, has_premium_lite,
+              is_premium, premium_activated_at, profile_bg_url
        FROM users WHERE id = $1`,
       [uid]
     );
@@ -1063,6 +1105,16 @@ app.put("/api/me/profile", authRequired, (req, res) => {
         tagStyle: tags.tagStyle,
         registrationDate: registrationDateIso(user.created_at),
         isEarlyTester: isEarlyTesterUser(Number(user.id), user.created_at),
+        referralCode: user.referral_code || "",
+        invitedBy: user.invited_by != null ? Number(user.invited_by) : null,
+        referralsCount: Math.max(0, Number(user.referrals_count) || 0),
+        hasCustomBg: Boolean(user.has_custom_bg),
+        hasBadge: Boolean(user.has_badge),
+        hasReactions: Boolean(user.has_reactions),
+        hasPremiumLite: Boolean(user.has_premium_lite),
+        isPremium: Boolean(user.is_premium),
+        premiumActivatedAt: user.premium_activated_at,
+        profileBackground: user.profile_bg_url || "",
       },
     });
   })().catch(() => res.status(500).json({ error: "Server error" }));
@@ -1117,6 +1169,63 @@ app.put("/api/me/avatar", authRequired, (req, res) => {
         avatar: user.avatar_url,
         isOnline: Boolean(user.is_online),
         lastSeenAt: user.last_seen_at,
+      },
+    });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
+// Premium MVP: activate premium for current user.
+app.post("/api/me/premium/activate", authRequired, (req, res) => {
+  (async () => {
+    const uid = Number(req.user.id);
+    await query(
+      `UPDATE users
+       SET is_premium = TRUE,
+           premium_activated_at = COALESCE(premium_activated_at, now())
+       WHERE id = $1`,
+      [uid]
+    );
+    const r = await query(
+      `SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about, aura_color, messages_sent_count,
+              user_tag, tag_color, tag_style, created_at,
+              referral_code, invited_by, referrals_count,
+              has_custom_bg, has_badge, has_reactions, has_premium_lite,
+              is_premium, premium_activated_at, profile_bg_url
+       FROM users WHERE id = $1`,
+      [uid]
+    );
+    const user = r.rows[0];
+    if (!user) return res.status(404).json({ error: "User not found" });
+    const tags = buildSenderTagsFromRow(user, false);
+    return res.json({
+      user: {
+        id: Number(user.id),
+        username: user.username,
+        avatar: user.avatar_url,
+        role: user.role,
+        banned: Boolean(user.banned),
+        isOnline: Boolean(user.is_online),
+        lastSeenAt: user.last_seen_at,
+        statusKind: user.status_kind || "",
+        statusText: user.status_text || "",
+        about: user.about || "",
+        auraColor: normalizeAuraColorApi(user.aura_color),
+        messageCount: Math.max(0, Number(user.messages_sent_count) || 0),
+        tag: tags.tag,
+        tagColor: tags.tagColor,
+        tagStyle: tags.tagStyle,
+        registrationDate: registrationDateIso(user.created_at),
+        isEarlyTester: isEarlyTesterUser(Number(user.id), user.created_at),
+        referralCode: user.referral_code || "",
+        invitedBy: user.invited_by != null ? Number(user.invited_by) : null,
+        referralsCount: Math.max(0, Number(user.referrals_count) || 0),
+        hasCustomBg: Boolean(user.has_custom_bg),
+        hasBadge: Boolean(user.has_badge),
+        hasReactions: Boolean(user.has_reactions),
+        hasPremiumLite: Boolean(user.has_premium_lite),
+        isPremium: Boolean(user.is_premium),
+        premiumActivatedAt: user.premium_activated_at,
+        profileBackground: user.profile_bg_url || "",
       },
     });
   })().catch(() => res.status(500).json({ error: "Server error" }));
@@ -1193,7 +1302,8 @@ app.get("/api/users/:userId", authRequired, (req, res) => {
     }
     const r = await query(
       `SELECT id, username, avatar_url, aura_color, is_online, last_seen_at, status_kind, status_text, about, messages_sent_count,
-              user_tag, tag_color, tag_style, created_at
+              user_tag, tag_color, tag_style, created_at,
+              is_premium, premium_activated_at, profile_bg_url
        FROM users
        WHERE id = $1`,
       [uid]
@@ -1218,6 +1328,9 @@ app.get("/api/users/:userId", authRequired, (req, res) => {
         tagStyle: tg.tagStyle,
         registrationDate: registrationDateIso(u.created_at),
         isEarlyTester: isEarlyTesterUser(Number(u.id), u.created_at),
+        isPremium: Boolean(u.is_premium),
+        premiumActivatedAt: u.premium_activated_at,
+        profileBackground: u.profile_bg_url || "",
       },
     });
   })().catch(() => res.status(500).json({ error: "Server error" }));

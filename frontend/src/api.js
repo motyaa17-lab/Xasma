@@ -113,10 +113,18 @@ export async function updateMyProfile({ statusKind, statusText, about, auraColor
     about: typeof about === "string" ? about : "",
   };
   if (auraColor !== undefined) body.auraColor = auraColor;
+  if (typeof arguments[0]?.profileBackground === "string") {
+    body.profileBackground = arguments[0].profileBackground;
+  }
   const data = await apiFetch("/api/me/profile", {
     method: "PUT",
     body,
   });
+  return data.user;
+}
+
+export async function activatePremium() {
+  const data = await apiFetch("/api/me/premium/activate", { method: "POST", body: {} });
   return data.user;
 }
 

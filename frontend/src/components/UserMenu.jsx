@@ -7,6 +7,7 @@ import {
   adminPatchUserTag,
   adminSetUserBanned,
   adminSetUserRole,
+  activatePremium,
 } from "../api.js";
 import { compressImageFileToJpegDataUrl } from "../chatBackgroundImage.js";
 import { currentLanguageLabel, localeForLang } from "../i18n.js";
@@ -295,9 +296,13 @@ export default function UserMenu({
   const [profileStatusText, setProfileStatusText] = useState("");
   const [profileAbout, setProfileAbout] = useState("");
   const [profileAuraColor, setProfileAuraColor] = useState(DEFAULT_AURA_COLOR);
+  const [profileBgPreview, setProfileBgPreview] = useState("");
+  const [profileBgBusy, setProfileBgBusy] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaveError, setProfileSaveError] = useState("");
   const [inviteCopied, setInviteCopied] = useState(false);
+  const [premiumBusy, setPremiumBusy] = useState(false);
+  const [premiumNotice, setPremiumNotice] = useState("");
   const chatBgFileInputRef = useRef(null);
   const [chatBgError, setChatBgError] = useState("");
   const [adminUsers, setAdminUsers] = useState([]);
@@ -347,6 +352,7 @@ export default function UserMenu({
     setProfileStatusText(String(me?.statusText || ""));
     setProfileAbout(String(me?.about || ""));
     setProfileAuraColor(String(me?.auraColor || "").trim() || DEFAULT_AURA_COLOR);
+    setProfileBgPreview(String(me?.profileBackground || ""));
     setProfileSaveError("");
   }, [panel, me?.statusKind, me?.statusText, me?.about, me?.auraColor]);
 
@@ -363,6 +369,7 @@ export default function UserMenu({
             : "",
         about: profileAbout,
         auraColor: profileAuraColor,
+        ...(profileBgPreview ? { profileBackground: profileBgPreview } : {}),
       });
     } catch (e) {
       setProfileSaveError(e.message || t("errorGeneric"));
@@ -614,6 +621,18 @@ export default function UserMenu({
             )}
           </div>
 
+          <div className="settingsSectionHeader">{t("premiumTitleShort")}</div>
+          <div className="settingsSection">
+            <SettingsRow
+              label={t("premiumButton")}
+              right={me?.isPremium ? t("premiumActive") : t("premiumInactive")}
+              onClick={() => {
+                setPremiumNotice("");
+                setPanel("premium");
+              }}
+            />
+          </div>
+
           {me?.role === "admin" ? (
             <>
               <div className="settingsSectionHeader">{t("adminPanelTitle")}</div>
@@ -653,6 +672,8 @@ export default function UserMenu({
                     ? t("notifySettingsTitle")
                     : panel === "chatBackground"
                       ? t("chatBackground")
+                      : panel === "premium"
+                        ? t("premiumTitle")
                       : panel === "support"
                         ? t("settingsSupportAuthors")
                         : t("adminPanelTitle")
@@ -936,6 +957,51 @@ export default function UserMenu({
                   ) : null}
                   {chatBgError ? <div className="authError settingsChatBgErr">{chatBgError}</div> : null}
                 </div>
+              </div>
+            ) : panel === "premium" ? (
+              <div className="settingsModalList">
+                <div className="premiumHero">
+                  <div className="premiumTitleRow">{t("premiumTitle")}</div>
+                  <p className="muted small premiumOfferText">{t("premiumOfferText")}</p>
+                </div>
+
+                <div className="settingsSection settingsSection--padded">
+                  <div className="settingsTitle">{t("premiumPerksTitle")}</div>
+                  <ul className="premiumPerks">
+                    <li>{t("premiumPerkBg")}</li>
+                    <li>{t("premiumPerkName")}</li>
+                    <li>{t("premiumPerkMessages")}</li>
+                    <li>{t("premiumPerkFuture")}</li>
+                  </ul>
+                </div>
+
+                <div className="settingsSection settingsSection--padded">
+                  <div className="settingsTitle">{t("premiumPricingTitle")}</div>
+                  <div className="muted small">{t("premiumPricingMvp")}</div>
+                </div>
+
+                {premiumNotice ? <div className="realtimeBanner">{premiumNotice}</div> : null}
+
+                <button
+                  type="button"
+                  className="primaryBtn premiumCtaBtn"
+                  disabled={premiumBusy || me?.isPremium}
+                  onClick={async () => {
+                    setPremiumBusy(true);
+                    setPremiumNotice("");
+                    try {
+                      const u = await activatePremium();
+                      onUpdateMe?.(u);
+                      setPremiumNotice(t("premiumActivated"));
+                    } catch (e) {
+                      setPremiumNotice(e.message || t("errorGeneric"));
+                    } finally {
+                      setPremiumBusy(false);
+                    }
+                  }}
+                >
+                  {me?.isPremium ? t("premiumActive") : t("premiumCta")}
+                </button>
               </div>
             ) : panel === "support" ? (
               <div className="settingsModalList donateSupportModal">
