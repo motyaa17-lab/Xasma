@@ -57,6 +57,32 @@ export function IconSettings(props) {
   );
 }
 
+export function IconDownload(props) {
+  return (
+    <svg {...baseProps(props)} fill="none">
+      <path
+        d="M12 3v10"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M8 10.5L12 13.9l4-3.4"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      <path
+        d="M5 20h14"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function IconEllipsis(props) {
   // Use circles instead of "⋯" so it renders on all platforms/fonts.
   return (

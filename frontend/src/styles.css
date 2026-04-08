@@ -255,6 +255,9 @@ body.body--mobileConversationOpen {
 }
 
 .topBarDownloadBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   padding: 8px 14px;
   border-radius: 10px;
   border: 1px solid rgba(59, 130, 246, 0.45);
@@ -264,6 +267,14 @@ body.body--mobileConversationOpen {
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
+}
+
+.topBarDownloadIcon svg {
+  display: block;
+}
+
+.topBarDownloadText {
+  display: inline-block;
 }
 
 .topBarDownloadBtn:hover {
@@ -360,6 +371,22 @@ body.body--mobileConversationOpen {
   border-radius: 999px;
   background: currentColor;
   opacity: 1;
+}
+
+.menuBtnIcon {
+  display: none;
+}
+
+/* Desktop: show explicit settings icon; keep hamburger as fallback. */
+.appShell--desktop .menuBtnIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text);
+}
+
+.appShell--desktop .hamburger {
+  display: none;
 }
 
 /* Desktop safety: ensure header/menu icons stay visible */

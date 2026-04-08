@@ -6,7 +6,7 @@ import Sidebar from "./components/Sidebar.jsx";
 import Chat from "./components/Chat.jsx";
 import UserMenu from "./components/UserMenu.jsx";
 import InstallDownloadPanel from "./components/InstallDownloadPanel.jsx";
-import { IconChats, IconPhone, IconSettings } from "./components/Icons.jsx";
+import { IconChats, IconPhone, IconSettings, IconDownload } from "./components/Icons.jsx";
 import CallOverlay from "./components/CallOverlay.jsx";
 import CallsScreen from "./components/CallsScreen.jsx";
 import { useIsMobile } from "./hooks/useIsMobile.js";
@@ -1786,8 +1786,13 @@ export default function App() {
             type="button"
             className="topBarDownloadBtn"
             onClick={() => setInstallDownloadOpen(true)}
+            aria-label={t("downloadButton")}
+            title={t("downloadButton")}
           >
-            {t("downloadButton")}
+            <span className="topBarDownloadIcon" aria-hidden>
+              <IconDownload size={18} />
+            </span>
+            <span className="topBarDownloadText">{t("downloadButton")}</span>
           </button>
           <UserMenu {...userMenuProps} variant="dropdown" />
         </div>

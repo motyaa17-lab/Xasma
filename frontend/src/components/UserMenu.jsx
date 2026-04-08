@@ -11,6 +11,7 @@ import {
   adminGrantPremium,
   adminRemovePremium,
 } from "../api.js";
+import { IconSettings } from "./Icons.jsx";
 import { compressImageFileToJpegDataUrl } from "../chatBackgroundImage.js";
 import { currentLanguageLabel, localeForLang } from "../i18n.js";
 import { DONATION_ALERTS_URL } from "../config/donation.js";
@@ -1291,6 +1292,9 @@ export default function UserMenu({
         aria-expanded={open}
         title={t("menu")}
       >
+        <span className="menuBtnIcon" aria-hidden>
+          <IconSettings size={18} />
+        </span>
         <span className="hamburger" aria-hidden="true">
           <span />
           <span />
