@@ -1660,6 +1660,8 @@ export default function App() {
     const statusText = typeof next?.statusText === "string" ? next.statusText : "";
     const about = typeof next?.about === "string" ? next.about : "";
     const auraColor = next?.auraColor !== undefined ? next.auraColor : undefined;
+    const profileBackground =
+      typeof next?.profileBackground === "string" ? String(next.profileBackground) : undefined;
     setMe((prev) =>
       prev
         ? {
@@ -1668,6 +1670,7 @@ export default function App() {
             statusText,
             about,
             ...(auraColor !== undefined ? { auraColor } : {}),
+            ...(profileBackground !== undefined ? { profileBackground } : {}),
           }
         : prev
     );
@@ -1676,6 +1679,7 @@ export default function App() {
       statusText,
       about,
       ...(auraColor !== undefined ? { auraColor } : {}),
+      ...(profileBackground !== undefined ? { profileBackground } : {}),
     });
     setMe(updated);
   }

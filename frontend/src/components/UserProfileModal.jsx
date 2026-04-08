@@ -75,7 +75,15 @@ export default function UserProfileModal({ open, userId, onClose, t, lang = "en"
           {err ? <div className="authError">{err}</div> : null}
           {user ? (
             <div className="userProfileCard">
-              <div className="userProfileHero">
+              <div className={`userProfileHero${user.isPremium && user.profileBackground ? " userProfileHero--hasBg" : ""}`}>
+                {user.isPremium && user.profileBackground ? (
+                  <div
+                    className="userProfileBg"
+                    style={{ backgroundImage: `url(${user.profileBackground})` }}
+                    aria-hidden
+                  />
+                ) : null}
+                <div className="userProfileBgOverlay" aria-hidden />
                 <AvatarAura auraColor={user.auraColor}>
                   <div className="profileAvatar userProfileAvatar userProfileAvatar--xl">
                     {user.avatar ? <img src={user.avatar} alt="" /> : <span>{initials(user.username)}</span>}

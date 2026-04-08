@@ -29,6 +29,14 @@ function formatShortDate(iso) {
   return `${dd}.${mm}.${yy}`;
 }
 
+async function fileToJpegDataUrl(file, { maxSizeBytes } = {}) {
+  if (!file) throw new Error("No file");
+  if (!String(file.type || "").startsWith("image/")) throw new Error("Not an image");
+  if (maxSizeBytes && Number(file.size || 0) > Number(maxSizeBytes)) throw new Error("Too large");
+  // Reuse existing compression helper (keeps payload small enough for DB/HTTP).
+  return compressImageFileToJpegDataUrl(file);
+}
+
 function AdminUserTagEditor({ user, onUpdate, t }) {
   const [tag, setTag] = useState(user.tag || "");
   const [tagColor, setTagColor] = useState(user.tagColor || "#6366f1");
@@ -390,6 +398,25 @@ export default function UserMenu({
       setProfileSaving(false);
     }
   }
+
+  const profileBgInputRef = useRef(null);
+
+  const pickProfileBackground = useCallback(
+    async (file) => {
+      if (!file) return;
+      setProfileBgBusy(true);
+      setProfileSaveError("");
+      try {
+        const dataUrl = await fileToJpegDataUrl(file, { maxSizeBytes: 6_000_000 });
+        setProfileBgPreview(dataUrl);
+      } catch (e) {
+        setProfileSaveError(e.message || t("errorGeneric"));
+      } finally {
+        setProfileBgBusy(false);
+      }
+    },
+    [t]
+  );
 
   async function loadAdminUsers() {
     setAdminLoading(true);
@@ -1392,6 +1419,56 @@ export default function UserMenu({
                 <div className="muted small profileLimitHint">
                   {t("maxAvatarHint")}
                 </div>
+              </div>
+
+              <div className="settingsSection">
+                <div className="settingsTitle">{t("profileBgTitle")}</div>
+                {me?.isPremium ? (
+                  <>
+                    <div className="profileBgPreviewRow">
+                      <div
+                        className="profileBgPreview"
+                        style={{
+                          backgroundImage: profileBgPreview ? `url(${profileBgPreview})` : "none",
+                        }}
+                        aria-label={t("profileBgTitle")}
+                      />
+                      <div className="profileBgPreviewMeta">
+                        <div className="muted small">
+                          {profileBgPreview ? t("profileBgActive") : t("profileBgNone")}
+                        </div>
+                        <div className="profileBgActions">
+                          <input
+                            ref={profileBgInputRef}
+                            className="fileInput"
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => pickProfileBackground(e.target.files?.[0])}
+                          />
+                          <button
+                            type="button"
+                            className="primaryBtn"
+                            onClick={() => profileBgInputRef.current?.click()}
+                            disabled={profileBgBusy}
+                          >
+                            {profileBgBusy ? t("saving") : t("profileBgChoose")}
+                          </button>
+                          <button
+                            type="button"
+                            className="ghostBtn"
+                            onClick={() => setProfileBgPreview("")}
+                            disabled={profileBgBusy}
+                          >
+                            {t("profileBgRemove")}
+                          </button>
+                        </div>
+                        <div className="muted small">{t("profileBgHint")}</div>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="muted small">{t("profileBgPremiumOnly")}</div>
+                )}
               </div>
 
               <div className="settingsSection profileAuraSection">
