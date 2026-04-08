@@ -230,6 +230,8 @@ export default function Chat({
   lang,
   onMobileBack,
   sendRateLimitNotice = "",
+  realtimeReady = true,
+  realtimeSendNotice = "",
   meAuraColor,
   onSetChatPin,
 }) {
@@ -1949,6 +1951,7 @@ export default function Chat({
   const showSendAction =
     composerCanSend && !(voiceRecording || voiceArming || videoRecording || videoArming);
   const sendBlockedByRateLimit = Boolean(sendRateLimitNotice);
+  const sendBlockedByRealtime = !realtimeReady;
 
   const themeAnimatedClass =
     !chatBackgroundImageUrl && chatTheme === "darkGradient"
@@ -2561,6 +2564,9 @@ export default function Chat({
             {isBanned ? <div className="banBanner">{t("authBanned")}</div> : null}
             {uploadError ? <div className="uploadErrBanner">{uploadError}</div> : null}
             {reportFeedback ? <div className="reportToastBanner">{reportFeedback}</div> : null}
+            {sendBlockedByRealtime ? (
+              <div className="realtimeBanner">{realtimeSendNotice || t("realtimeReconnecting")}</div>
+            ) : null}
             {sendRateLimitNotice ? <div className="rateLimitBanner">{sendRateLimitNotice}</div> : null}
             {imageUploading ? <div className="uploadProgressHint">{t("uploadImageProgress")}</div> : null}
             {voiceUploading ? <div className="uploadProgressHint">{t("voiceSending")}</div> : null}
@@ -2619,6 +2625,7 @@ export default function Chat({
                   className="pendingImageRemove"
                   onClick={clearPendingImage}
                   disabled={
+                    sendBlockedByRealtime ||
                     imageUploading ||
                     voiceRecording ||
                     voiceArming ||
@@ -2655,6 +2662,7 @@ export default function Chat({
                 className="attachPhotoBtn"
                 disabled={
                   isBanned ||
+                  sendBlockedByRealtime ||
                   Boolean(editingMessageId) ||
                   imageUploading ||
                   voiceUploading ||
@@ -2722,6 +2730,7 @@ export default function Chat({
                   enterKeyHint={isMobileChat ? "send" : undefined}
                   disabled={
                     isBanned ||
+                    sendBlockedByRealtime ||
                     imageUploading ||
                     voiceRecording ||
                     voiceArming ||
@@ -2751,6 +2760,7 @@ export default function Chat({
                 }${videoPressing ? " videoCamBtn--pressing" : ""}`}
                 disabled={
                   isBanned ||
+                    sendBlockedByRealtime ||
                   Boolean(editingMessageId) ||
                   Boolean(pendingImageUrl) ||
                   voiceRecording ||
@@ -2793,6 +2803,7 @@ export default function Chat({
                   }${voicePressing ? " voiceMicBtn--pressing" : ""}${showSendAction ? " isHidden" : ""}`}
                   disabled={
                     isBanned ||
+                    sendBlockedByRealtime ||
                     Boolean(editingMessageId) ||
                     Boolean(pendingImageUrl) ||
                     imageUploading ||
@@ -2838,6 +2849,7 @@ export default function Chat({
                   onClick={handlePrimary}
                   disabled={
                     isBanned ||
+                    sendBlockedByRealtime ||
                     sendBlockedByRateLimit ||
                     imageUploading ||
                     voiceRecording ||

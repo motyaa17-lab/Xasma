@@ -100,6 +100,7 @@ export default function App() {
   const [mobileTab, setMobileTab] = useState("chats");
   const [installDownloadOpen, setInstallDownloadOpen] = useState(false);
   const [sendRateLimitNotice, setSendRateLimitNotice] = useState("");
+  const [realtimeSendNotice, setRealtimeSendNotice] = useState("");
   const mobileConversationOpen = Boolean(isMobile && mobileTab === "chats" && selectedChatId);
 
   useEffect(() => {
@@ -246,6 +247,7 @@ export default function App() {
 
     socket.on("connect", () => {
       setSocketReady(true);
+      setRealtimeSendNotice("");
       scheduleSocketResync("connect");
     });
     socket.on("disconnect", (reason) => {
@@ -618,6 +620,12 @@ export default function App() {
     return () => window.clearTimeout(id);
   }, [sendRateLimitNotice]);
 
+  useEffect(() => {
+    if (!realtimeSendNotice) return;
+    const id = window.setTimeout(() => setRealtimeSendNotice(""), 6_000);
+    return () => window.clearTimeout(id);
+  }, [realtimeSendNotice]);
+
   async function refreshMessages(chatId) {
     const list = await getMessages(chatId, 50);
     setMessages(list);
@@ -715,7 +723,10 @@ export default function App() {
     const videoUrl = isObj && payload.videoUrl ? String(payload.videoUrl).trim() : "";
     const replyToMessageId = isObj && payload.replyToMessageId ? Number(payload.replyToMessageId) : 0;
     if (!text && !imageUrl && !audioUrl && !videoUrl) return;
-    if (!socketRef.current || !socketReady) return;
+    if (!socketRef.current || !socketReady) {
+      setRealtimeSendNotice(t("realtimeReconnecting"));
+      return;
+    }
     if (!selectedChatId) return;
     if (me?.banned) return;
     const activeChat = chats.find((c) => Number(c.id) === Number(selectedChatId));
@@ -881,6 +892,8 @@ export default function App() {
     t,
     lang: settings.lang,
     sendRateLimitNotice,
+    realtimeReady: socketReady,
+    realtimeSendNotice,
     meAuraColor: me?.auraColor,
     onSetChatPin: handleSetChatPin,
   };

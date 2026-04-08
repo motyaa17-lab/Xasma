@@ -4235,6 +4235,18 @@ body.body--mobileConversationOpen {
   border: 1px solid rgba(251, 191, 36, 0.4);
 }
 
+.realtimeBanner {
+  margin: 0 12px 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  background: rgba(59, 130, 246, 0.14);
+  color: rgba(219, 234, 254, 0.98);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
 .iconCloseBtn {
   border: none;
   background: transparent;
