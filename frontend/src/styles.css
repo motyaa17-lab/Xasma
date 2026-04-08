@@ -3194,6 +3194,56 @@ body.body--mobileConversationOpen {
   animation: msgMenuDropdownIn var(--dur-menu) var(--ease-tg-out) both;
 }
 
+/* ----- Premium message styling (visual-only) ----- */
+@keyframes premiumGlow {
+  0% {
+    box-shadow: 0 0 8px rgba(120, 140, 255, 0.18);
+  }
+  50% {
+    box-shadow: 0 0 14px rgba(120, 140, 255, 0.28);
+  }
+  100% {
+    box-shadow: 0 0 8px rgba(120, 140, 255, 0.18);
+  }
+}
+
+.msgPremium {
+  position: relative;
+  background: linear-gradient(135deg, rgba(80, 120, 255, 0.18), rgba(140, 80, 255, 0.16));
+  border: 1px solid rgba(120, 140, 255, 0.32);
+  box-shadow: 0 0 12px rgba(120, 140, 255, 0.16);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: premiumGlow 3.2s ease-in-out infinite;
+}
+
+.msgPremium::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.10), transparent);
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.msgPremium::after {
+  content: "💎";
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-size: 11px;
+  opacity: 0.55;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 6px rgba(120, 140, 255, 0.18));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .msgPremium {
+    animation: none !important;
+  }
+}
+
 /* Mobile: portal + fixed — not clipped by .messages overflow; stays above composer */
 .msgMenuDropdown--mobileFixed {
   position: fixed;

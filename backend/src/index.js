@@ -620,6 +620,7 @@ function messageRowToApi(mr, reactions = []) {
         tag: null,
         tagColor: DEFAULT_TAG_COLOR,
         tagStyle: "solid",
+        isPremium: false,
       }
     : {
         id: sid,
@@ -628,6 +629,7 @@ function messageRowToApi(mr, reactions = []) {
         auraColor: normalizeAuraColorApi(mr.aura_color),
         messageCount: Math.max(0, Number(mr.messages_sent_count) || 0),
         ...tagInfo,
+        ...computePremiumInfo(mr),
       };
   const replyFromOfficial =
     botId && mr.reply_to_sender_id != null && Number(mr.reply_to_sender_id) === botId;
@@ -671,6 +673,7 @@ async function fetchMessageById(messageId) {
              m.message_type, m.system_kind, m.system_payload, m.image_url, m.audio_url, m.video_url,
              u.username, u.avatar_url, u.aura_color, u.messages_sent_count,
              u.user_tag, u.tag_color, u.tag_style,
+             u.premium_type, u.premium_expires_at, u.premium_granted_at,
              rm.sender_id AS reply_to_sender_id,
              ru.username AS reply_to_sender_username,
              rm.text AS reply_to_text,
@@ -2231,6 +2234,9 @@ app.get("/api/chats/:chatId/messages", authRequired, (req, res) => {
       u.user_tag,
       u.tag_color,
       u.tag_style,
+      u.premium_type,
+      u.premium_expires_at,
+      u.premium_granted_at,
       rm.sender_id AS reply_to_sender_id,
       ru.username AS reply_to_sender_username,
       rm.text AS reply_to_text,

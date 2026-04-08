@@ -2291,6 +2291,8 @@ export default function Chat({
 
                   const msgAura =
                     (m.senderId === meId ? meAuraColor : m.sender?.auraColor) || undefined;
+                  const senderIsPremium = Boolean(m.sender?.isPremium);
+                  const bubblePremiumClass = senderIsPremium ? " msgPremium" : "";
 
                   return (
                 <div
@@ -2327,7 +2329,9 @@ export default function Chat({
                     className={
                       (m.senderId === meId
                         ? `bubble me${showMenuButton ? " bubbleOwn" : ""} bubbleWithActions${bubbleMediaBare}`
-                        : `bubble bubbleWithActions${bubbleMediaBare}`) + (longPressFlashMessageId === m.id ? " bubble--lpFlash" : "")
+                        : `bubble bubbleWithActions${bubbleMediaBare}`) +
+                      bubblePremiumClass +
+                      (longPressFlashMessageId === m.id ? " bubble--lpFlash" : "")
                     }
                     style={
                       ENABLE_SWIPE_TO_REPLY && isMobileChat && swipeMessageId === m.id
