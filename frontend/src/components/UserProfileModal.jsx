@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { getUserById } from "../api.js";
 import AvatarAura from "./AvatarAura.jsx";
 import { formatUserStatusLine } from "../userStatusLine.js";
@@ -28,6 +28,9 @@ export default function UserProfileModal({ open, userId, onClose, t, lang = "en"
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+  const [visible, setVisible] = useState(false);
+  const [phase, setPhase] = useState("in"); // in | out
+  const closeTimerRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -50,14 +53,49 @@ export default function UserProfileModal({ open, userId, onClose, t, lang = "en"
     };
   }, [open, userId]);
 
-  if (!open) return null;
+  useEffect(() => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    if (open) {
+      setVisible(true);
+      setPhase("in");
+      return undefined;
+    }
+    if (visible) {
+      setPhase("out");
+      closeTimerRef.current = window.setTimeout(() => {
+        setVisible(false);
+      }, 220);
+    }
+    return undefined;
+  }, [open, visible]);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    };
+  }, []);
+
+  if (!visible) return null;
 
   const memberSince = user?.registrationDate ? formatMemberSince(user.registrationDate, lang) : "";
+  const premiumMode = Boolean(user?.isPremium);
+  const rootClass = `userProfileModal${premiumMode ? " userProfileModal--premium" : ""}${
+    phase === "out" ? " userProfileModal--out" : " userProfileModal--in"
+  }`;
 
   return (
-    <div className="modalBackdrop modalBackdrop--app" role="presentation" onClick={onClose}>
+    <div
+      className={`modalBackdrop modalBackdrop--app${premiumMode ? " modalBackdrop--premiumProfile" : ""}${
+        phase === "out" ? " modalBackdrop--out" : ""
+      }`}
+      role="presentation"
+      onClick={onClose}
+    >
       <div
-        className="modalCard modalCard--mobileFriendly modalCard--userProfile"
+        className={`modalCard modalCard--mobileFriendly modalCard--userProfile ${rootClass}`}
         role="dialog"
         aria-labelledby="userProfileTitle"
         onClick={(e) => e.stopPropagation()}
@@ -74,9 +112,21 @@ export default function UserProfileModal({ open, userId, onClose, t, lang = "en"
           {loading ? <div className="muted userProfileLoading">{t("loading")}</div> : null}
           {err ? <div className="authError">{err}</div> : null}
           {user ? (
-            <div className="userProfileCard">
-              <div className={`userProfileHero${user.isPremium && user.profileBackground ? " userProfileHero--hasBg" : ""}`}>
-                {user.isPremium && user.profileBackground ? (
+            <div className={`userProfileCard${premiumMode ? " userProfileCard--premium" : ""}`}>
+              <div
+                className={`userProfileHero${
+                  premiumMode && user.profileBackground ? " userProfileHero--hasBg" : ""
+                }${premiumMode ? " userProfileHero--premium" : ""}`}
+              >
+                {premiumMode ? <div className="userProfilePremiumGlow" aria-hidden /> : null}
+                {premiumMode ? (
+                  <div className="userProfilePremiumParticles" aria-hidden>
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                ) : null}
+                {premiumMode && user.profileBackground ? (
                   <div
                     className="userProfileBg"
                     style={{ backgroundImage: `url(${user.profileBackground})` }}
@@ -85,7 +135,7 @@ export default function UserProfileModal({ open, userId, onClose, t, lang = "en"
                 ) : null}
                 <div className="userProfileBgOverlay" aria-hidden />
                 <AvatarAura auraColor={user.auraColor}>
-                  <div className="profileAvatar userProfileAvatar userProfileAvatar--xl">
+                  <div className={`profileAvatar userProfileAvatar userProfileAvatar--xl${premiumMode ? " avatarPremium userProfileAvatar--wow" : ""}`}>
                     {user.avatar ? <img src={user.avatar} alt="" /> : <span>{initials(user.username)}</span>}
                   </div>
                 </AvatarAura>
@@ -98,7 +148,7 @@ export default function UserProfileModal({ open, userId, onClose, t, lang = "en"
                 <h2 className="userProfileDisplayName">
                   <span className={user.isPremium ? "premiumName" : undefined}>
                     {user.username}
-                    {user.isPremium ? <span className="premiumBadge">💎</span> : null}
+                    {user.isPremium ? <span className={`premiumBadge${premiumMode ? " premiumBadge--pop" : ""}`}>💎</span> : null}
                   </span>
                 </h2>
                 <div className="userProfileBadgesRow">
