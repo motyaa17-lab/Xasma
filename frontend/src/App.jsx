@@ -7,6 +7,7 @@ import Chat from "./components/Chat.jsx";
 import UserMenu from "./components/UserMenu.jsx";
 import InstallDownloadPanel from "./components/InstallDownloadPanel.jsx";
 import { IconChats, IconPhone, IconSettings } from "./components/Icons.jsx";
+import CallOverlay from "./components/CallOverlay.jsx";
 import { useIsMobile } from "./hooks/useIsMobile.js";
 import { t as tr, normalizeLang } from "./i18n.js";
 import {
@@ -99,6 +100,17 @@ export default function App() {
   const [installDownloadOpen, setInstallDownloadOpen] = useState(false);
   const [sendRateLimitNotice, setSendRateLimitNotice] = useState("");
   const [realtimeSendNotice, setRealtimeSendNotice] = useState("");
+  const [call, setCall] = useState(() => ({
+    phase: "idle", // idle | calling | ringing | connecting | connected | ended
+    direction: null, // outgoing | incoming
+    callId: null,
+    chatId: null,
+    peerUserId: null,
+    peerUsername: "",
+    peerAvatar: "",
+    muted: false,
+    endedReason: "",
+  }));
   const mobileConversationOpen = Boolean(isMobile && mobileTab === "chats" && selectedChatId);
 
   useEffect(() => {
@@ -128,10 +140,132 @@ export default function App() {
 
   const t = useMemo(() => (key) => tr(settings.lang, key), [settings.lang]);
 
+  const callRef = useRef(call);
+  useEffect(() => {
+    callRef.current = call;
+  }, [call]);
+
   function debugLog(...args) {
     if (!import.meta.env.DEV) return;
     // eslint-disable-next-line no-console
     console.log("[Xasma]", ...args);
+  }
+
+  const callConnectedTimerRef = useRef(null);
+  const outgoingCancelBeforeCallIdRef = useRef(false);
+
+  function clearCallTimers() {
+    if (callConnectedTimerRef.current) {
+      window.clearTimeout(callConnectedTimerRef.current);
+      callConnectedTimerRef.current = null;
+    }
+  }
+
+  function resetCallState() {
+    clearCallTimers();
+    outgoingCancelBeforeCallIdRef.current = false;
+    setCall({
+      phase: "idle",
+      direction: null,
+      callId: null,
+      chatId: null,
+      peerUserId: null,
+      peerUsername: "",
+      peerAvatar: "",
+      muted: false,
+      endedReason: "",
+    });
+  }
+
+  function endCallUi(reason = "") {
+    clearCallTimers();
+    setCall((prev) => {
+      if (prev.phase === "idle") return prev;
+      return { ...prev, phase: "ended", endedReason: String(reason || prev.endedReason || "") };
+    });
+    window.setTimeout(() => {
+      const c = callRef.current;
+      if (c.phase === "ended") resetCallState();
+    }, 900);
+  }
+
+  function beginOutgoingCall({ chatId, other }) {
+    const cid = Number(chatId);
+    if (!cid) return;
+    const c = callRef.current;
+    if (c.phase !== "idle") return;
+    if (!socketRef.current || !socketReady) {
+      setRealtimeSendNotice(t("realtimeReconnecting"));
+      return;
+    }
+
+    outgoingCancelBeforeCallIdRef.current = false;
+    setCall({
+      phase: "calling",
+      direction: "outgoing",
+      callId: null,
+      chatId: cid,
+      peerUserId: other?.id != null ? Number(other.id) : null,
+      peerUsername: String(other?.username || ""),
+      peerAvatar: String(other?.avatar || ""),
+      muted: false,
+      endedReason: "",
+    });
+    socketRef.current.emit("call:invite", { chatId: cid });
+  }
+
+  function acceptIncomingCall() {
+    const c = callRef.current;
+    if (!socketRef.current || !socketReady) return;
+    if (c.phase !== "ringing" || !c.callId) return;
+    socketRef.current.emit("call:accept", { callId: c.callId });
+    setCall((prev) => ({ ...prev, phase: "connecting" }));
+    clearCallTimers();
+    callConnectedTimerRef.current = window.setTimeout(() => {
+      setCall((prev) => (prev.phase === "connecting" ? { ...prev, phase: "connected" } : prev));
+    }, 900);
+  }
+
+  function rejectIncomingCall() {
+    const c = callRef.current;
+    if (!socketRef.current || !socketReady) {
+      endCallUi("rejected");
+      return;
+    }
+    if (c.phase !== "ringing" || !c.callId) {
+      endCallUi("rejected");
+      return;
+    }
+    socketRef.current.emit("call:reject", { callId: c.callId, reason: "rejected" });
+    endCallUi("rejected");
+  }
+
+  function endOrCancelCall() {
+    const c = callRef.current;
+    if (c.phase === "idle") return;
+    if (!socketRef.current || !socketReady) {
+      endCallUi("ended");
+      return;
+    }
+
+    if (!c.callId) {
+      outgoingCancelBeforeCallIdRef.current = true;
+      endCallUi("cancelled");
+      return;
+    }
+
+    if (c.phase === "calling") {
+      socketRef.current.emit("call:reject", { callId: c.callId, reason: "cancelled" });
+      endCallUi("cancelled");
+      return;
+    }
+
+    socketRef.current.emit("call:end", { callId: c.callId, reason: "ended" });
+    endCallUi("ended");
+  }
+
+  function toggleMuteUi() {
+    setCall((prev) => ({ ...prev, muted: !prev.muted }));
   }
 
   function makeClientTempId() {
@@ -382,6 +516,92 @@ export default function App() {
         t: (key) => tr(lang, key),
         onOpenChat: (cid) => openChatFromNotificationRef.current(cid),
       });
+    });
+
+    // ========================
+    // Call signaling (UI only)
+    // ========================
+
+    socket.on("call:incoming", ({ callId, chatId, fromUserId } = {}) => {
+      const c = callRef.current;
+      const id = callId ? String(callId) : "";
+      if (c.phase !== "idle") {
+        // Reject as busy to avoid stuck states.
+        if (id) socket.emit("call:reject", { callId: id, reason: "busy" });
+        return;
+      }
+      const cid = Number(chatId);
+      const row = chats.find((x) => Number(x.id) === cid);
+      const other = row?.other || null;
+      setCall({
+        phase: "ringing",
+        direction: "incoming",
+        callId: id || null,
+        chatId: cid || null,
+        peerUserId:
+          fromUserId != null
+            ? Number(fromUserId)
+            : other?.id != null
+              ? Number(other.id)
+              : null,
+        peerUsername: String(other?.username || ""),
+        peerAvatar: String(other?.avatar || ""),
+        muted: false,
+        endedReason: "",
+      });
+    });
+
+    socket.on("call:ringing", ({ callId, chatId } = {}) => {
+      const c = callRef.current;
+      if (c.phase !== "calling") return;
+      const id = callId ? String(callId) : null;
+      if (!id) return;
+      if (outgoingCancelBeforeCallIdRef.current) {
+        outgoingCancelBeforeCallIdRef.current = false;
+        socket.emit("call:reject", { callId: id, reason: "cancelled" });
+        endCallUi("cancelled");
+        return;
+      }
+      setCall((prev) => ({ ...prev, callId: id, chatId: Number(chatId) || prev.chatId }));
+    });
+
+    socket.on("call:accept", ({ callId } = {}) => {
+      const c = callRef.current;
+      if (!c.callId || String(callId || "") !== String(c.callId)) return;
+      setCall((prev) => ({ ...prev, phase: "connecting" }));
+      clearCallTimers();
+      callConnectedTimerRef.current = window.setTimeout(() => {
+        setCall((prev) => (prev.phase === "connecting" ? { ...prev, phase: "connected" } : prev));
+      }, 900);
+    });
+
+    socket.on("call:connecting", ({ callId } = {}) => {
+      const c = callRef.current;
+      if (!c.callId || String(callId || "") !== String(c.callId)) return;
+      setCall((prev) => ({ ...prev, phase: "connecting" }));
+      clearCallTimers();
+      callConnectedTimerRef.current = window.setTimeout(() => {
+        setCall((prev) => (prev.phase === "connecting" ? { ...prev, phase: "connected" } : prev));
+      }, 900);
+    });
+
+    socket.on("call:reject", ({ callId, reason } = {}) => {
+      const c = callRef.current;
+      if (c.callId && String(callId || "") !== String(c.callId)) return;
+      endCallUi(reason || "rejected");
+    });
+
+    socket.on("call:ended", ({ callId, reason } = {}) => {
+      const c = callRef.current;
+      if (c.callId && String(callId || "") !== String(c.callId)) return;
+      endCallUi(reason || "ended");
+    });
+
+    // Defensive: if server ever emits call:end.
+    socket.on("call:end", ({ callId, reason } = {}) => {
+      const c = callRef.current;
+      if (c.callId && String(callId || "") !== String(c.callId)) return;
+      endCallUi(reason || "ended");
     });
 
     socket.on("user:avatar", ({ userId, avatar }) => {
@@ -652,6 +872,13 @@ export default function App() {
       socket.off("user:profileStatus");
       socket.off("user:messageCount");
       socket.off("chat:sendRateLimited");
+      socket.off("call:incoming");
+      socket.off("call:ringing");
+      socket.off("call:accept");
+      socket.off("call:connecting");
+      socket.off("call:reject");
+      socket.off("call:ended");
+      socket.off("call:end");
       socket.disconnect();
     };
   }, [token, socketEndpoint, me?.id]);
@@ -1115,6 +1342,8 @@ export default function App() {
     realtimeSendNotice,
     meAuraColor: me?.auraColor,
     onSetChatPin: handleSetChatPin,
+    onStartCall: beginOutgoingCall,
+    callUiBlocked: call.phase !== "idle",
   };
 
   const chatPropsDesktop = { ...chatPropsBase, onMobileBack: undefined };
@@ -1284,6 +1513,17 @@ export default function App() {
     </div>
   );
 
+  const callOverlay = (
+    <CallOverlay
+      call={call}
+      t={t}
+      onAccept={acceptIncomingCall}
+      onReject={rejectIncomingCall}
+      onEnd={endOrCancelCall}
+      onToggleMute={toggleMuteUi}
+    />
+  );
+
   return (
     <AppRuntimeErrorBoundary>
       <div className={`appRoot${mobileConversationOpen ? " appRoot--mobileConversationOpen" : ""}`}>
@@ -1293,6 +1533,7 @@ export default function App() {
           desktopShell
         )}
       </div>
+      {callOverlay}
       <InstallDownloadPanel open={installDownloadOpen} onClose={() => setInstallDownloadOpen(false)} t={t} />
     </AppRuntimeErrorBoundary>
   );

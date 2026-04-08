@@ -459,6 +459,40 @@ const io = new Server(server, {
 // Track sockets by authenticated user (direct + group chats).
 const userSockets = new Map(); // userId -> Set(socket.id)
 
+// 1:1 call signaling state (in-memory MVP).
+// NOTE: This is intentionally ephemeral: a server restart ends all calls.
+const activeCalls = new Map(); // callId -> { callId, chatId, callerId, calleeId, state, createdAt, acceptedAt }
+const userActiveCall = new Map(); // userId -> callId
+const callInviteTimers = new Map(); // callId -> timeoutId
+
+function isUserOnline(userId) {
+  const s = userSockets.get(Number(userId));
+  return Boolean(s && s.size > 0);
+}
+
+function endCallInternal(callId, { reason = "ended", endedByUserId = null } = {}) {
+  const id = String(callId || "");
+  const call = activeCalls.get(id);
+  if (!call) return;
+
+  activeCalls.delete(id);
+  callInviteTimers.get(id) && clearTimeout(callInviteTimers.get(id));
+  callInviteTimers.delete(id);
+
+  if (call.callerId) userActiveCall.delete(Number(call.callerId));
+  if (call.calleeId) userActiveCall.delete(Number(call.calleeId));
+
+  const payload = {
+    callId: id,
+    chatId: Number(call.chatId),
+    reason: String(reason || "ended"),
+    endedByUserId: endedByUserId != null ? Number(endedByUserId) : null,
+  };
+
+  emitToUser(Number(call.callerId), "call:ended", payload);
+  emitToUser(Number(call.calleeId), "call:ended", payload);
+}
+
 async function emitToChatMemberSockets(chatId, event, payload) {
   const ids = await getChatMemberUserIds(chatId);
   const recipients = new Set();
@@ -2540,6 +2574,11 @@ io.on("connection", (socket) => {
     set.delete(socket.id);
     if (set.size === 0) {
       userSockets.delete(userId);
+
+      // If user had an active call, end it (covers app kill / network drop).
+      const callId = userActiveCall.get(Number(userId));
+      if (callId) endCallInternal(callId, { reason: "disconnect", endedByUserId: Number(userId) });
+
       (async () => {
         await query(`UPDATE users SET is_online = FALSE, last_seen_at = now() WHERE id = $1`, [Number(userId)]);
         const row = await query(`SELECT last_seen_at FROM users WHERE id = $1`, [Number(userId)]);
@@ -2591,6 +2630,134 @@ io.on("connection", (socket) => {
     }
     }
   );
+
+  // ========================
+  // 1:1 Audio call signaling
+  // ========================
+
+  socket.on("call:invite", async ({ chatId } = {}) => {
+    const cid = Number(chatId);
+    if (!cid) return;
+
+    // Only allow calls in direct chats.
+    const chat = await getChatById(cid);
+    if (!chat || chat.type !== "direct") return;
+    if (!(await isUserChatMember(cid, Number(userId)))) return;
+
+    const callerId = Number(userId);
+    const calleeId =
+      chat.user1_id != null && Number(chat.user1_id) === callerId
+        ? Number(chat.user2_id)
+        : chat.user2_id != null && Number(chat.user2_id) === callerId
+          ? Number(chat.user1_id)
+          : 0;
+    if (!calleeId) return;
+
+    // Busy guard.
+    if (userActiveCall.get(callerId) || userActiveCall.get(calleeId)) {
+      socket.emit("call:reject", { chatId: cid, reason: "busy" });
+      return;
+    }
+
+    const callId = crypto.randomUUID();
+    const createdAt = new Date().toISOString();
+    const call = { callId, chatId: cid, callerId, calleeId, state: "ringing", createdAt, acceptedAt: null };
+    activeCalls.set(callId, call);
+    userActiveCall.set(callerId, callId);
+    userActiveCall.set(calleeId, callId);
+
+    // Notify caller UI that we're ringing (even if callee offline).
+    socket.emit("call:ringing", { callId, chatId: cid, toUserId: calleeId });
+
+    // If callee is online, send incoming event; otherwise let it timeout as "offline".
+    if (isUserOnline(calleeId)) {
+      emitToUser(calleeId, "call:incoming", { callId, chatId: cid, fromUserId: callerId });
+    }
+
+    // Unanswered timeout -> missed/offline.
+    const timeoutMs = 28_000;
+    const tid = setTimeout(() => {
+      const c = activeCalls.get(callId);
+      if (!c) return;
+      const reason = isUserOnline(calleeId) ? "missed" : "offline";
+      endCallInternal(callId, { reason, endedByUserId: null });
+    }, timeoutMs);
+    callInviteTimers.set(callId, tid);
+  });
+
+  socket.on("call:accept", async ({ callId } = {}) => {
+    const id = String(callId || "");
+    const call = activeCalls.get(id);
+    if (!call) return;
+    if (Number(call.calleeId) !== Number(userId)) return;
+    if (!(await isUserChatMember(Number(call.chatId), Number(userId)))) return;
+
+    call.state = "connecting";
+    call.acceptedAt = new Date().toISOString();
+    activeCalls.set(id, call);
+
+    callInviteTimers.get(id) && clearTimeout(callInviteTimers.get(id));
+    callInviteTimers.delete(id);
+
+    emitToUser(Number(call.callerId), "call:accept", { callId: id, chatId: Number(call.chatId) });
+    emitToUser(Number(call.calleeId), "call:connecting", { callId: id, chatId: Number(call.chatId) });
+  });
+
+  socket.on("call:reject", async ({ callId, reason } = {}) => {
+    const id = String(callId || "");
+    const call = activeCalls.get(id);
+    if (!call) return;
+    // Either participant may reject/cancel before connect.
+    const uid = Number(userId);
+    if (uid !== Number(call.callerId) && uid !== Number(call.calleeId)) return;
+    if (!(await isUserChatMember(Number(call.chatId), uid))) return;
+    endCallInternal(id, { reason: reason || "rejected", endedByUserId: uid });
+  });
+
+  socket.on("call:end", async ({ callId, reason } = {}) => {
+    const id = String(callId || "");
+    const call = activeCalls.get(id);
+    if (!call) return;
+    const uid = Number(userId);
+    if (uid !== Number(call.callerId) && uid !== Number(call.calleeId)) return;
+    if (!(await isUserChatMember(Number(call.chatId), uid))) return;
+    endCallInternal(id, { reason: reason || "ended", endedByUserId: uid });
+  });
+
+  function relayToOther(call, fromUserId, event, payload) {
+    const other = Number(fromUserId) === Number(call.callerId) ? Number(call.calleeId) : Number(call.callerId);
+    emitToUser(other, event, payload);
+  }
+
+  socket.on("webrtc:offer", async ({ callId, sdp } = {}) => {
+    const id = String(callId || "");
+    const call = activeCalls.get(id);
+    if (!call) return;
+    const uid = Number(userId);
+    if (uid !== Number(call.callerId) && uid !== Number(call.calleeId)) return;
+    if (call.state !== "connecting" && call.state !== "connected") return;
+    relayToOther(call, uid, "webrtc:offer", { callId: id, sdp });
+  });
+
+  socket.on("webrtc:answer", async ({ callId, sdp } = {}) => {
+    const id = String(callId || "");
+    const call = activeCalls.get(id);
+    if (!call) return;
+    const uid = Number(userId);
+    if (uid !== Number(call.callerId) && uid !== Number(call.calleeId)) return;
+    if (call.state !== "connecting" && call.state !== "connected") return;
+    relayToOther(call, uid, "webrtc:answer", { callId: id, sdp });
+  });
+
+  socket.on("webrtc:ice-candidate", async ({ callId, candidate } = {}) => {
+    const id = String(callId || "");
+    const call = activeCalls.get(id);
+    if (!call) return;
+    const uid = Number(userId);
+    if (uid !== Number(call.callerId) && uid !== Number(call.calleeId)) return;
+    if (call.state !== "connecting" && call.state !== "connected") return;
+    relayToOther(call, uid, "webrtc:ice-candidate", { callId: id, candidate });
+  });
 
   socket.on("chat:read", async ({ chatId, upToMessageId } = {}) => {
     const cid = Number(chatId);

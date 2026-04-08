@@ -8,7 +8,7 @@ import CircleVideoMessage from "./CircleVideoMessage.jsx";
 import UserProfileModal from "./UserProfileModal.jsx";
 import ActivityBadge from "./ActivityBadge.jsx";
 import UserTagBadge from "./UserTagBadge.jsx";
-import { IconEllipsis } from "./Icons.jsx";
+import { IconEllipsis, IconPhone } from "./Icons.jsx";
 import { localeForLang } from "../i18n.js";
 import { formatUserStatusLine } from "../userStatusLine.js";
 
@@ -219,6 +219,8 @@ export default function Chat({
   chatBackgroundImageUrl = null,
   onSend,
   onRetrySend,
+  onStartCall,
+  callUiBlocked = false,
   onEditMessage,
   onToggleReaction,
   isAdmin,
@@ -248,6 +250,7 @@ export default function Chat({
   const isOfficial = chat?.type === "official";
   const isMobileChat = Boolean(onMobileBack);
   const channelReadOnly = Boolean(isChannel && chat?.canPostMessage === false);
+  const canShowCallButton = Boolean(chatId && !isRoom && !isOfficial && chat?.other?.id);
 
   const canPinForUser = useMemo(() => {
     if (!chat || isOfficial) return false;
@@ -2168,6 +2171,20 @@ export default function Chat({
                 </div>
               )}
             </div>
+            {canShowCallButton ? (
+              <button
+                type="button"
+                className="chatHeaderCallBtn"
+                onClick={() => onStartCall?.({ chatId: Number(chatId), other: chat?.other || null })}
+                aria-label={t("callAudio")}
+                title={t("callAudio")}
+                disabled={callUiBlocked}
+              >
+                <span className="chatHeaderCallIcon" aria-hidden>
+                  <IconPhone size={18} />
+                </span>
+              </button>
+            ) : null}
             {isRoom ? (
               <button
                 type="button"

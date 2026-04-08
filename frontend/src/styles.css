@@ -1363,6 +1363,156 @@ body.body--mobileConversationOpen {
   transform: scale(0.92);
 }
 
+.chatHeaderCallBtn {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  cursor: pointer;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    transform var(--dur-tap) var(--ease-tg-snappy),
+    background 0.14s ease,
+    border-color 0.14s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chatHeaderCallBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.chatHeaderCallBtn:active {
+  transform: scale(0.92);
+}
+
+.chatHeaderCallBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.chatHeaderCallIcon svg {
+  display: block;
+}
+
+.callOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.58);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.callCard {
+  width: min(520px, 96vw);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(17, 27, 46, 0.98);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55);
+  padding: 16px;
+}
+
+.callStatus {
+  font-weight: 900;
+  letter-spacing: 0.01em;
+  margin-bottom: 12px;
+}
+
+.callPeer {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.callAvatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+}
+
+.callAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.callPeerName {
+  font-weight: 900;
+  font-size: 16px;
+  margin-bottom: 2px;
+}
+
+.callActions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.callBtn {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(229, 231, 235, 0.98);
+  font-weight: 900;
+  padding: 10px 14px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition:
+    transform var(--dur-tap) var(--ease-tg-snappy),
+    background 0.14s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.callBtn--primary {
+  background: rgba(37, 99, 235, 0.22);
+  border-color: rgba(37, 99, 235, 0.36);
+}
+
+.callBtn--danger {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.30);
+}
+
+.callBtn--ghost {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.callBtn:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.callBtn--primary:hover {
+  background: rgba(37, 99, 235, 0.28);
+}
+
+.callBtn--danger:hover {
+  background: rgba(239, 68, 68, 0.22);
+}
+
+.callBtn:active {
+  transform: scale(0.97);
+}
+
 .groupInfoModal {
   width: 440px;
   max-width: 96vw;
