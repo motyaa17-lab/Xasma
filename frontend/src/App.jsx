@@ -84,11 +84,8 @@ export default function App() {
 
   const socketRef = useRef(null);
   const selectedChatIdRef = useRef(null);
-  const chatsRefreshTimer = useRef(null);
-  const chatsPresenceRefreshTimer = useRef(null);
   const lastReadSentRef = useRef({}); // chatId -> messageId
   const readEmitTimerRef = useRef(null);
-  const chatsRefreshAfterStatusTimerRef = useRef(null);
   const socketResyncTimerRef = useRef(null);
   const lastSocketResyncAtRef = useRef(0);
   const mobileInboxSidebarRef = useRef(null);
@@ -134,6 +131,31 @@ export default function App() {
     if (!import.meta.env.DEV) return;
     // eslint-disable-next-line no-console
     console.log("[Xasma]", ...args);
+  }
+
+  function previewTextForMessage(msg) {
+    const text = String(msg?.text ?? "").replace(/\s+/g, " ").trim();
+    if (text) return text;
+    if (msg?.videoUrl) return t("notifyPreviewVideo");
+    if (msg?.audioUrl) return t("notifyPreviewVoice");
+    if (msg?.imageUrl) return t("notifyPreviewPhoto");
+    if (msg?.type === "system") return "[Event]";
+    return "…";
+  }
+
+  function reorderChatsByActivity(nextChats, chatIdToBump) {
+    const cid = Number(chatIdToBump);
+    if (!cid) return nextChats;
+    const idx = nextChats.findIndex((c) => Number(c.id) === cid);
+    if (idx < 0) return nextChats;
+    const chat = nextChats[idx];
+    const rest = nextChats.slice(0, idx).concat(nextChats.slice(idx + 1));
+    const pinned = [];
+    const unpinned = [];
+    for (const c of rest) (c.listPinned ? pinned : unpinned).push(c);
+    if (chat.listPinned) pinned.unshift(chat);
+    else unpinned.unshift(chat);
+    return pinned.concat(unpinned);
   }
 
   function markBanned() {
@@ -292,15 +314,32 @@ export default function App() {
         }
       }
 
-      if (chatsRefreshTimer.current) clearTimeout(chatsRefreshTimer.current);
-      chatsRefreshTimer.current = setTimeout(async () => {
-        try {
-          const list = await getChats();
-          setChats(list);
-        } catch {
-          // ignore
-        }
-      }, 250);
+      // Keep chat list fresh without full refresh:
+      // update the affected chat row (last preview, time, unread count) and bump it to top of its section.
+      setChats((prev) => {
+        const cid = Number(msg?.chatId);
+        if (!cid) return prev;
+        const now = Date.now();
+        const open = Number(openChatId || 0);
+        const isIncoming =
+          me?.id &&
+          msg?.senderId &&
+          Number(msg.senderId) !== Number(me.id) &&
+          msg?.type !== "system";
+        const treatAsUnread = Boolean(isIncoming && (open !== cid || !isWindowActive()));
+
+        const next = prev.map((c) => {
+          if (Number(c.id) !== cid) return c;
+          const last = {
+            text: previewTextForMessage(msg),
+            createdAt: msg.createdAt || new Date(now).toISOString(),
+            senderId: msg.senderId != null ? Number(msg.senderId) : null,
+          };
+          const unreadCount = treatAsUnread ? Math.max(0, Number(c.unreadCount) || 0) + 1 : c.unreadCount;
+          return { ...c, last, unreadCount };
+        });
+        return reorderChatsByActivity(next, cid);
+      });
 
       const lang = normalizeLang(settingsRef.current?.lang);
       tryShowIncomingMessageNotification(msg, {
@@ -349,16 +388,6 @@ export default function App() {
             : m
         )
       );
-
-      if (chatsPresenceRefreshTimer.current) clearTimeout(chatsPresenceRefreshTimer.current);
-      chatsPresenceRefreshTimer.current = setTimeout(async () => {
-        try {
-          const list = await getChats();
-          setChats(list);
-        } catch {
-          // ignore
-        }
-      }, 220);
     });
 
     socket.on("chat:typing", ({ chatId, userId, isTyping }) => {
@@ -390,16 +419,6 @@ export default function App() {
           };
         })
       );
-      if (chatsRefreshAfterStatusTimerRef.current) clearTimeout(chatsRefreshAfterStatusTimerRef.current);
-      chatsRefreshAfterStatusTimerRef.current = setTimeout(async () => {
-        chatsRefreshAfterStatusTimerRef.current = null;
-        try {
-          const list = await getChats();
-          setChats(list);
-        } catch {
-          // ignore
-        }
-      }, 220);
     });
 
     socket.on("message:edited", ({ chatId, message }) => {
@@ -562,10 +581,6 @@ export default function App() {
       if (socketResyncTimerRef.current) {
         window.clearTimeout(socketResyncTimerRef.current);
         socketResyncTimerRef.current = null;
-      }
-      if (chatsRefreshAfterStatusTimerRef.current) {
-        clearTimeout(chatsRefreshAfterStatusTimerRef.current);
-        chatsRefreshAfterStatusTimerRef.current = null;
       }
       socket.off("connect_error");
       socket.io?.off?.("reconnect");
