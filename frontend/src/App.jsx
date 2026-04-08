@@ -331,6 +331,7 @@ export default function App() {
         const next = prev.map((c) => {
           if (Number(c.id) !== cid) return c;
           const last = {
+            id: msg.id != null ? Number(msg.id) : null,
             text: previewTextForMessage(msg),
             createdAt: msg.createdAt || new Date(now).toISOString(),
             senderId: msg.senderId != null ? Number(msg.senderId) : null,
@@ -428,6 +429,15 @@ export default function App() {
       setMessages((prev) =>
         prev.map((m) => (m.id === message.id ? { ...m, ...message } : m))
       );
+
+      // If the edited message is the chat list "last", update its preview text in-place.
+      setChats((prev) =>
+        prev.map((c) => {
+          if (Number(c.id) !== Number(chatId)) return c;
+          if (!c.last || Number(c.last.id) !== Number(message.id)) return c;
+          return { ...c, last: { ...c.last, text: previewTextForMessage(message) } };
+        })
+      );
     });
 
     socket.on("message:reactionsUpdated", ({ chatId, messageId, reactions }) => {
@@ -448,11 +458,19 @@ export default function App() {
         setMessages((prev) => prev.filter((m) => Number(m.id) !== mid));
       }
       setChats((prev) =>
-        prev.map((c) =>
-          c.id === cid && Number(c.pinnedMessageId) === mid
-            ? { ...c, pinnedMessageId: null, pinnedPreview: null }
-            : c
-        )
+        prev.map((c) => {
+          if (Number(c.id) !== cid) return c;
+          const unpin =
+            Number(c.pinnedMessageId) === mid ? { pinnedMessageId: null, pinnedPreview: null } : null;
+
+          // If the deleted message is the chat list "last", update preview accordingly.
+          if (c.last && Number(c.last.id) === mid) {
+            const last = { ...c.last, text: t("noMessages"), id: null };
+            return { ...c, ...(unpin || {}), last };
+          }
+
+          return unpin ? { ...c, ...unpin } : c;
+        })
       );
     });
 
