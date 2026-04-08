@@ -8,6 +8,7 @@ import UserMenu from "./components/UserMenu.jsx";
 import InstallDownloadPanel from "./components/InstallDownloadPanel.jsx";
 import { IconChats, IconPhone, IconSettings } from "./components/Icons.jsx";
 import CallOverlay from "./components/CallOverlay.jsx";
+import CallsScreen from "./components/CallsScreen.jsx";
 import { useIsMobile } from "./hooks/useIsMobile.js";
 import { t as tr, normalizeLang } from "./i18n.js";
 import {
@@ -109,8 +110,18 @@ export default function App() {
     peerUsername: "",
     peerAvatar: "",
     muted: false,
+    connectedAtMs: 0,
     endedReason: "",
   }));
+  const [callLogs, setCallLogs] = useState(() => {
+    try {
+      const raw = localStorage.getItem("callLogs");
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
   const mobileConversationOpen = Boolean(isMobile && mobileTab === "chats" && selectedChatId);
 
   useEffect(() => {
@@ -145,6 +156,38 @@ export default function App() {
     callRef.current = call;
   }, [call]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem("callLogs", JSON.stringify(callLogs.slice(0, 250)));
+    } catch {
+      // ignore
+    }
+  }, [callLogs]);
+
+  const chatsRef = useRef(chats);
+  useEffect(() => {
+    chatsRef.current = chats;
+  }, [chats]);
+
+  const activeCallLogIdRef = useRef(null); // string | null
+
+  function newId() {
+    try {
+      if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+    } catch {
+      // ignore
+    }
+    return `log_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  }
+
+  function upsertActiveCallLog(patch) {
+    const id = activeCallLogIdRef.current;
+    if (!id) return;
+    setCallLogs((prev) =>
+      prev.map((x) => (String(x.id) === String(id) ? { ...x, ...patch } : x))
+    );
+  }
+
   function debugLog(...args) {
     if (!import.meta.env.DEV) return;
     // eslint-disable-next-line no-console
@@ -173,6 +216,7 @@ export default function App() {
       peerUsername: "",
       peerAvatar: "",
       muted: false,
+      connectedAtMs: 0,
       endedReason: "",
     });
   }
@@ -200,6 +244,27 @@ export default function App() {
     }
 
     outgoingCancelBeforeCallIdRef.current = false;
+    // Create call log immediately.
+    const logId = newId();
+    activeCallLogIdRef.current = logId;
+    const now = new Date().toISOString();
+    setCallLogs((prev) => [
+      {
+        id: logId,
+        callerId: Number(me?.id || 0),
+        receiverId: other?.id != null ? Number(other.id) : null,
+        chatId: Number(cid),
+        direction: "outgoing",
+        status: "missed", // will be corrected on accept/decline/answer
+        startedAt: now,
+        endedAt: null,
+        peerUserId: other?.id != null ? Number(other.id) : null,
+        peerUsername: String(other?.username || ""),
+        peerAvatar: String(other?.avatar || ""),
+      },
+      ...prev,
+    ]);
+
     setCall({
       phase: "calling",
       direction: "outgoing",
@@ -209,6 +274,7 @@ export default function App() {
       peerUsername: String(other?.username || ""),
       peerAvatar: String(other?.avatar || ""),
       muted: false,
+      connectedAtMs: 0,
       endedReason: "",
     });
     socketRef.current.emit("call:invite", { chatId: cid });
@@ -219,10 +285,15 @@ export default function App() {
     if (!socketRef.current || !socketReady) return;
     if (c.phase !== "ringing" || !c.callId) return;
     socketRef.current.emit("call:accept", { callId: c.callId });
-    setCall((prev) => ({ ...prev, phase: "connecting" }));
+    setCall((prev) => ({ ...prev, phase: "connecting", connectedAtMs: 0 }));
+    upsertActiveCallLog({ status: "answered" });
     clearCallTimers();
     callConnectedTimerRef.current = window.setTimeout(() => {
-      setCall((prev) => (prev.phase === "connecting" ? { ...prev, phase: "connected" } : prev));
+      setCall((prev) =>
+        prev.phase === "connecting"
+          ? { ...prev, phase: "connected", connectedAtMs: prev.connectedAtMs || Date.now() }
+          : prev
+      );
     }, 900);
   }
 
@@ -237,6 +308,7 @@ export default function App() {
       return;
     }
     socketRef.current.emit("call:reject", { callId: c.callId, reason: "rejected" });
+    upsertActiveCallLog({ status: "declined", endedAt: new Date().toISOString() });
     endCallUi("rejected");
   }
 
@@ -250,23 +322,203 @@ export default function App() {
 
     if (!c.callId) {
       outgoingCancelBeforeCallIdRef.current = true;
+      upsertActiveCallLog({ status: "declined", endedAt: new Date().toISOString() });
       endCallUi("cancelled");
       return;
     }
 
     if (c.phase === "calling") {
       socketRef.current.emit("call:reject", { callId: c.callId, reason: "cancelled" });
+      upsertActiveCallLog({ status: "declined", endedAt: new Date().toISOString() });
       endCallUi("cancelled");
       return;
     }
 
     socketRef.current.emit("call:end", { callId: c.callId, reason: "ended" });
+    upsertActiveCallLog({ status: "answered", endedAt: new Date().toISOString() });
     endCallUi("ended");
   }
 
   function toggleMuteUi() {
     setCall((prev) => ({ ...prev, muted: !prev.muted }));
   }
+
+  // ========================
+  // WebRTC (audio only)
+  // ========================
+
+  const pcRef = useRef(null); // RTCPeerConnection | null
+  const localStreamRef = useRef(null); // MediaStream | null
+  const remoteStreamRef = useRef(null); // MediaStream | null
+  const remoteAudioRef = useRef(null); // HTMLAudioElement | null
+  const pendingIceRef = useRef([]); // RTCIceCandidateInit[]
+
+  function cleanupWebrtc() {
+    try {
+      if (pcRef.current) {
+        pcRef.current.onicecandidate = null;
+        pcRef.current.ontrack = null;
+        pcRef.current.onconnectionstatechange = null;
+        try {
+          pcRef.current.close();
+        } catch {
+          // ignore
+        }
+      }
+    } finally {
+      pcRef.current = null;
+    }
+
+    try {
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((t) => t.stop());
+      }
+    } finally {
+      localStreamRef.current = null;
+    }
+
+    remoteStreamRef.current = null;
+    pendingIceRef.current = [];
+
+    const el = remoteAudioRef.current;
+    if (el) {
+      try {
+        el.srcObject = null;
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  async function ensureLocalAudioOrFail() {
+    if (localStreamRef.current) return localStreamRef.current;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      localStreamRef.current = stream;
+      return stream;
+    } catch (e) {
+      debugLog("getUserMedia failed", e?.message || e);
+      // End call on mic denial/failure.
+      endOrCancelCall();
+      return null;
+    }
+  }
+
+  function ensurePeerConnection(callId) {
+    if (pcRef.current) return pcRef.current;
+    const id = String(callId || "");
+    const socket = socketRef.current;
+    if (!socket || !id) return null;
+
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    });
+
+    pc.onicecandidate = (ev) => {
+      if (!ev.candidate) return;
+      socket.emit("webrtc:ice-candidate", { callId: id, candidate: ev.candidate.toJSON() });
+    };
+
+    pc.ontrack = (ev) => {
+      const stream = ev.streams && ev.streams[0] ? ev.streams[0] : null;
+      if (!stream) return;
+      remoteStreamRef.current = stream;
+      const el = remoteAudioRef.current;
+      if (el) {
+        try {
+          el.srcObject = stream;
+          const p = el.play?.();
+          if (p && typeof p.catch === "function") p.catch(() => {});
+        } catch {
+          // ignore
+        }
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      const st = pc.connectionState;
+      if (st === "connected") {
+        // Do not rewrite phase logic; only advance from connecting if still there.
+        setCall((prev) =>
+          prev.phase === "connecting"
+            ? { ...prev, phase: "connected", connectedAtMs: prev.connectedAtMs || Date.now() }
+            : prev
+        );
+      }
+      if (st === "failed" || st === "disconnected") {
+        debugLog("webrtc connectionState", st);
+        endOrCancelCall();
+      }
+    };
+
+    pcRef.current = pc;
+    return pc;
+  }
+
+  async function flushPendingIce(pc) {
+    const list = pendingIceRef.current;
+    if (!list.length) return;
+    pendingIceRef.current = [];
+    for (const c of list) {
+      try {
+        await pc.addIceCandidate(c);
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  useEffect(() => {
+    // Cleanup when call leaves active phases.
+    if (call.phase === "idle" || call.phase === "ended") {
+      cleanupWebrtc();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [call.phase]);
+
+  useEffect(() => {
+    // Start WebRTC setup when entering "connecting".
+    if (call.phase !== "connecting") return;
+    if (!call.callId) return;
+
+    let cancelled = false;
+    (async () => {
+      const stream = await ensureLocalAudioOrFail();
+      if (!stream || cancelled) return;
+
+      const pc = ensurePeerConnection(call.callId);
+      if (!pc || cancelled) return;
+
+      // Attach local tracks once.
+      const already = new Set(pc.getSenders().map((s) => s.track).filter(Boolean));
+      stream.getTracks().forEach((tr) => {
+        if (already.has(tr)) return;
+        try {
+          pc.addTrack(tr, stream);
+        } catch {
+          // ignore
+        }
+      });
+
+      // Caller creates and sends offer.
+      if (call.direction === "outgoing") {
+        try {
+          const offer = await pc.createOffer({ offerToReceiveAudio: true });
+          if (cancelled) return;
+          await pc.setLocalDescription(offer);
+          socketRef.current?.emit("webrtc:offer", { callId: String(call.callId), sdp: pc.localDescription });
+        } catch (e) {
+          debugLog("createOffer/setLocalDescription failed", e?.message || e);
+          endOrCancelCall();
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [call.phase, call.callId, call.direction]);
 
   function makeClientTempId() {
     try {
@@ -531,8 +783,27 @@ export default function App() {
         return;
       }
       const cid = Number(chatId);
-      const row = chats.find((x) => Number(x.id) === cid);
+      const row = chatsRef.current.find((x) => Number(x.id) === cid);
       const other = row?.other || null;
+      const logId = newId();
+      activeCallLogIdRef.current = logId;
+      const now = new Date().toISOString();
+      setCallLogs((prev) => [
+        {
+          id: logId,
+          callerId: fromUserId != null ? Number(fromUserId) : null,
+          receiverId: Number(me?.id || 0),
+          chatId: cid || null,
+          direction: "incoming",
+          status: "missed", // becomes answered/declined if user acts
+          startedAt: now,
+          endedAt: null,
+          peerUserId: other?.id != null ? Number(other.id) : fromUserId != null ? Number(fromUserId) : null,
+          peerUsername: String(other?.username || ""),
+          peerAvatar: String(other?.avatar || ""),
+        },
+        ...prev,
+      ]);
       setCall({
         phase: "ringing",
         direction: "incoming",
@@ -547,6 +818,7 @@ export default function App() {
         peerUsername: String(other?.username || ""),
         peerAvatar: String(other?.avatar || ""),
         muted: false,
+        connectedAtMs: 0,
         endedReason: "",
       });
     });
@@ -569,9 +841,14 @@ export default function App() {
       const c = callRef.current;
       if (!c.callId || String(callId || "") !== String(c.callId)) return;
       setCall((prev) => ({ ...prev, phase: "connecting" }));
+      upsertActiveCallLog({ status: "answered" });
       clearCallTimers();
       callConnectedTimerRef.current = window.setTimeout(() => {
-        setCall((prev) => (prev.phase === "connecting" ? { ...prev, phase: "connected" } : prev));
+        setCall((prev) =>
+          prev.phase === "connecting"
+            ? { ...prev, phase: "connected", connectedAtMs: prev.connectedAtMs || Date.now() }
+            : prev
+        );
       }, 900);
     });
 
@@ -581,27 +858,108 @@ export default function App() {
       setCall((prev) => ({ ...prev, phase: "connecting" }));
       clearCallTimers();
       callConnectedTimerRef.current = window.setTimeout(() => {
-        setCall((prev) => (prev.phase === "connecting" ? { ...prev, phase: "connected" } : prev));
+        setCall((prev) =>
+          prev.phase === "connecting"
+            ? { ...prev, phase: "connected", connectedAtMs: prev.connectedAtMs || Date.now() }
+            : prev
+        );
       }, 900);
     });
 
     socket.on("call:reject", ({ callId, reason } = {}) => {
       const c = callRef.current;
       if (c.callId && String(callId || "") !== String(c.callId)) return;
-      endCallUi(reason || "rejected");
+      const r = String(reason || "rejected");
+      const status = r === "busy" || r === "rejected" || r === "cancelled" ? "declined" : "missed";
+      upsertActiveCallLog({ status, endedAt: new Date().toISOString() });
+      endCallUi(r);
     });
 
     socket.on("call:ended", ({ callId, reason } = {}) => {
       const c = callRef.current;
       if (c.callId && String(callId || "") !== String(c.callId)) return;
-      endCallUi(reason || "ended");
+      const r = String(reason || "ended");
+      const status = r === "missed" || r === "offline" ? "missed" : "answered";
+      upsertActiveCallLog({ status, endedAt: new Date().toISOString() });
+      endCallUi(r);
     });
 
     // Defensive: if server ever emits call:end.
     socket.on("call:end", ({ callId, reason } = {}) => {
       const c = callRef.current;
       if (c.callId && String(callId || "") !== String(c.callId)) return;
-      endCallUi(reason || "ended");
+      const r = String(reason || "ended");
+      upsertActiveCallLog({ status: "answered", endedAt: new Date().toISOString() });
+      endCallUi(r);
+    });
+
+    // ========================
+    // WebRTC signaling relay
+    // ========================
+
+    socket.on("webrtc:offer", async ({ callId, sdp } = {}) => {
+      const c = callRef.current;
+      if (!c.callId || String(callId || "") !== String(c.callId)) return;
+      if (c.phase !== "connecting" && c.phase !== "connected") return;
+
+      const stream = await ensureLocalAudioOrFail();
+      if (!stream) return;
+      const pc = ensurePeerConnection(String(callId));
+      if (!pc) return;
+
+      // Attach local tracks once.
+      const already = new Set(pc.getSenders().map((s) => s.track).filter(Boolean));
+      stream.getTracks().forEach((tr) => {
+        if (already.has(tr)) return;
+        try {
+          pc.addTrack(tr, stream);
+        } catch {
+          // ignore
+        }
+      });
+
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+        await flushPendingIce(pc);
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        socket.emit("webrtc:answer", { callId: String(callId), sdp: pc.localDescription });
+      } catch (e) {
+        debugLog("handle offer failed", e?.message || e);
+        endOrCancelCall();
+      }
+    });
+
+    socket.on("webrtc:answer", async ({ callId, sdp } = {}) => {
+      const c = callRef.current;
+      if (!c.callId || String(callId || "") !== String(c.callId)) return;
+      if (c.phase !== "connecting" && c.phase !== "connected") return;
+      const pc = pcRef.current;
+      if (!pc) return;
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+        await flushPendingIce(pc);
+      } catch (e) {
+        debugLog("handle answer failed", e?.message || e);
+        endOrCancelCall();
+      }
+    });
+
+    socket.on("webrtc:ice-candidate", async ({ callId, candidate } = {}) => {
+      const c = callRef.current;
+      if (!c.callId || String(callId || "") !== String(c.callId)) return;
+      if (c.phase !== "connecting" && c.phase !== "connected") return;
+      const pc = pcRef.current;
+      if (!pc || !candidate) return;
+      try {
+        if (!pc.remoteDescription) {
+          pendingIceRef.current.push(candidate);
+          return;
+        }
+        await pc.addIceCandidate(candidate);
+      } catch {
+        // ignore
+      }
     });
 
     socket.on("user:avatar", ({ userId, avatar }) => {
@@ -879,6 +1237,9 @@ export default function App() {
       socket.off("call:reject");
       socket.off("call:ended");
       socket.off("call:end");
+      socket.off("webrtc:offer");
+      socket.off("webrtc:answer");
+      socket.off("webrtc:ice-candidate");
       socket.disconnect();
     };
   }, [token, socketEndpoint, me?.id]);
@@ -1454,13 +1815,24 @@ export default function App() {
         ) : null}
 
         {mobileTab === "calls" ? (
-          <div className="mobilePane mobilePane--placeholder">
-            <header className="mobileSubHeader">
-              <h1 className="mobileSubHeaderTitle">{t("navCalls")}</h1>
-            </header>
-            <div className="mobilePlaceholderBody">
-              <p className="muted">{t("callsComingSoon")}</p>
-            </div>
+          <div className="mobilePane mobilePane--calls">
+            <CallsScreen
+              t={t}
+              lang={settings.lang}
+              logs={callLogs}
+              onOpenChat={(cid) => {
+                if (!cid) return;
+                setMobileTab("chats");
+                void selectChat(cid);
+              }}
+              onRedial={(cid) => {
+                const row = chatsRef.current.find((c) => Number(c.id) === Number(cid));
+                if (!row?.other?.id) return;
+                setMobileTab("chats");
+                void selectChat(cid);
+                beginOutgoingCall({ chatId: cid, other: row.other });
+              }}
+            />
           </div>
         ) : null}
 
@@ -1534,6 +1906,7 @@ export default function App() {
         )}
       </div>
       {callOverlay}
+      <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: "none" }} />
       <InstallDownloadPanel open={installDownloadOpen} onClose={() => setInstallDownloadOpen(false)} t={t} />
     </AppRuntimeErrorBoundary>
   );
