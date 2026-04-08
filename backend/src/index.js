@@ -1589,6 +1589,9 @@ app.get("/api/chats", authRequired, (req, res) => {
         other.user_tag AS other_user_tag,
         other.tag_color AS other_tag_color,
         other.tag_style AS other_tag_style,
+        other.premium_type AS other_premium_type,
+        other.premium_expires_at AS other_premium_expires_at,
+        other.premium_granted_at AS other_premium_granted_at,
         lm.id AS last_id,
         lm.text AS last_text,
         lm.created_at AS last_created_at,
@@ -1713,6 +1716,11 @@ app.get("/api/chats", authRequired, (req, res) => {
                   statusText: c.other_status_text || "",
                   messageCount: Math.max(0, Number(c.other_messages_sent_count) || 0),
                   ...buildOtherUserTagsFromChatRow(c),
+                  ...computePremiumInfo({
+                    premium_type: c.other_premium_type,
+                    premium_expires_at: c.other_premium_expires_at,
+                    premium_granted_at: c.other_premium_granted_at,
+                  }),
                 },
           last: c.last_text
             ? {

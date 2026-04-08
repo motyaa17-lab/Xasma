@@ -95,7 +95,12 @@ export default function UserProfileModal({ open, userId, onClose, t, lang = "en"
               </div>
 
               <div className="userProfileNameBlock">
-                <h2 className="userProfileDisplayName">{user.username}</h2>
+                <h2 className="userProfileDisplayName">
+                  <span className={user.isPremium ? "premiumName" : undefined}>
+                    {user.username}
+                    {user.isPremium ? <span className="premiumBadge">💎</span> : null}
+                  </span>
+                </h2>
                 <div className="userProfileBadgesRow">
                   <UserTagBadge tag={user.tag} tagColor={user.tagColor} tagStyle={user.tagStyle} />
                   <ActivityBadge messageCount={user.messageCount} t={t} />

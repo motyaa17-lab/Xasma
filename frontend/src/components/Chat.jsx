@@ -2148,7 +2148,7 @@ export default function Chat({
                   <AvatarAura auraColor={chat?.other?.auraColor}>
                     <button
                       type="button"
-                      className="avatarSm avatarTapBtn"
+                      className={`avatarSm avatarTapBtn${chat?.other?.isPremium ? " avatarPremium" : ""}`}
                       onClick={() => chat?.other?.id && setProfileUserId(Number(chat.other.id))}
                       aria-label={t("profile")}
                     >
@@ -2161,7 +2161,10 @@ export default function Chat({
                   </AvatarAura>
                   <div className="chatHeaderInfo">
                     <div className="chatHeaderName">
-                      {chat?.other?.username || ""}
+                      <span className={chat?.other?.isPremium ? "premiumName" : undefined}>
+                        {chat?.other?.username || ""}
+                        {chat?.other?.isPremium ? <span className="premiumBadge">💎</span> : null}
+                      </span>
                       <ActivityBadge messageCount={chat?.other?.messageCount} t={t} />
                     </div>
                     <div className="chatHeaderStatus">
@@ -2309,7 +2312,7 @@ export default function Chat({
                   <AvatarAura auraColor={msgAura}>
                     <button
                       type="button"
-                      className="msgAvatar avatarTapBtn"
+                      className={`msgAvatar avatarTapBtn${m.sender?.isPremium ? " avatarPremium" : ""}`}
                       title={m.sender?.username || ""}
                       onClick={() => {
                         const uid = Number(m.senderId);

@@ -566,11 +566,16 @@ export default function UserMenu({
       <div className="settingsScreen settingsScreen--mobile" ref={rootRef}>
         <button type="button" className="settingsTopProfile" onClick={() => setPanel("profile")}>
           <span className="settingsTopAvatar">
-            {me?.avatar ? <img src={me.avatar} alt="" /> : <span>{initials(me?.username)}</span>}
+            <span className={me?.isPremium ? "avatarPremium" : undefined}>
+              {me?.avatar ? <img src={me.avatar} alt="" /> : <span>{initials(me?.username)}</span>}
+            </span>
           </span>
           <span className="settingsTopMain">
             <span className="settingsTopName">
-              {me?.username}
+              <span className={me?.isPremium ? "premiumName" : undefined}>
+                {me?.username}
+                {me?.isPremium ? <span className="premiumBadge">💎</span> : null}
+              </span>
               <ActivityBadge messageCount={me?.messageCount} t={t} />
             </span>
             <span className="settingsTopStatus">{statusLine}</span>

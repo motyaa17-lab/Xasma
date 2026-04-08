@@ -762,12 +762,15 @@ const Sidebar = forwardRef(function Sidebar(
       <div className="sidebarHeader">
         <div className="meRow">
           <AvatarAura auraColor={me?.auraColor}>
-            <div className="avatarSm" title={me.username}>
+            <div className={me?.isPremium ? "avatarSm avatarPremium" : "avatarSm"} title={me.username}>
               {me.avatar ? <img src={me.avatar} alt="" /> : <span>{initials(me.username)}</span>}
             </div>
           </AvatarAura>
           <div className="meName">
-            {me.username}
+            <span className={me?.isPremium ? "premiumName" : undefined}>
+              {me.username}
+              {me?.isPremium ? <span className="premiumBadge">💎</span> : null}
+            </span>
             <UserTagBadge tag={me?.tag} tagColor={me?.tagColor} tagStyle={me?.tagStyle} />
             <ActivityBadge messageCount={me?.messageCount} t={t} />
           </div>
@@ -823,7 +826,11 @@ const Sidebar = forwardRef(function Sidebar(
                 <div className="chatItemTop">
                   <div className="chatAvatarWrap">
                     <AvatarAura skip={isRoom || isOfficial} auraColor={other?.auraColor}>
-                      <div className={!isRoom && online ? "avatarSm presence online" : "avatarSm presence"}>
+                      <div
+                        className={`${!isRoom && online ? "avatarSm presence online" : "avatarSm presence"}${
+                          !isRoom && !isOfficial && other?.isPremium ? " avatarPremium" : ""
+                        }`}
+                      >
                         {isRoom && c.avatar ? (
                           <img src={c.avatar} alt="" />
                         ) : !isRoom && other?.avatar ? (
@@ -844,7 +851,12 @@ const Sidebar = forwardRef(function Sidebar(
                   <div className="chatOther">
                     <div className="chatOtherNameRow">
                       <div className="chatOtherName">
-                        {label}
+                        <span className={!isRoom && !isOfficial && other?.isPremium ? "premiumName" : undefined}>
+                          {label}
+                          {!isRoom && !isOfficial && other?.isPremium ? (
+                            <span className="premiumBadge">💎</span>
+                          ) : null}
+                        </span>
                         {isOfficial ? (
                           <span className="officialChatListBadge">{t("officialChatBadge")}</span>
                         ) : null}
@@ -914,13 +926,16 @@ const Sidebar = forwardRef(function Sidebar(
                 onClick={() => onStartChat(u.id)}
               >
                 <AvatarAura auraColor={u.auraColor}>
-                  <div className="avatarSm">
+                  <div className={u?.isPremium ? "avatarSm avatarPremium" : "avatarSm"}>
                     {u.avatar ? <img src={u.avatar} alt="" /> : <span>{initials(u.username)}</span>}
                   </div>
                 </AvatarAura>
                 <div>
                   <div className="searchUser">
-                    {u.username}
+                    <span className={u?.isPremium ? "premiumName" : undefined}>
+                      {u.username}
+                      {u?.isPremium ? <span className="premiumBadge">💎</span> : null}
+                    </span>
                     <UserTagBadge tag={u.tag} tagColor={u.tagColor} tagStyle={u.tagStyle} />
                   </div>
                 </div>
