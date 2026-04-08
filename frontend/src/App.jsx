@@ -88,6 +88,7 @@ export default function App() {
   const readEmitTimerRef = useRef(null);
   const socketResyncTimerRef = useRef(null);
   const lastSocketResyncAtRef = useRef(0);
+  const optimisticSendTimersRef = useRef(new Map()); // clientTempId -> timeoutId
   const mobileInboxSidebarRef = useRef(null);
   const settingsRef = useRef(settings);
   const openChatFromNotificationRef = useRef(() => {});
@@ -131,6 +132,15 @@ export default function App() {
     if (!import.meta.env.DEV) return;
     // eslint-disable-next-line no-console
     console.log("[Xasma]", ...args);
+  }
+
+  function makeClientTempId() {
+    try {
+      if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+    } catch {
+      // ignore
+    }
+    return `tmp_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   }
 
   function previewTextForMessage(msg) {
@@ -288,10 +298,32 @@ export default function App() {
     });
 
     socket.on("chat:message", (msg) => {
+      const msgId = msg?.id != null ? Number(msg.id) : 0;
+      const temp = typeof msg?.clientTempId === "string" ? msg.clientTempId : "";
+
       // Update open chat immediately; otherwise refresh chat list.
       const openChatId = selectedChatIdRef.current;
       if (openChatId && msg.chatId === openChatId) {
-        setMessages((prev) => [...prev, msg]);
+        setMessages((prev) => {
+          // If this is the server-confirmation of an optimistic message, replace it in-place.
+          if (temp && me?.id && Number(msg?.senderId) === Number(me.id)) {
+            const idx = prev.findIndex((m) => m && typeof m.clientTempId === "string" && m.clientTempId === temp);
+            if (idx >= 0) {
+              const tid = optimisticSendTimersRef.current.get(temp);
+              if (tid) {
+                window.clearTimeout(tid);
+                optimisticSendTimersRef.current.delete(temp);
+              }
+              const next = prev.slice();
+              next[idx] = msg;
+              return next;
+            }
+          }
+
+          // Avoid duplicates (e.g. reconnect/resync races).
+          if (msgId && prev.some((m) => Number(m?.id) === msgId)) return prev;
+          return prev.concat(msg);
+        });
 
         // If I'm currently viewing this chat and the tab is active,
         // immediately mark the incoming message as read.
@@ -756,18 +788,171 @@ export default function App() {
     const videoUrl = isObj && payload.videoUrl ? String(payload.videoUrl).trim() : "";
     const replyToMessageId = isObj && payload.replyToMessageId ? Number(payload.replyToMessageId) : 0;
     if (!text && !imageUrl && !audioUrl && !videoUrl) return;
-    if (!socketRef.current || !socketReady) {
-      setRealtimeSendNotice(t("realtimeReconnecting"));
-      return;
-    }
     if (!selectedChatId) return;
     if (me?.banned) return;
     const activeChat = chats.find((c) => Number(c.id) === Number(selectedChatId));
     if (activeChat && activeChat.canPostMessage === false) return;
+
+    const clientTempId = makeClientTempId();
+    const nowIso = new Date().toISOString();
+    const optimisticMessage = {
+      id: -Date.now(), // local-only; replaced when server confirms
+      chatId: Number(selectedChatId),
+      senderId: Number(me?.id || 0),
+      sender: {
+        id: Number(me?.id || 0),
+        username: me?.username || "",
+        avatar: me?.avatar || "",
+        auraColor: me?.auraColor || "",
+        isOnline: Boolean(me?.isOnline),
+        lastSeenAt: me?.lastSeenAt || null,
+        statusKind: me?.statusKind || "",
+        statusText: me?.statusText || "",
+        messageCount: Math.max(0, Number(me?.messageCount) || 0),
+        tag: me?.tag ?? null,
+        tagColor: me?.tagColor || "",
+        tagStyle: me?.tagStyle || "solid",
+      },
+      type: "text",
+      text,
+      imageUrl: imageUrl || null,
+      audioUrl: audioUrl || null,
+      videoUrl: videoUrl || null,
+      replyTo: replyToMessageId
+        ? (() => {
+            const r = messages.find((m) => Number(m?.id) === Number(replyToMessageId));
+            if (!r) return { id: Number(replyToMessageId), senderId: null, senderUsername: "", text: "" };
+            return {
+              id: Number(r.id),
+              senderId: r.senderId != null ? Number(r.senderId) : null,
+              senderUsername: r.sender?.username || "",
+              text: r.text || "",
+              imageUrl: r.imageUrl || null,
+              audioUrl: r.audioUrl || null,
+              videoUrl: r.videoUrl || null,
+            };
+          })()
+        : null,
+      reactions: [],
+      deliveredAt: null,
+      readAt: null,
+      editedAt: null,
+      createdAt: nowIso,
+      clientTempId,
+      localStatus: "sending",
+      _optimistic: true,
+      _optimisticPayload: { text, imageUrl, audioUrl, videoUrl, replyToMessageId },
+    };
+
+    // Optimistically render immediately in the open chat.
+    setMessages((prev) => prev.concat(optimisticMessage));
+
+    // Optimistically update chat list preview (safe; id may be null until server confirms).
+    setChats((prev) => {
+      const cid = Number(selectedChatId);
+      const next = prev.map((c) => {
+        if (Number(c.id) !== cid) return c;
+        const last = {
+          id: null,
+          text: previewTextForMessage(optimisticMessage),
+          createdAt: nowIso,
+          senderId: Number(me?.id || 0),
+        };
+        return { ...c, last };
+      });
+      return reorderChatsByActivity(next, Number(selectedChatId));
+    });
+
+    // If the server never confirms, show a failed state (but keep the bubble).
+    const failAfterMs = 15_000;
+    const timeoutId = window.setTimeout(() => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m && typeof m.clientTempId === "string" && m.clientTempId === clientTempId && m.localStatus === "sending"
+            ? { ...m, localStatus: "failed" }
+            : m
+        )
+      );
+      optimisticSendTimersRef.current.delete(clientTempId);
+    }, failAfterMs);
+    optimisticSendTimersRef.current.set(clientTempId, timeoutId);
+
+    if (!socketRef.current || !socketReady) {
+      setRealtimeSendNotice(t("realtimeReconnecting"));
+      // Mark failed immediately (still visible), user can retry after reconnect.
+      setMessages((prev) =>
+        prev.map((m) =>
+          m && typeof m.clientTempId === "string" && m.clientTempId === clientTempId
+            ? { ...m, localStatus: "failed" }
+            : m
+        )
+      );
+      return;
+    }
+
     // Sending implies typing stopped.
     socketRef.current.emit("chat:typing", { chatId: selectedChatId, isTyping: false });
     socketRef.current.emit("chat:send", {
       chatId: selectedChatId,
+      clientTempId,
+      text,
+      ...(imageUrl ? { imageUrl } : {}),
+      ...(audioUrl ? { audioUrl } : {}),
+      ...(videoUrl ? { videoUrl } : {}),
+      ...(replyToMessageId ? { replyToMessageId } : {}),
+    });
+  }
+
+  function handleRetrySend(msg) {
+    if (!msg || typeof msg !== "object") return;
+    if (!selectedChatId || Number(msg.chatId) !== Number(selectedChatId)) return;
+    if (me?.banned) return;
+    const payload = msg._optimisticPayload || {};
+    const text = String(payload.text ?? "").trim();
+    const imageUrl = payload.imageUrl ? String(payload.imageUrl).trim() : "";
+    const audioUrl = payload.audioUrl ? String(payload.audioUrl).trim() : "";
+    const videoUrl = payload.videoUrl ? String(payload.videoUrl).trim() : "";
+    const replyToMessageId = payload.replyToMessageId ? Number(payload.replyToMessageId) : 0;
+    if (!text && !imageUrl && !audioUrl && !videoUrl) return;
+
+    const newClientTempId = makeClientTempId();
+    setMessages((prev) =>
+      prev.map((m) =>
+        m && typeof m.clientTempId === "string" && m.clientTempId === String(msg.clientTempId)
+          ? { ...m, clientTempId: newClientTempId, localStatus: "sending" }
+          : m
+      )
+    );
+
+    const failAfterMs = 15_000;
+    const timeoutId = window.setTimeout(() => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m && typeof m.clientTempId === "string" && m.clientTempId === newClientTempId && m.localStatus === "sending"
+            ? { ...m, localStatus: "failed" }
+            : m
+        )
+      );
+      optimisticSendTimersRef.current.delete(newClientTempId);
+    }, failAfterMs);
+    optimisticSendTimersRef.current.set(newClientTempId, timeoutId);
+
+    if (!socketRef.current || !socketReady) {
+      setRealtimeSendNotice(t("realtimeReconnecting"));
+      setMessages((prev) =>
+        prev.map((m) =>
+          m && typeof m.clientTempId === "string" && m.clientTempId === newClientTempId
+            ? { ...m, localStatus: "failed" }
+            : m
+        )
+      );
+      return;
+    }
+
+    socketRef.current.emit("chat:typing", { chatId: selectedChatId, isTyping: false });
+    socketRef.current.emit("chat:send", {
+      chatId: selectedChatId,
+      clientTempId: newClientTempId,
       text,
       ...(imageUrl ? { imageUrl } : {}),
       ...(audioUrl ? { audioUrl } : {}),
@@ -914,6 +1099,7 @@ export default function App() {
     chatTheme: settings.chatTheme,
     chatBackgroundImageUrl: settings.chatBackgroundImageUrl || null,
     onSend: handleSend,
+    onRetrySend: handleRetrySend,
     onEditMessage: handleEditMessage,
     onToggleReaction: handleToggleReaction,
     isAdmin: me.role === "admin",

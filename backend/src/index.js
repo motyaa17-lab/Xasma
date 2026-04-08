@@ -621,7 +621,16 @@ async function insertSystemMessageAndBroadcast(chatId, actorUserId, systemKind, 
   return message;
 }
 
-async function insertChatMessageAndBroadcast(chatId, senderId, bodyText, imageUrl, audioUrl, videoUrl, replyToMessageId) {
+async function insertChatMessageAndBroadcast(
+  chatId,
+  senderId,
+  bodyText,
+  imageUrl,
+  audioUrl,
+  videoUrl,
+  replyToMessageId,
+  clientTempId
+) {
   const chat = await getChatById(chatId);
   if (chat?.type === "official") {
     const bot = getOfficialAnnounceUserId();
@@ -675,6 +684,7 @@ async function insertChatMessageAndBroadcast(chatId, senderId, bodyText, imageUr
   emitToAll("user:messageCount", { userId: Number(senderId), messageCount: newMessageCount });
 
   const message = await fetchMessageById(insertedId);
+  if (clientTempId) message.clientTempId = String(clientTempId);
   await emitToChatMemberSockets(chatId, "chat:message", message);
 
   const memberIds = await getChatMemberUserIds(chatId);
@@ -1301,6 +1311,7 @@ app.get("/api/chats", authRequired, (req, res) => {
         other.user_tag AS other_user_tag,
         other.tag_color AS other_tag_color,
         other.tag_style AS other_tag_style,
+        lm.id AS last_id,
         lm.text AS last_text,
         lm.created_at AS last_created_at,
         lm.sender_id AS last_sender_id,
@@ -1327,6 +1338,7 @@ app.get("/api/chats", authRequired, (req, res) => {
         AND other.id = CASE WHEN c.user1_id = $1 THEN c.user2_id ELSE c.user1_id END
       LEFT JOIN LATERAL (
         SELECT
+          m.id,
           CASE
             WHEN COALESCE(m.message_type, 'text') = 'system' THEN
               CASE COALESCE(m.system_kind, '')
@@ -1414,7 +1426,12 @@ app.get("/api/chats", authRequired, (req, res) => {
                   ...buildOtherUserTagsFromChatRow(c),
                 },
           last: c.last_text
-            ? { text: c.last_text, createdAt: c.last_created_at, senderId: Number(c.last_sender_id) }
+            ? {
+                id: c.last_id != null ? Number(c.last_id) : null,
+                text: c.last_text,
+                createdAt: c.last_created_at,
+                senderId: Number(c.last_sender_id),
+              }
             : null,
           unreadCount: Number(c.unread_count) || 0,
           pinnedMessageId: c.pinned_message_id != null ? Number(c.pinned_message_id) : null,
@@ -2535,12 +2552,15 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("chat:send", async ({ chatId, text, imageUrl, audioUrl, videoUrl, replyToMessageId } = {}) => {
+  socket.on(
+    "chat:send",
+    async ({ chatId, text, imageUrl, audioUrl, videoUrl, replyToMessageId, clientTempId } = {}) => {
     const cid = Number(chatId);
     const bodyText = String(text || "").trim();
     const rawImg = typeof imageUrl === "string" ? imageUrl.trim() : "";
     const rawAud = typeof audioUrl === "string" ? audioUrl.trim() : "";
     const rawVid = typeof videoUrl === "string" ? videoUrl.trim() : "";
+      const temp = typeof clientTempId === "string" ? clientTempId.trim() : "";
     const img = validateMessageMediaUrlFromSocket(rawImg);
     const aud = validateMessageMediaUrlFromSocket(rawAud);
     const vid = validateMessageMediaUrlFromSocket(rawVid);
@@ -2564,12 +2584,13 @@ io.on("connection", (socket) => {
     }
 
     try {
-      await insertChatMessageAndBroadcast(cid, Number(userId), bodyText, img, aud, vid, replyToMessageId);
+      await insertChatMessageAndBroadcast(cid, Number(userId), bodyText, img, aud, vid, replyToMessageId, temp || null);
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error("[Xasma] chat:send failed", e);
     }
-  });
+    }
+  );
 
   socket.on("chat:read", async ({ chatId, upToMessageId } = {}) => {
     const cid = Number(chatId);

@@ -218,6 +218,7 @@ export default function Chat({
   chatTheme,
   chatBackgroundImageUrl = null,
   onSend,
+  onRetrySend,
   onEditMessage,
   onToggleReaction,
   isAdmin,
@@ -2495,9 +2496,30 @@ export default function Chat({
                     <div className="bubbleMeta">
                       <span className="bubbleTime">{formatTime(m.createdAt, lang)}</span>
                       {m.senderId === meId ? (
-                        <span className="bubbleChecks" title={checksTitle(m, t)}>
+                        <span
+                          className={
+                            m.localStatus === "failed"
+                              ? "bubbleChecks bubbleChecks--failed"
+                              : m.localStatus === "sending"
+                                ? "bubbleChecks bubbleChecks--sending"
+                                : "bubbleChecks"
+                          }
+                          title={checksTitle(m, t)}
+                        >
                           {renderChecks(m)}
                         </span>
+                      ) : null}
+                      {m.senderId === meId && m.localStatus === "failed" ? (
+                        <button
+                          type="button"
+                          className="bubbleRetry"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRetrySend?.(m);
+                          }}
+                        >
+                          {t("retry")}
+                        </button>
                       ) : null}
                     </div>
 
@@ -3222,12 +3244,16 @@ function getAvatarSrc(message, meId, meAvatar) {
 }
 
 function renderChecks(m) {
+  if (m.localStatus === "failed") return "!";
+  if (m.localStatus === "sending") return "…";
   if (m.readAt) return "✓✓";
   if (m.deliveredAt) return "✓";
   return "";
 }
 
 function checksTitle(m, t) {
+  if (m.localStatus === "failed") return t("messageStatusFailed");
+  if (m.localStatus === "sending") return t("messageStatusSending");
   if (m.readAt) return t("messageStatusRead");
   if (m.deliveredAt) return t("messageStatusDelivered");
   return "";
