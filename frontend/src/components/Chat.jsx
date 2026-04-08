@@ -252,6 +252,25 @@ export default function Chat({
   const channelReadOnly = Boolean(isChannel && chat?.canPostMessage === false);
   const canShowCallButton = Boolean(chatId && !isRoom && !isOfficial && chat?.other?.id);
 
+  const usersMap = useMemo(() => {
+    const m = new Map();
+    if (meId) {
+      m.set(Number(meId), {
+        id: Number(meId),
+        username: meUsername || "",
+        avatar: meAvatar || "",
+      });
+    }
+    if (chat?.other?.id) m.set(Number(chat.other.id), chat.other);
+    // Messages usually carry `sender`; use it as the best source of truth per message.
+    for (const msg of safeMessages) {
+      const sid = Number(msg?.senderId);
+      if (!sid || m.has(sid)) continue;
+      if (msg?.sender && typeof msg.sender === "object") m.set(sid, msg.sender);
+    }
+    return m;
+  }, [chat?.other, meAvatar, meId, meUsername, safeMessages]);
+
   const canPinForUser = useMemo(() => {
     if (!chat || isOfficial) return false;
     if (isBanned && !isAdmin) return false;
@@ -2294,7 +2313,11 @@ export default function Chat({
 
                   const msgAura =
                     (m.senderId === meId ? meAuraColor : m.sender?.auraColor) || undefined;
-                  const senderIsPremium = Boolean(m.sender?.isPremium);
+                  const sender =
+                    m.sender && typeof m.sender === "object"
+                      ? m.sender
+                      : usersMap.get(Number(m.senderId)) || null;
+                  const senderIsPremium = Boolean(sender?.isPremium);
                   const bubblePremiumClass = senderIsPremium ? " msgPremium" : "";
 
                   return (
@@ -2312,8 +2335,8 @@ export default function Chat({
                   <AvatarAura auraColor={msgAura}>
                     <button
                       type="button"
-                      className={`msgAvatar avatarTapBtn${m.sender?.isPremium ? " avatarPremium" : ""}`}
-                      title={m.sender?.username || ""}
+                      className={`msgAvatar avatarTapBtn${senderIsPremium ? " avatarPremium" : ""}`}
+                      title={sender?.username || ""}
                       onClick={() => {
                         const uid = Number(m.senderId);
                         if (!uid || uid === Number(meId)) return;
