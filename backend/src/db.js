@@ -174,6 +174,10 @@ async function initDb() {
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_premium BOOLEAN NOT NULL DEFAULT FALSE`);
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_activated_at TIMESTAMPTZ`);
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_bg_url TEXT`);
+  // Timed premium access (source of truth).
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_type TEXT`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_granted_at TIMESTAMPTZ`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_expires_at TIMESTAMPTZ`);
   await query(`
     CREATE UNIQUE INDEX IF NOT EXISTS users_referral_code_uidx
     ON users (referral_code)

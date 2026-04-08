@@ -8,6 +8,8 @@ import {
   adminSetUserBanned,
   adminSetUserRole,
   activatePremium,
+  adminGrantPremium,
+  adminRemovePremium,
 } from "../api.js";
 import { compressImageFileToJpegDataUrl } from "../chatBackgroundImage.js";
 import { currentLanguageLabel, localeForLang } from "../i18n.js";
@@ -17,6 +19,15 @@ import { USER_STATUS_TEXT_MAX } from "../userStatusLine.js";
 import AvatarAura from "./AvatarAura.jsx";
 import ActivityBadge from "./ActivityBadge.jsx";
 import UserTagBadge from "./UserTagBadge.jsx";
+
+function formatShortDate(iso) {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "";
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yy = String(d.getFullYear());
+  return `${dd}.${mm}.${yy}`;
+}
 
 function AdminUserTagEditor({ user, onUpdate, t }) {
   const [tag, setTag] = useState(user.tag || "");
@@ -306,6 +317,8 @@ export default function UserMenu({
   const chatBgFileInputRef = useRef(null);
   const [chatBgError, setChatBgError] = useState("");
   const [adminUsers, setAdminUsers] = useState([]);
+  const [adminPremDaysById, setAdminPremDaysById] = useState({});
+  const [adminPremTypeById, setAdminPremTypeById] = useState({});
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminError, setAdminError] = useState("");
   const [adminNotice, setAdminNotice] = useState("");
@@ -385,6 +398,8 @@ export default function UserMenu({
     try {
       const data = await adminListUsers();
       setAdminUsers(Array.isArray(data.users) ? data.users : []);
+      setAdminPremDaysById({});
+      setAdminPremTypeById({});
     } catch (e) {
       setAdminError(e.message || t("adminRequestFailed"));
     } finally {
@@ -966,6 +981,20 @@ export default function UserMenu({
                 </div>
 
                 <div className="settingsSection settingsSection--padded">
+                  <div className="settingsTitle">{t("premiumStatusTitle")}</div>
+                  <div className="muted small">
+                    {t("premiumStatusLabel")}: {me?.isPremium ? t("premiumActive") : t("premiumInactive")}
+                    <br />
+                    {t("premiumTypeLabel")}:{" "}
+                    {me?.isPremium && me?.premiumType ? t(`premiumType_${me.premiumType}`) : t("premiumTypeNone")}
+                    <br />
+                    {t("premiumUntil")}: {me?.isPremium && me?.premiumExpiresAt ? formatShortDate(me.premiumExpiresAt) : "—"}
+                    <br />
+                    {t("premiumDaysLeft", { days: me?.isPremium ? me?.premiumDaysLeft || 0 : 0 })}
+                  </div>
+                </div>
+
+                <div className="settingsSection settingsSection--padded">
                   <div className="settingsTitle">{t("premiumPerksTitle")}</div>
                   <ul className="premiumPerks">
                     <li>{t("premiumPerkBg")}</li>
@@ -985,7 +1014,7 @@ export default function UserMenu({
                 <button
                   type="button"
                   className="primaryBtn premiumCtaBtn"
-                  disabled={premiumBusy || me?.isPremium}
+                  disabled={premiumBusy}
                   onClick={async () => {
                     setPremiumBusy(true);
                     setPremiumNotice("");
@@ -1000,7 +1029,7 @@ export default function UserMenu({
                     }
                   }}
                 >
-                  {me?.isPremium ? t("premiumActive") : t("premiumCta")}
+                  {t("premiumCta")}
                 </button>
               </div>
             ) : panel === "support" ? (
@@ -1062,6 +1091,14 @@ export default function UserMenu({
                           <div className="adminUserMeta muted small">
                             {t("adminRoleLabel")}: {u.role} · {u.banned ? t("adminStatusBanned") : t("adminStatusActive")}
                           </div>
+                          <div className="adminUserMeta muted small">
+                            {t("premiumTitleShort")}: {u.isPremium ? t("premiumActive") : t("premiumInactive")}
+                            {u.isPremium && u.premiumType ? ` · ${t("premiumTypeLabel")}: ${t(`premiumType_${u.premiumType}`)}` : ""}
+                            {u.premiumExpiresAt ? ` · ${t("premiumUntil")} ${formatShortDate(u.premiumExpiresAt)}` : ""}
+                            {u.isPremium && typeof u.premiumDaysLeft === "number"
+                              ? ` · ${t("premiumDaysLeft", { days: u.premiumDaysLeft })}`
+                              : ""}
+                          </div>
                         </div>
 
                         <div className="adminActions">
@@ -1113,6 +1150,83 @@ export default function UserMenu({
                           >
                             {u.banned ? t("adminUnban") : t("adminBan")}
                           </button>
+                        </div>
+                        <div className="adminPremiumControls">
+                          <select
+                            className="input adminPremSelect"
+                            value={adminPremTypeById[u.id] || "admin"}
+                            onChange={(e) =>
+                              setAdminPremTypeById((prev) => ({ ...prev, [u.id]: e.target.value }))
+                            }
+                          >
+                            <option value="admin">{t("premiumType_admin")}</option>
+                            <option value="paid">{t("premiumType_paid")}</option>
+                            <option value="invite">{t("premiumType_invite")}</option>
+                          </select>
+                          <input
+                            className="input adminPremDays"
+                            inputMode="numeric"
+                            placeholder="30"
+                            value={adminPremDaysById[u.id] ?? ""}
+                            onChange={(e) =>
+                              setAdminPremDaysById((prev) => ({ ...prev, [u.id]: e.target.value }))
+                            }
+                          />
+                          <button
+                            type="button"
+                            className="ghostBtn"
+                            onClick={async () => {
+                              const type = adminPremTypeById[u.id] || "admin";
+                              const daysRaw = adminPremDaysById[u.id];
+                              const days = Math.max(1, Math.min(3650, parseInt(String(daysRaw || "30"), 10) || 30));
+                              try {
+                                const res = await adminGrantPremium(u.id, { type, days });
+                                const updated = res.user;
+                                setAdminUsers((prev) =>
+                                  prev.map((x) => (x.id === u.id ? { ...x, ...updated } : x))
+                                );
+                                setAdminNotice(t("adminPremiumGranted"));
+                              } catch (e) {
+                                setAdminError(e.message || t("adminRequestFailed"));
+                                loadAdminUsers();
+                              }
+                            }}
+                          >
+                            {t("adminPremiumGrant")}
+                          </button>
+                          <button
+                            type="button"
+                            className="ghostBtn"
+                            onClick={async () => {
+                              try {
+                                const res = await adminRemovePremium(u.id);
+                                const updated = res.user;
+                                setAdminUsers((prev) =>
+                                  prev.map((x) => (x.id === u.id ? { ...x, ...updated } : x))
+                                );
+                                setAdminNotice(t("adminPremiumRemoved"));
+                              } catch (e) {
+                                setAdminError(e.message || t("adminRequestFailed"));
+                                loadAdminUsers();
+                              }
+                            }}
+                          >
+                            {t("adminPremiumRemove")}
+                          </button>
+                          <div className="adminPremPresets">
+                            {[14, 30, 90].map((d) => (
+                              <button
+                                key={d}
+                                type="button"
+                                className="ghostBtn adminPremPresetBtn"
+                                onClick={() =>
+                                  setAdminPremDaysById((prev) => ({ ...prev, [u.id]: String(d) }))
+                                }
+                              >
+                                {d}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                         <AdminUserTagEditor
                           user={u}

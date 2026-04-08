@@ -46,6 +46,23 @@ function normalizeTagColorApi(raw) {
   return DEFAULT_TAG_COLOR;
 }
 
+function computePremiumInfo(row) {
+  const typeRaw = row?.premium_type;
+  const premiumType =
+    typeRaw === "invite" || typeRaw === "paid" || typeRaw === "admin" ? String(typeRaw) : null;
+  const expiresAt = row?.premium_expires_at || null;
+  const expMs = expiresAt ? new Date(expiresAt).getTime() : 0;
+  const now = Date.now();
+  const isPremium = Boolean(expMs && expMs > now);
+  const daysLeft = isPremium ? Math.max(0, Math.ceil((expMs - now) / (24 * 3600 * 1000))) : 0;
+  return {
+    isPremium,
+    premiumType: isPremium ? premiumType : null,
+    premiumExpiresAt: expiresAt,
+    premiumDaysLeft: daysLeft,
+  };
+}
+
 function normalizeTagStyleApi(raw) {
   return String(raw || "").trim().toLowerCase() === "gradient" ? "gradient" : "solid";
 }
@@ -821,7 +838,8 @@ app.post("/api/register", async (req, res) => {
            VALUES ($1, $2, $3, $4, $5)
            RETURNING id, username, avatar_url, role, banned, aura_color, created_at,
                      referral_code, invited_by, referrals_count,
-                     has_custom_bg, has_badge, has_reactions, has_premium_lite`,
+                     has_custom_bg, has_badge, has_reactions, has_premium_lite,
+                     premium_type, premium_expires_at, premium_granted_at, profile_bg_url`,
           [uname, password_hash, avatar_url, c, inviterId]
         );
         user = inserted.rows[0];
@@ -853,9 +871,33 @@ app.post("/api/register", async (req, res) => {
              has_reactions = has_reactions OR (referrals_count + 1) >= 5,
              has_premium_lite = has_premium_lite OR (referrals_count + 1) >= 10
          WHERE id = $1
-         RETURNING referrals_count, has_custom_bg, has_badge, has_reactions, has_premium_lite`,
+         RETURNING referrals_count, has_custom_bg, has_badge, has_reactions, has_premium_lite,
+                   premium_type, premium_expires_at`,
         [inviterId]
       );
+      const after = up.rows[0];
+      const nextRef = Math.max(0, Number(after?.referrals_count) || 0);
+      const hitPremiumLite = nextRef >= 10;
+      if (hitPremiumLite) {
+        // Grant invite premium for 14 days (timed), without overriding stronger active premium.
+        const curType = String(after?.premium_type || "");
+        const curExpMs = after?.premium_expires_at ? new Date(after.premium_expires_at).getTime() : 0;
+        const now = Date.now();
+        const curActive = Boolean(curExpMs && curExpMs > now);
+        const strongerActive = curActive && (curType === "paid" || curType === "admin");
+        if (!strongerActive) {
+          const base = curActive && curType === "invite" ? curExpMs : now;
+          const exp = new Date(Math.max(base, now) + 14 * 24 * 3600 * 1000).toISOString();
+          await client.query(
+            `UPDATE users
+             SET premium_type = 'invite',
+                 premium_granted_at = now(),
+                 premium_expires_at = $2
+             WHERE id = $1`,
+            [inviterId, exp]
+          );
+        }
+      }
       // (Optional future: emit realtime toast to inviter here.)
       void up;
     }
@@ -909,7 +951,8 @@ app.post("/api/login", async (req, res) => {
             user_tag, tag_color, tag_style, created_at,
             referral_code, invited_by, referrals_count,
             has_custom_bg, has_badge, has_reactions, has_premium_lite,
-            is_premium, premium_activated_at, profile_bg_url
+            is_premium, premium_activated_at, profile_bg_url,
+            premium_type, premium_expires_at, premium_granted_at
      FROM users WHERE username = $1`,
     [username.trim()]
   );
@@ -950,8 +993,7 @@ app.post("/api/login", async (req, res) => {
       hasBadge: Boolean(user.has_badge),
       hasReactions: Boolean(user.has_reactions),
       hasPremiumLite: Boolean(user.has_premium_lite),
-      isPremium: Boolean(user.is_premium),
-      premiumActivatedAt: user.premium_activated_at,
+      ...computePremiumInfo(user),
       profileBackground: user.profile_bg_url || "",
     },
   });
@@ -964,7 +1006,8 @@ app.get("/api/me", authRequired, (req, res) => {
             user_tag, tag_color, tag_style, created_at,
             referral_code, invited_by, referrals_count,
             has_custom_bg, has_badge, has_reactions, has_premium_lite,
-            is_premium, premium_activated_at, profile_bg_url
+            is_premium, premium_activated_at, profile_bg_url,
+            premium_type, premium_expires_at, premium_granted_at
      FROM users WHERE id = $1`,
     [uid]
   ).then((r) => {
@@ -997,8 +1040,7 @@ app.get("/api/me", authRequired, (req, res) => {
         hasBadge: Boolean(user.has_badge),
         hasReactions: Boolean(user.has_reactions),
         hasPremiumLite: Boolean(user.has_premium_lite),
-        isPremium: Boolean(user.is_premium),
-        premiumActivatedAt: user.premium_activated_at,
+        ...computePremiumInfo(user),
         profileBackground: user.profile_bg_url || "",
       },
     });
@@ -1029,8 +1071,9 @@ app.put("/api/me/profile", authRequired, (req, res) => {
       if (profileBackgroundRaw.length > 1_200_000) {
         return res.status(400).json({ error: "Profile background too large" });
       }
-      const prem = await query(`SELECT is_premium FROM users WHERE id = $1`, [uid]);
-      if (!prem.rows[0]?.is_premium) return res.status(403).json({ error: "Premium required" });
+      const prem = await query(`SELECT premium_expires_at FROM users WHERE id = $1`, [uid]);
+      const expMs = prem.rows[0]?.premium_expires_at ? new Date(prem.rows[0].premium_expires_at).getTime() : 0;
+      if (!(expMs && expMs > Date.now())) return res.status(403).json({ error: "Premium required" });
       profileBg = profileBackgroundRaw;
     }
 
@@ -1072,7 +1115,8 @@ app.put("/api/me/profile", authRequired, (req, res) => {
               user_tag, tag_color, tag_style, created_at,
               referral_code, invited_by, referrals_count,
               has_custom_bg, has_badge, has_reactions, has_premium_lite,
-              is_premium, premium_activated_at, profile_bg_url
+              is_premium, premium_activated_at, profile_bg_url,
+              premium_type, premium_expires_at, premium_granted_at
        FROM users WHERE id = $1`,
       [uid]
     );
@@ -1112,8 +1156,7 @@ app.put("/api/me/profile", authRequired, (req, res) => {
         hasBadge: Boolean(user.has_badge),
         hasReactions: Boolean(user.has_reactions),
         hasPremiumLite: Boolean(user.has_premium_lite),
-        isPremium: Boolean(user.is_premium),
-        premiumActivatedAt: user.premium_activated_at,
+        ...computePremiumInfo(user),
         profileBackground: user.profile_bg_url || "",
       },
     });
@@ -1174,23 +1217,40 @@ app.put("/api/me/avatar", authRequired, (req, res) => {
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });
 
-// Premium MVP: activate premium for current user.
+// Premium MVP: activate paid premium for current user (30 days, extends if already active).
 app.post("/api/me/premium/activate", authRequired, (req, res) => {
   (async () => {
     const uid = Number(req.user.id);
+    const cur = await query(`SELECT premium_type, premium_expires_at FROM users WHERE id = $1`, [uid]);
+    const row = cur.rows[0] || {};
+    const now = Date.now();
+    const curType = String(row.premium_type || "");
+    const curExpMs = row.premium_expires_at ? new Date(row.premium_expires_at).getTime() : 0;
+    const curActive = Boolean(curExpMs && curExpMs > now);
+
+    // Paid rules:
+    // - if already active paid -> extend from current expiry by +30 days
+    // - else start from now
+    const baseMs = curActive && curType === "paid" ? curExpMs : now;
+    const exp = new Date(baseMs + 30 * 24 * 3600 * 1000).toISOString();
+
     await query(
       `UPDATE users
-       SET is_premium = TRUE,
+       SET premium_type = 'paid',
+           premium_granted_at = now(),
+           premium_expires_at = $2,
+           is_premium = TRUE,
            premium_activated_at = COALESCE(premium_activated_at, now())
        WHERE id = $1`,
-      [uid]
+      [uid, exp]
     );
     const r = await query(
       `SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about, aura_color, messages_sent_count,
               user_tag, tag_color, tag_style, created_at,
               referral_code, invited_by, referrals_count,
               has_custom_bg, has_badge, has_reactions, has_premium_lite,
-              is_premium, premium_activated_at, profile_bg_url
+               is_premium, premium_activated_at, profile_bg_url,
+               premium_type, premium_expires_at, premium_granted_at
        FROM users WHERE id = $1`,
       [uid]
     );
@@ -1223,8 +1283,7 @@ app.post("/api/me/premium/activate", authRequired, (req, res) => {
         hasBadge: Boolean(user.has_badge),
         hasReactions: Boolean(user.has_reactions),
         hasPremiumLite: Boolean(user.has_premium_lite),
-        isPremium: Boolean(user.is_premium),
-        premiumActivatedAt: user.premium_activated_at,
+        ...computePremiumInfo(user),
         profileBackground: user.profile_bg_url || "",
       },
     });
@@ -1303,7 +1362,8 @@ app.get("/api/users/:userId", authRequired, (req, res) => {
     const r = await query(
       `SELECT id, username, avatar_url, aura_color, is_online, last_seen_at, status_kind, status_text, about, messages_sent_count,
               user_tag, tag_color, tag_style, created_at,
-              is_premium, premium_activated_at, profile_bg_url
+              is_premium, premium_activated_at, profile_bg_url,
+              premium_type, premium_expires_at, premium_granted_at
        FROM users
        WHERE id = $1`,
       [uid]
@@ -1328,8 +1388,7 @@ app.get("/api/users/:userId", authRequired, (req, res) => {
         tagStyle: tg.tagStyle,
         registrationDate: registrationDateIso(u.created_at),
         isEarlyTester: isEarlyTesterUser(Number(u.id), u.created_at),
-        isPremium: Boolean(u.is_premium),
-        premiumActivatedAt: u.premium_activated_at,
+        ...computePremiumInfo(u),
         profileBackground: u.profile_bg_url || "",
       },
     });
@@ -1337,77 +1396,6 @@ app.get("/api/users/:userId", authRequired, (req, res) => {
 });
 
 // (rest of file unchanged from working version)
-
-app.put("/api/me/profile", authRequired, (req, res) => {
-  const statusKindRaw = typeof req.body?.statusKind === "string" ? req.body.statusKind.trim() : "";
-  const statusTextRaw = typeof req.body?.statusText === "string" ? req.body.statusText.trim() : "";
-  const aboutRaw = typeof req.body?.about === "string" ? req.body.about.trim() : "";
-
-  const allowedKinds = new Set(["", "online", "dnd", "away", "custom"]);
-  const statusKind = allowedKinds.has(statusKindRaw) ? statusKindRaw : "";
-  const statusText = statusTextRaw.length > 30 ? statusTextRaw.slice(0, 30) : statusTextRaw;
-  const about = aboutRaw.length > 600 ? aboutRaw.slice(0, 600) : aboutRaw;
-
-  const auraParsed = parseAuraColorBody(req.body);
-  if (!auraParsed.ok) return res.status(400).json({ error: "Invalid aura color (use #RRGGBB)" });
-
-  (async () => {
-    const uid = Number(req.user.id);
-    if (auraParsed.skip) {
-      await query(`UPDATE users SET status_kind = $1, status_text = $2, about = $3 WHERE id = $4`, [
-        statusKind || null,
-        statusText || null,
-        about || null,
-        uid,
-      ]);
-    } else {
-      await query(`UPDATE users SET status_kind = $1, status_text = $2, about = $3, aura_color = $4 WHERE id = $5`, [
-        statusKind || null,
-        statusText || null,
-        about || null,
-        auraParsed.value,
-        uid,
-      ]);
-    }
-    const r = await query(
-      `SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about, aura_color, messages_sent_count,
-              user_tag, tag_color, tag_style, created_at
-       FROM users WHERE id = $1`,
-      [uid]
-    );
-    const user = r.rows[0];
-    if (!user) return res.status(404).json({ error: "User not found" });
-    const auraColor = normalizeAuraColorApi(user.aura_color);
-    const tags = buildSenderTagsFromRow(user, false);
-    if (!auraParsed.skip) emitToAll("user:auraColor", { userId: uid, auraColor });
-    emitToAll("user:profileStatus", {
-      userId: uid,
-      statusKind: user.status_kind || "",
-      statusText: user.status_text || "",
-    });
-    return res.json({
-      user: {
-        id: Number(user.id),
-        username: user.username,
-        avatar: user.avatar_url,
-        role: user.role,
-        banned: Boolean(user.banned),
-        isOnline: Boolean(user.is_online),
-        lastSeenAt: user.last_seen_at,
-        statusKind: user.status_kind || "",
-        statusText: user.status_text || "",
-        about: user.about || "",
-        auraColor,
-        messageCount: Math.max(0, Number(user.messages_sent_count) || 0),
-        tag: tags.tag,
-        tagColor: tags.tagColor,
-        tagStyle: tags.tagStyle,
-        registrationDate: registrationDateIso(user.created_at),
-        isEarlyTester: isEarlyTesterUser(Number(user.id), user.created_at),
-      },
-    });
-  })().catch(() => res.status(500).json({ error: "Server error" }));
-});
 
 function emitToUser(userId, event, payload) {
   const sockets = userSockets.get(userId);
@@ -2591,7 +2579,8 @@ app.get("/api/admin/users", authRequired, requireAdmin, (req, res) => {
     const r = await query(
       `
       SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, created_at, messages_sent_count,
-             user_tag, tag_color, tag_style
+             user_tag, tag_color, tag_style,
+             premium_type, premium_expires_at, premium_granted_at
       FROM users
       WHERE username != $1
       ORDER BY created_at DESC, id DESC
@@ -2601,6 +2590,7 @@ app.get("/api/admin/users", authRequired, requireAdmin, (req, res) => {
     return res.json({
       users: r.rows.map((u) => {
         const tg = buildSenderTagsFromRow(u, false);
+        const prem = computePremiumInfo(u);
         return {
           id: Number(u.id),
           username: u.username,
@@ -2614,8 +2604,97 @@ app.get("/api/admin/users", authRequired, requireAdmin, (req, res) => {
           tag: tg.tag,
           tagColor: tg.tagColor,
           tagStyle: tg.tagStyle,
+          ...prem,
         };
       }),
+    });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
+app.post("/api/admin/users/:userId/premium", authRequired, requireAdmin, (req, res) => {
+  const userId = Number(req.params.userId);
+  const type = typeof req.body?.type === "string" ? req.body.type : "";
+  const days = Number(req.body?.days);
+  if (!userId) return res.status(400).json({ error: "Invalid user id" });
+  if (!Number.isFinite(days) || days <= 0) return res.status(400).json({ error: "Invalid days" });
+  if (type !== "admin" && type !== "paid" && type !== "invite") {
+    return res.status(400).json({ error: "Invalid type" });
+  }
+  if (getOfficialAnnounceUserId() && userId === getOfficialAnnounceUserId()) {
+    return res.status(400).json({ error: "Not allowed" });
+  }
+
+  (async () => {
+    // For admin actions we always set expiry from now (custom duration), not extend.
+    const exp = new Date(Date.now() + Math.min(3650, Math.floor(days)) * 24 * 3600 * 1000).toISOString();
+    const r = await query(
+      `UPDATE users
+       SET premium_type = $2,
+           premium_granted_at = now(),
+           premium_expires_at = $3
+       WHERE id = $1
+       RETURNING id, username, avatar_url, role, banned, is_online, last_seen_at, created_at, messages_sent_count,
+                 user_tag, tag_color, tag_style, premium_type, premium_expires_at, premium_granted_at`,
+      [userId, type, exp]
+    );
+    const u = r.rows[0];
+    if (!u) return res.status(404).json({ error: "User not found" });
+    const tg = buildSenderTagsFromRow(u, false);
+    return res.json({
+      user: {
+        id: Number(u.id),
+        username: u.username,
+        avatar_url: u.avatar_url,
+        role: u.role,
+        banned: Boolean(u.banned),
+        is_online: Boolean(u.is_online),
+        last_seen_at: u.last_seen_at,
+        created_at: u.created_at,
+        messageCount: Math.max(0, Number(u.messages_sent_count) || 0),
+        tag: tg.tag,
+        tagColor: tg.tagColor,
+        tagStyle: tg.tagStyle,
+        ...computePremiumInfo(u),
+      },
+    });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
+app.delete("/api/admin/users/:userId/premium", authRequired, requireAdmin, (req, res) => {
+  const userId = Number(req.params.userId);
+  if (!userId) return res.status(400).json({ error: "Invalid user id" });
+  if (getOfficialAnnounceUserId() && userId === getOfficialAnnounceUserId()) {
+    return res.status(400).json({ error: "Not allowed" });
+  }
+  (async () => {
+    const r = await query(
+      `UPDATE users
+       SET premium_type = NULL,
+           premium_expires_at = NULL
+       WHERE id = $1
+       RETURNING id, username, avatar_url, role, banned, is_online, last_seen_at, created_at, messages_sent_count,
+                 user_tag, tag_color, tag_style, premium_type, premium_expires_at, premium_granted_at`,
+      [userId]
+    );
+    const u = r.rows[0];
+    if (!u) return res.status(404).json({ error: "User not found" });
+    const tg = buildSenderTagsFromRow(u, false);
+    return res.json({
+      user: {
+        id: Number(u.id),
+        username: u.username,
+        avatar_url: u.avatar_url,
+        role: u.role,
+        banned: Boolean(u.banned),
+        is_online: Boolean(u.is_online),
+        last_seen_at: u.last_seen_at,
+        created_at: u.created_at,
+        messageCount: Math.max(0, Number(u.messages_sent_count) || 0),
+        tag: tg.tag,
+        tagColor: tg.tagColor,
+        tagStyle: tg.tagStyle,
+        ...computePremiumInfo(u),
+      },
     });
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });

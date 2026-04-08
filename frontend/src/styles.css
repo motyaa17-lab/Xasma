@@ -6008,6 +6008,33 @@ body.body--mobileConversationOpen {
   width: 100%;
 }
 
+.adminPremiumControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 0 0;
+  align-items: center;
+}
+
+.adminPremSelect {
+  min-width: 140px;
+}
+
+.adminPremDays {
+  width: 86px;
+}
+
+.adminPremPresets {
+  display: flex;
+  gap: 6px;
+}
+
+.adminPremPresetBtn {
+  padding: 6px 10px;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
 .settingsChatBgHint {
   margin: 0 0 10px;
 }

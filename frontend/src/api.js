@@ -128,6 +128,19 @@ export async function activatePremium() {
   return data.user;
 }
 
+export async function adminGrantPremium(userId, { type, days }) {
+  return apiFetch(`/api/admin/users/${userId}/premium`, {
+    method: "POST",
+    body: { type, days },
+  });
+}
+
+export async function adminRemovePremium(userId) {
+  return apiFetch(`/api/admin/users/${userId}/premium`, {
+    method: "DELETE",
+  });
+}
+
 export async function searchUsers(q) {
   const data = await apiFetch(`/api/users?q=${encodeURIComponent(q)}`);
   return data.users;
