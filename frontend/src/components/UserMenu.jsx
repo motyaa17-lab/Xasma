@@ -377,7 +377,7 @@ export default function UserMenu({
     setProfileAuraColor(String(me?.auraColor || "").trim() || DEFAULT_AURA_COLOR);
     setProfileBgPreview(String(me?.profileBackground || ""));
     setProfileSaveError("");
-  }, [panel, me?.statusKind, me?.statusText, me?.about, me?.auraColor]);
+  }, [panel, me?.statusKind, me?.statusText, me?.about, me?.auraColor, me?.profileBackground]);
 
   async function saveProfile() {
     if (!onChangeProfile) return;
@@ -809,6 +809,54 @@ export default function UserMenu({
                       ))}
                     </div>
                   </div>
+                </div>
+
+                <div className="settingsSection">
+                  <div className="settingsTitle">{t("profileBgTitle")}</div>
+                  {isPremiumActive(me) ? (
+                    <div className="profileBgPreviewRow">
+                      <div
+                        className="profileBgPreview"
+                        style={{
+                          backgroundImage: profileBgPreview ? `url(${profileBgPreview})` : "none",
+                        }}
+                        aria-label={t("profileBgTitle")}
+                      />
+                      <div className="profileBgPreviewMeta">
+                        <div className="muted small">
+                          {profileBgPreview ? t("profileBgActive") : t("profileBgNone")}
+                        </div>
+                        <div className="profileBgActions">
+                          <input
+                            ref={profileBgInputRef}
+                            className="fileInput"
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => pickProfileBackground(e.target.files?.[0])}
+                          />
+                          <button
+                            type="button"
+                            className="primaryBtn"
+                            onClick={() => profileBgInputRef.current?.click()}
+                            disabled={profileBgBusy}
+                          >
+                            {profileBgBusy ? t("saving") : t("profileBgChoose")}
+                          </button>
+                          <button
+                            type="button"
+                            className="ghostBtn"
+                            onClick={() => setProfileBgPreview("")}
+                            disabled={profileBgBusy}
+                          >
+                            {t("profileBgRemove")}
+                          </button>
+                        </div>
+                        <div className="muted small">{t("profileBgHint")}</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="muted small">{t("profileBgPremiumOnly")}</div>
+                  )}
                 </div>
 
                 <div className="settingsSection">

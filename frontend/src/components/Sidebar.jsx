@@ -607,6 +607,7 @@ const Sidebar = forwardRef(function Sidebar(
             const isRoom = isGroup || isChannel;
             const isOfficial = c.type === "official";
             const other = c.other;
+            const otherIsPremium = !isRoom && !isOfficial && isPremiumActive(other);
             const label = isChannel
               ? c.title || t("channelInfoTitle")
               : isGroup
@@ -629,7 +630,12 @@ const Sidebar = forwardRef(function Sidebar(
               <>
                 <div className="mobileChatRowAvatarWrap">
                   <AvatarAura skip={isRoom || isOfficial} auraColor={other?.auraColor}>
-                    <div className={online ? "mobileChatRowAvatar presence online" : "mobileChatRowAvatar presence"}>
+                    <div
+                      className={
+                        (online ? "mobileChatRowAvatar presence online" : "mobileChatRowAvatar presence") +
+                        (otherIsPremium ? " avatarPremium" : "")
+                      }
+                    >
                       {isRoom && c.avatar ? (
                         <img src={c.avatar} alt="" />
                       ) : !isRoom && other?.avatar ? (
@@ -650,7 +656,10 @@ const Sidebar = forwardRef(function Sidebar(
                   <div className="mobileChatRowTop">
                     <div className="mobileChatRowTitleBlock">
                       <span className="mobileChatRowName">
-                        {label}
+                        <span className={otherIsPremium ? "premiumName" : undefined}>
+                          {label}
+                          {otherIsPremium ? <span className="premiumBadge">💎</span> : null}
+                        </span>
                         {isOfficial ? (
                           <span className="officialChatListBadge">{t("officialChatBadge")}</span>
                         ) : null}

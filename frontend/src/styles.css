@@ -3233,6 +3233,21 @@ body.body--mobileConversationOpen {
   touch-action: manipulation;
 }
 
+/* Desktop: allow bubbles/composer to breathe more on wide screens */
+@media (min-width: 900px) {
+  .bubble {
+    max-width: min(860px, 78%);
+  }
+  .messages {
+    padding-left: 26px;
+    padding-right: 26px;
+  }
+  .composer {
+    padding-left: 26px;
+    padding-right: 26px;
+  }
+}
+
 .bubble.bubble--pressed {
   transform: scale(0.987);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
@@ -5628,15 +5643,15 @@ body.body--mobileConversationOpen {
 /* Swipe rows: opaque card — base .mobileChatRow uses rgba(..., 0.55) which lets pin/delete pads show through at rest. */
 .mobileChatRowSwipeFront.mobileChatRow {
   margin-bottom: 0;
-  background-color: rgb(17, 27, 46);
-  background-image: linear-gradient(180deg, rgb(17, 27, 46), rgb(11, 18, 32));
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background-color: rgb(14, 20, 34);
+  background-image: linear-gradient(180deg, rgb(14, 20, 34), rgb(10, 15, 27));
+  border: 1px solid rgba(255, 255, 255, 0.055);
 }
 
 .mobileChatRowSwipeFront.mobileChatRow:active {
-  background-color: rgb(19, 31, 52);
-  background-image: linear-gradient(180deg, rgb(19, 31, 52), rgb(12, 20, 36));
-  border-color: rgba(59, 130, 246, 0.25);
+  background-color: rgb(17, 26, 44);
+  background-image: linear-gradient(180deg, rgb(17, 26, 44), rgb(12, 18, 32));
+  border-color: rgba(148, 163, 184, 0.14);
 }
 
 .mobileChatRowSwipe--pinned .mobileChatRowSwipePad--pin {
@@ -5657,8 +5672,8 @@ body.body--mobileConversationOpen {
   margin-bottom: 3px;
   border: none;
   border-radius: 14px;
-  background: rgba(15, 23, 42, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(10, 15, 27, 0.46);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   color: inherit;
   text-align: left;
   cursor: pointer;
@@ -5666,8 +5681,8 @@ body.body--mobileConversationOpen {
 }
 
 .mobileChatRow:active {
-  background: rgba(37, 99, 235, 0.12);
-  border-color: rgba(59, 130, 246, 0.25);
+  background: rgba(30, 41, 59, 0.55);
+  border-color: rgba(148, 163, 184, 0.16);
 }
 
 .mobileChatRowAvatar {
@@ -5679,8 +5694,8 @@ body.body--mobileConversationOpen {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(37, 99, 235, 0.2);
-  border: 1px solid rgba(59, 130, 246, 0.25);
+  background: rgba(37, 99, 235, 0.14);
+  border: 1px solid rgba(148, 163, 184, 0.14);
   font-weight: 800;
   font-size: 14px;
   box-shadow: var(--shadow-avatar);
@@ -5705,7 +5720,7 @@ body.body--mobileConversationOpen {
 
 .mobileChatRowAvatar.online {
   border-color: rgba(34, 197, 94, 0.45);
-  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.12);
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.1);
 }
 
 .mobileChatRowMain {
@@ -5797,7 +5812,7 @@ body.body--mobileConversationOpen {
   border-radius: 50%;
   flex-shrink: 0;
   background: linear-gradient(135deg, #3b82f6, #60a5fa);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.14);
 }
 
 .mobileChatRowPresence {

@@ -83,6 +83,7 @@ export default function UserProfileModal({ open, userId, onClose, t, lang = "en"
 
   const memberSince = user?.registrationDate ? formatMemberSince(user.registrationDate, lang) : "";
   const premiumMode = isPremiumActive(user);
+  const profileBg = String(user?.profileBackground || user?.profileBgUrl || user?.profile_bg_url || "").trim();
   const rootClass = `userProfileModal${premiumMode ? " userProfileModal--premium" : ""}${
     phase === "out" ? " userProfileModal--out" : " userProfileModal--in"
   }`;
@@ -115,9 +116,9 @@ export default function UserProfileModal({ open, userId, onClose, t, lang = "en"
           {user ? (
             <div className={`userProfileCard${premiumMode ? " userProfileCard--premium" : ""}`}>
               <div
-                className={`userProfileHero${
-                  premiumMode && user.profileBackground ? " userProfileHero--hasBg" : ""
-                }${premiumMode ? " userProfileHero--premium" : ""}`}
+                className={`userProfileHero${premiumMode && profileBg ? " userProfileHero--hasBg" : ""}${
+                  premiumMode ? " userProfileHero--premium" : ""
+                }`}
               >
                 {premiumMode ? <div className="userProfilePremiumGlow" aria-hidden /> : null}
                 {premiumMode ? (
@@ -127,10 +128,10 @@ export default function UserProfileModal({ open, userId, onClose, t, lang = "en"
                     <span />
                   </div>
                 ) : null}
-                {premiumMode && user.profileBackground ? (
+                {premiumMode && profileBg ? (
                   <div
                     className="userProfileBg"
-                    style={{ backgroundImage: `url(${user.profileBackground})` }}
+                    style={{ backgroundImage: `url(${profileBg})` }}
                     aria-hidden
                   />
                 ) : null}
@@ -147,9 +148,11 @@ export default function UserProfileModal({ open, userId, onClose, t, lang = "en"
 
               <div className="userProfileNameBlock">
                 <h2 className="userProfileDisplayName">
-                  <span className={user.isPremium ? "premiumName" : undefined}>
+                  <span className={premiumMode ? "premiumName" : undefined}>
                     {user.username}
-                    {user.isPremium ? <span className={`premiumBadge${premiumMode ? " premiumBadge--pop" : ""}`}>💎</span> : null}
+                    {premiumMode ? (
+                      <span className={`premiumBadge${premiumMode ? " premiumBadge--pop" : ""}`}>💎</span>
+                    ) : null}
                   </span>
                 </h2>
                 <div className="userProfileBadgesRow">
