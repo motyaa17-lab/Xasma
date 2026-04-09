@@ -1928,7 +1928,6 @@ export default function App() {
           </div>
         </div>
         <div className="topBarRight">
-          <div style={{ color: "red", fontWeight: 900 }}>TEST BUTTON</div>
           <button
             type="button"
             className="topBarDownloadBtn"
@@ -1980,6 +1979,9 @@ export default function App() {
                 </div>
               </div>
               <div className="mobileMainHeaderActions">
+                <span style={{ color: "red", fontWeight: 900, fontSize: 12 }} data-xasma-trace="mobile-inbox-header">
+                  TEST MOBILE HEADER
+                </span>
                 <button
                   type="button"
                   className="mobileDownloadBtn"
@@ -2112,7 +2114,31 @@ export default function App() {
 
   return (
     <AppRuntimeErrorBoundary>
-      <div className={`appRoot${mobileConversationOpen ? " appRoot--mobileConversationOpen" : ""}`}>
+      <div
+        className={`appRoot${mobileConversationOpen ? " appRoot--mobileConversationOpen" : ""}`}
+        data-xasma-entry="frontend/src/main.jsx"
+        data-xasma-root="frontend/src/App.jsx"
+        data-xasma-layout={isMobile ? "mobile-shell" : "desktop-shell"}
+      >
+        {/* TRACE: always mounted if this bundle runs; shows which layout branch is active (see useIsMobile(900)). */}
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            zIndex: 2147483647,
+            background: "#dc2626",
+            color: "#fff",
+            padding: "6px 10px",
+            font: '700 12px/1.2 system-ui, -apple-system, sans-serif',
+            pointerEvents: "none",
+            maxWidth: "100%",
+            boxSizing: "border-box",
+          }}
+          data-xasma-trace="1"
+        >
+          TRACE: App.jsx | entry main.jsx | layout: {isMobile ? "mobile (≤900px)" : "desktop (>900px)"}
+        </div>
         {isMobile ? (
           <MobileLayoutErrorBoundary fallback={desktopShell}>{mobileShell}</MobileLayoutErrorBoundary>
         ) : (
