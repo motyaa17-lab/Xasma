@@ -91,6 +91,7 @@ export default function App() {
   const socketResyncTimerRef = useRef(null);
   const lastSocketResyncAtRef = useRef(0);
   const optimisticSendTimersRef = useRef(new Map()); // clientTempId -> timeoutId
+  const messagesLoadSeqRef = useRef(0);
   const mobileInboxSidebarRef = useRef(null);
   const settingsRef = useRef(settings);
   const openChatFromNotificationRef = useRef(() => {});
@@ -188,6 +189,23 @@ export default function App() {
   useEffect(() => {
     chatsRef.current = chats;
   }, [chats]);
+
+  function mergeFetchedMessages(chatId, fetchedList, prevList) {
+    const cid = Number(chatId);
+    const fetched = Array.isArray(fetchedList) ? fetchedList : [];
+    const prev = Array.isArray(prevList) ? prevList : [];
+    const out = fetched.slice();
+    const ids = new Set(out.map((m) => Number(m?.id)).filter((x) => Number.isFinite(x)));
+    // Keep any messages that arrived via realtime/optimistic while fetch was in-flight.
+    for (const m of prev) {
+      if (!m || typeof m !== "object") continue;
+      if (Number(m.chatId) !== cid) continue;
+      const mid = Number(m.id);
+      if (Number.isFinite(mid) && ids.has(mid)) continue;
+      out.push(m);
+    }
+    return out;
+  }
 
   const activeCallLogIdRef = useRef(null); // string | null
 
@@ -686,8 +704,13 @@ export default function App() {
         const openChatId = Number(selectedChatIdRef.current || 0);
         if (!openChatId) return;
         try {
+          const loadSeq = ++messagesLoadSeqRef.current;
           const list = await getMessages(openChatId, 50);
-          setMessages(list);
+          setMessages((prev) => {
+            if (Number(selectedChatIdRef.current || 0) !== Number(openChatId)) return prev;
+            if (messagesLoadSeqRef.current !== loadSeq) return prev;
+            return mergeFetchedMessages(openChatId, list, prev);
+          });
           const lastId = list.length ? Number(list[list.length - 1].id) : 0;
           if (lastId && socket.connected) {
             socket.emit("chat:read", { chatId: openChatId, upToMessageId: lastId });
@@ -1315,8 +1338,13 @@ export default function App() {
   }, [realtimeSendNotice]);
 
   async function refreshMessages(chatId) {
+    const loadSeq = ++messagesLoadSeqRef.current;
     const list = await getMessages(chatId, 50);
-    setMessages(list);
+    setMessages((prev) => {
+      if (Number(selectedChatIdRef.current || 0) !== Number(chatId)) return prev;
+      if (messagesLoadSeqRef.current !== loadSeq) return prev;
+      return mergeFetchedMessages(chatId, list, prev);
+    });
   }
 
   async function handleSetChatPin(messageId) {
@@ -1342,13 +1370,18 @@ export default function App() {
 
   async function selectChat(chatId) {
     setSendRateLimitNotice("");
+    const loadSeq = ++messagesLoadSeqRef.current;
     setSelectedChatId(chatId);
     setChats((prev) =>
       prev.map((c) => (Number(c.id) === Number(chatId) ? { ...c, unreadCount: 0 } : c))
     );
     setMessages([]);
     const list = await getMessages(chatId, 50);
-    setMessages(list);
+    setMessages((prev) => {
+      if (Number(selectedChatIdRef.current || 0) !== Number(chatId)) return prev;
+      if (messagesLoadSeqRef.current !== loadSeq) return prev;
+      return mergeFetchedMessages(chatId, list, prev);
+    });
     const lastId = list.length ? list[list.length - 1].id : 0;
     if (lastId && socketRef.current && socketReady) {
       socketRef.current.emit("chat:read", { chatId, upToMessageId: lastId });
