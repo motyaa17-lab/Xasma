@@ -26,8 +26,8 @@ const MOBILE_LONG_PRESS_MS = 420;
 const MOBILE_LONG_PRESS_MOVE_CANCEL_PX = 14;
 const MOBILE_LONG_PRESS_MOVE_CANCEL_PX2 = MOBILE_LONG_PRESS_MOVE_CANCEL_PX * MOBILE_LONG_PRESS_MOVE_CANCEL_PX;
 
-// Swipe-to-reply (Telegram-like)
-const ENABLE_SWIPE_TO_REPLY = false;
+// Swipe-to-reply (Telegram-like); touch handlers also gated by isMobileChat.
+const ENABLE_SWIPE_TO_REPLY = true;
 const SWIPE_REPLY_ARM_X_PX = 10;
 const SWIPE_REPLY_CANCEL_Y_PX = 14;
 const SWIPE_REPLY_TRIGGER_PX = 56;
@@ -42,6 +42,7 @@ const MessageActionMenuPanel = forwardRef(function MessageActionMenuPanel(
     canReport,
     canAdminDelete,
     canPin,
+    canReply,
     className,
     style,
     onToggleReaction,
@@ -49,6 +50,7 @@ const MessageActionMenuPanel = forwardRef(function MessageActionMenuPanel(
     onReport,
     onAdminDelete,
     onPin,
+    onReply,
     closeMenu,
   },
   ref
@@ -85,6 +87,22 @@ const MessageActionMenuPanel = forwardRef(function MessageActionMenuPanel(
           </div>
           {hasSecondaryActions ? <div className="msgMenuDivider" aria-hidden /> : null}
         </>
+      ) : null}
+      {canReply ? (
+        <button
+          type="button"
+          className="msgMenuItem"
+          role="menuitem"
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            closeMenu();
+            onReply?.();
+          }}
+        >
+          {t("replyToMessage")}
+        </button>
       ) : null}
       {canEditOwn ? (
         <button
@@ -363,7 +381,7 @@ export default function Chat({
   const longPressClickBlockUntilRef = useRef(0);
   const longPressTimerRef = useRef(null);
   const longPressTrackRef = useRef(null);
-  const swipeStateRef = useRef(null); // { id, sx, sy, active, dx }
+  const swipeStateRef = useRef(null); // { id, sx, sy, active, dx, msg, isOwn }
   const swipeAnimRafRef = useRef(0);
   const swipeClickBlockUntilRef = useRef(0);
   const [swipeMessageId, setSwipeMessageId] = useState(null);
@@ -393,14 +411,24 @@ export default function Chat({
     (e, message) => {
       if (!ENABLE_SWIPE_TO_REPLY) return;
       if (!isMobileChat) return;
+      if (isOfficial && !isAdmin) return;
       if (!message?.id) return;
       if (e.touches.length !== 1) return;
       const t0 = e.touches[0];
-      swipeStateRef.current = { id: message.id, sx: t0.clientX, sy: t0.clientY, active: false, dx: 0, msg: message };
+      const isOwn = Number(message.senderId) === Number(meId);
+      swipeStateRef.current = {
+        id: message.id,
+        sx: t0.clientX,
+        sy: t0.clientY,
+        active: false,
+        dx: 0,
+        msg: message,
+        isOwn,
+      };
       setSwipeMessageId(message.id);
       setSwipeDx(0);
     },
-    [isMobileChat]
+    [isMobileChat, meId, isOfficial, isAdmin]
   );
 
   const onMobileBubbleSwipeTouchMove = useCallback(
@@ -413,6 +441,7 @@ export default function Chat({
       if (!t0) return;
       const dx = t0.clientX - s.sx;
       const dy = t0.clientY - s.sy;
+      const isOwn = Boolean(s.isOwn);
 
       if (!s.active) {
         if (Math.abs(dy) > SWIPE_REPLY_CANCEL_Y_PX && Math.abs(dy) > Math.abs(dx)) {
@@ -421,14 +450,22 @@ export default function Chat({
           setSwipeDx(0);
           return;
         }
-        if (dx > SWIPE_REPLY_ARM_X_PX && dx > Math.abs(dy) * 1.2) {
+        if (isOwn) {
+          if (dx < -SWIPE_REPLY_ARM_X_PX && Math.abs(dx) > Math.abs(dy) * 1.2) {
+            s.active = true;
+          } else {
+            return;
+          }
+        } else if (dx > SWIPE_REPLY_ARM_X_PX && dx > Math.abs(dy) * 1.2) {
           s.active = true;
         } else {
           return;
         }
       }
 
-      const clamped = Math.max(0, Math.min(SWIPE_REPLY_MAX_PX, dx));
+      const clamped = isOwn
+        ? Math.max(-SWIPE_REPLY_MAX_PX, Math.min(0, dx))
+        : Math.max(0, Math.min(SWIPE_REPLY_MAX_PX, dx));
       s.dx = clamped;
       if (swipeAnimRafRef.current) cancelAnimationFrame(swipeAnimRafRef.current);
       swipeAnimRafRef.current = requestAnimationFrame(() => {
@@ -448,7 +485,11 @@ export default function Chat({
 
       const msg = s?.msg;
       const dx = Number(s?.dx || 0);
-      const shouldTrigger = Boolean(trigger) && dx >= SWIPE_REPLY_TRIGGER_PX && msg?.id;
+      const isOwn = Boolean(s?.isOwn);
+      const shouldTrigger =
+        Boolean(trigger) &&
+        msg?.id &&
+        (isOwn ? dx <= -SWIPE_REPLY_TRIGGER_PX : dx >= SWIPE_REPLY_TRIGGER_PX);
 
       setSwipeDx(0);
       setSwipeMessageId(null);
@@ -523,13 +564,15 @@ export default function Chat({
     const canReport =
       !isOfficial && !isBanned && m.senderId !== meId && (m.type || "text") !== "system";
     const canPin = canPinForUser && (m.type || "text") !== "system";
+    const canReply = showMessageMenu && (m.type || "text") !== "system";
     return {
       canQuickReact: !isBanned,
       canEditOwn,
       canReport,
       canAdminDelete,
       canPin,
-      hasSecondaryActions: canEditOwn || canReport || canAdminDelete || canPin,
+      canReply,
+      hasSecondaryActions: canReply || canEditOwn || canReport || canAdminDelete || canPin,
     };
   }, [mobileMenuTarget, meId, isBanned, isAdmin, isOfficial, canPinForUser]);
 
@@ -2309,8 +2352,10 @@ export default function Chat({
                     !isBanned &&
                     m.senderId !== meId &&
                     (m.type || "text") !== "system";
+                  const canReply =
+                    showBubbleInteractionMenu && (m.type || "text") !== "system";
                   const hasSecondaryActions =
-                    canEditOwn || canReport || canAdminDelete || canPinThisMessage;
+                    canReply || canEditOwn || canReport || canAdminDelete || canPinThisMessage;
 
                   const msgAura =
                     (m.senderId === meId ? meAuraColor : m.sender?.auraColor) || undefined;
@@ -2421,7 +2466,13 @@ export default function Chat({
                   >
                     {ENABLE_SWIPE_TO_REPLY && isMobileChat ? (
                       <span
-                        className={swipeMessageId === m.id && swipeDx > 8 ? "swipeReplyIcon swipeReplyIcon--on" : "swipeReplyIcon"}
+                        className={
+                          (m.senderId === meId ? "swipeReplyIcon swipeReplyIcon--own" : "swipeReplyIcon") +
+                          (swipeMessageId === m.id &&
+                          (m.senderId === meId ? swipeDx < -8 : swipeDx > 8)
+                            ? " swipeReplyIcon--on"
+                            : "")
+                        }
                         aria-hidden
                       >
                         ↩︎
@@ -2447,12 +2498,20 @@ export default function Chat({
                             t={t}
                             canQuickReact={canQuickReact}
                             hasSecondaryActions={hasSecondaryActions}
+                            canReply={canReply}
                             canEditOwn={canEditOwn}
                             canReport={canReport}
                             canAdminDelete={canAdminDelete}
                             canPin={canPinThisMessage}
                             className="msgMenuDropdown"
                             onToggleReaction={(emo) => onToggleReaction?.(m.id, emo)}
+                            onReply={() => {
+                              setReplyToMessage({
+                                id: m.id,
+                                senderUsername: m.sender?.username || getDisplayName(m, meId, meUsername, t),
+                                preview: getReplyPreviewForMessage(m),
+                              });
+                            }}
                             onEdit={() => {
                               setEditingMessageId(m.id);
                               setText(String(m.text ?? ""));
@@ -2641,7 +2700,7 @@ export default function Chat({
             {imageUploading ? <div className="uploadProgressHint">{t("uploadImageProgress")}</div> : null}
             {voiceUploading ? <div className="uploadProgressHint">{t("voiceSending")}</div> : null}
             {videoNoteUploading ? <div className="uploadProgressHint">{t("videoNoteUploading")}</div> : null}
-            {ENABLE_SWIPE_TO_REPLY && replyToMessage ? (
+            {replyToMessage ? (
               <div className="replyComposerBar" role="group" aria-label={t("replyTo")}>
                 <div className="replyComposerMain">
                   <div className="replyComposerLabel">{t("replyTo")}</div>
@@ -2964,6 +3023,7 @@ export default function Chat({
                     t={t}
                     canQuickReact={mobileMenuFlags.canQuickReact}
                     hasSecondaryActions={mobileMenuFlags.hasSecondaryActions}
+                    canReply={mobileMenuFlags.canReply}
                     canEditOwn={mobileMenuFlags.canEditOwn}
                     canReport={mobileMenuFlags.canReport}
                     canAdminDelete={mobileMenuFlags.canAdminDelete}
@@ -2993,6 +3053,14 @@ export default function Chat({
                           }
                     }
                     onToggleReaction={(emo) => onToggleReaction?.(mobileMenuTarget.id, emo)}
+                    onReply={() => {
+                      const mm = mobileMenuTarget;
+                      setReplyToMessage({
+                        id: mm.id,
+                        senderUsername: mm.sender?.username || getDisplayName(mm, meId, meUsername, t),
+                        preview: getReplyPreviewForMessage(mm),
+                      });
+                    }}
                     onEdit={() => {
                       setEditingMessageId(mobileMenuTarget.id);
                       setText(String(mobileMenuTarget.text ?? ""));

@@ -6,6 +6,7 @@ import { formatUserStatusLine } from "../userStatusLine.js";
 import ActivityBadge from "./ActivityBadge.jsx";
 import UserTagBadge from "./UserTagBadge.jsx";
 import { isPremiumActive } from "../premium.js";
+import { IconEllipsis } from "./Icons.jsx";
 
 const Sidebar = forwardRef(function Sidebar(
   {
@@ -49,6 +50,7 @@ const Sidebar = forwardRef(function Sidebar(
   const [channelAvatarDraft, setChannelAvatarDraft] = useState(null);
 
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+  const [desktopChatMenuId, setDesktopChatMenuId] = useState(null);
   const [swipeOpenId, setSwipeOpenId] = useState(null);
   const [swipeScrollNonce, setSwipeScrollNonce] = useState(0);
   const chatListScrollCloseRaf = useRef(null);
@@ -57,6 +59,17 @@ const Sidebar = forwardRef(function Sidebar(
     if (phase === "lock") setSwipeOpenId(id);
     if (phase === "end") setSwipeOpenId(null);
   }, []);
+
+  useEffect(() => {
+    if (desktopChatMenuId == null) return;
+    const onDown = (e) => {
+      const t = e.target;
+      if (t instanceof Element && t.closest(".chatListItemMenuCol")) return;
+      setDesktopChatMenuId(null);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [desktopChatMenuId]);
 
   const onMobileChatListScroll = useCallback(() => {
     if (!MOBILE_CHAT_SWIPE_ENABLED) return;
@@ -520,56 +533,56 @@ const Sidebar = forwardRef(function Sidebar(
       </div>
     ) : null;
 
-  if (mobileLayout) {
-    const mobileChatsToShow = query.trim() ? mobileFilteredChats : chats;
-
-    const deleteConfirmModal =
-      deleteConfirmId != null ? (
-        <div className="modalBackdrop" role="presentation" onClick={() => setDeleteConfirmId(null)}>
-          <div
-            className="modalCard modalCard--mobileFriendly"
-            role="alertdialog"
-            aria-labelledby="chatDeleteConfirmHeading"
-            aria-describedby="chatDeleteConfirmDesc"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="modalHeader">
-              <div className="modalTitle" id="chatDeleteConfirmHeading">
-                {t("chatDeleteConfirmTitle")}
-              </div>
+  const deleteConfirmModal =
+    deleteConfirmId != null ? (
+      <div className="modalBackdrop" role="presentation" onClick={() => setDeleteConfirmId(null)}>
+        <div
+          className={`modalCard${mobileLayout ? " modalCard--mobileFriendly" : ""}`}
+          role="alertdialog"
+          aria-labelledby="chatDeleteConfirmHeading"
+          aria-describedby="chatDeleteConfirmDesc"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="modalHeader">
+            <div className="modalTitle" id="chatDeleteConfirmHeading">
+              {t("chatDeleteConfirmTitle")}
+            </div>
+            <button
+              type="button"
+              className="iconCloseBtn"
+              onClick={() => setDeleteConfirmId(null)}
+              aria-label={t("close")}
+            >
+              ×
+            </button>
+          </div>
+          <div className="modalBody">
+            <p id="chatDeleteConfirmDesc" className="muted">
+              {t("chatDeleteConfirmBody")}
+            </p>
+            <div className="groupModalActions">
+              <button type="button" className="ghostBtn" onClick={() => setDeleteConfirmId(null)}>
+                {t("chatDeleteCancelButton")}
+              </button>
               <button
                 type="button"
-                className="iconCloseBtn"
-                onClick={() => setDeleteConfirmId(null)}
-                aria-label={t("close")}
+                className={`primaryBtn${mobileLayout ? " mobileChatDeleteConfirmBtn" : ""}`}
+                onClick={() => {
+                  const id = deleteConfirmId;
+                  setDeleteConfirmId(null);
+                  if (id != null && onChatDelete) void onChatDelete(id);
+                }}
               >
-                ×
+                {t("chatDeleteConfirmButton")}
               </button>
-            </div>
-            <div className="modalBody">
-              <p id="chatDeleteConfirmDesc" className="muted">
-                {t("chatDeleteConfirmBody")}
-              </p>
-              <div className="groupModalActions">
-                <button type="button" className="ghostBtn" onClick={() => setDeleteConfirmId(null)}>
-                  {t("chatDeleteCancelButton")}
-                </button>
-                <button
-                  type="button"
-                  className="primaryBtn mobileChatDeleteConfirmBtn"
-                  onClick={() => {
-                    const id = deleteConfirmId;
-                    setDeleteConfirmId(null);
-                    if (id != null && onChatDelete) void onChatDelete(id);
-                  }}
-                >
-                  {t("chatDeleteConfirmButton")}
-                </button>
-              </div>
             </div>
           </div>
         </div>
-      ) : null;
+      </div>
+    ) : null;
+
+  if (mobileLayout) {
+    const mobileChatsToShow = query.trim() ? mobileFilteredChats : chats;
 
     return (
       <>
@@ -826,90 +839,132 @@ const Sidebar = forwardRef(function Sidebar(
             const timeLabel = c.last?.createdAt ? formatListTime(c.last.createdAt, lang) : "";
             const statusSubtitle =
               !isRoom && !isOfficial && other ? formatUserStatusLine(other, t, lang) : "";
+            const showDesktopChatMenu = Boolean(onChatDelete) && !isOfficial;
             return (
-              <button
+              <div
                 key={c.id}
-                className={isOfficial ? "chatListItem chatListItem--official" : "chatListItem"}
-                onClick={() => onSelectChat(c.id)}
-                type="button"
+                className={`chatListItemRow${isOfficial ? " chatListItemRow--official" : ""}${
+                  desktopChatMenuId === c.id ? " chatListItemRow--menuOpen" : ""
+                }`}
               >
-                <div className="chatItemTop">
-                  <div className="chatAvatarWrap">
-                    <AvatarAura skip={isRoom || isOfficial} auraColor={other?.auraColor}>
-                      <div
-                        className={`${!isRoom && online ? "avatarSm presence online" : "avatarSm presence"}${
-                          !isRoom && !isOfficial && isPremiumActive(other) ? " avatarPremium" : ""
-                        }`}
-                      >
-                        {isRoom && c.avatar ? (
-                          <img src={c.avatar} alt="" />
-                        ) : !isRoom && other?.avatar ? (
-                          <img src={other.avatar} alt="" />
-                        ) : (
-                          <span>{initials(isRoom || isOfficial ? label : other?.username || "")}</span>
-                        )}
-                      </div>
-                    </AvatarAura>
-                    {!isRoom && !isOfficial ? (
-                      <span
-                        className={online ? "avatarPresenceDot avatarPresenceDot--on" : "avatarPresenceDot"}
-                        title={presenceText(other, t, lang)}
-                        aria-hidden
-                      />
-                    ) : null}
-                  </div>
-                  <div className="chatOther">
-                    <div className="chatOtherNameRow">
-                      <div className="chatOtherName">
-                        <span className={!isRoom && !isOfficial && isPremiumActive(other) ? "premiumName" : undefined}>
-                          {label}
-                          {!isRoom && !isOfficial && isPremiumActive(other) ? (
-                            <span className="premiumBadge">💎</span>
+                <button
+                  type="button"
+                  className={isOfficial ? "chatListItem chatListItem--official" : "chatListItem"}
+                  onClick={() => {
+                    setDesktopChatMenuId(null);
+                    onSelectChat(c.id);
+                  }}
+                >
+                  <div className="chatItemTop">
+                    <div className="chatAvatarWrap">
+                      <AvatarAura skip={isRoom || isOfficial} auraColor={other?.auraColor}>
+                        <div
+                          className={`${!isRoom && online ? "avatarSm presence online" : "avatarSm presence"}${
+                            !isRoom && !isOfficial && isPremiumActive(other) ? " avatarPremium" : ""
+                          }`}
+                        >
+                          {isRoom && c.avatar ? (
+                            <img src={c.avatar} alt="" />
+                          ) : !isRoom && other?.avatar ? (
+                            <img src={other.avatar} alt="" />
+                          ) : (
+                            <span>{initials(isRoom || isOfficial ? label : other?.username || "")}</span>
+                          )}
+                        </div>
+                      </AvatarAura>
+                      {!isRoom && !isOfficial ? (
+                        <span
+                          className={online ? "avatarPresenceDot avatarPresenceDot--on" : "avatarPresenceDot"}
+                          title={presenceText(other, t, lang)}
+                          aria-hidden
+                        />
+                      ) : null}
+                    </div>
+                    <div className="chatOther">
+                      <div className="chatOtherNameRow">
+                        <div className="chatOtherName">
+                          <span className={!isRoom && !isOfficial && isPremiumActive(other) ? "premiumName" : undefined}>
+                            {label}
+                            {!isRoom && !isOfficial && isPremiumActive(other) ? (
+                              <span className="premiumBadge">💎</span>
+                            ) : null}
+                          </span>
+                          {isOfficial ? (
+                            <span className="officialChatListBadge">{t("officialChatBadge")}</span>
                           ) : null}
-                        </span>
-                        {isOfficial ? (
-                          <span className="officialChatListBadge">{t("officialChatBadge")}</span>
-                        ) : null}
-                        {isChannel ? <span className="channelChatListBadge">{t("channelBadge")}</span> : null}
-                        {!isRoom && !isOfficial ? (
-                          <UserTagBadge
-                            tag={other?.tag}
-                            tagColor={other?.tagColor}
-                            tagStyle={other?.tagStyle}
-                          />
-                        ) : null}
-                        {!isRoom && !isOfficial ? (
-                          <ActivityBadge messageCount={other?.messageCount} t={t} />
-                        ) : null}
+                          {isChannel ? <span className="channelChatListBadge">{t("channelBadge")}</span> : null}
+                          {!isRoom && !isOfficial ? (
+                            <UserTagBadge
+                              tag={other?.tag}
+                              tagColor={other?.tagColor}
+                              tagStyle={other?.tagStyle}
+                            />
+                          ) : null}
+                          {!isRoom && !isOfficial ? (
+                            <ActivityBadge messageCount={other?.messageCount} t={t} />
+                          ) : null}
+                        </div>
                       </div>
+                      {!isRoom && !isOfficial && statusSubtitle ? (
+                        <div className="chatOtherStatus muted" title={statusSubtitle}>
+                          {statusSubtitle}
+                        </div>
+                      ) : null}
+                      {c.last ? (
+                        <div className="chatLast">{c.last.text}</div>
+                      ) : (
+                        <div className="chatLast muted">{t("noMessages")}</div>
+                      )}
                     </div>
-                    {!isRoom && !isOfficial && statusSubtitle ? (
-                      <div className="chatOtherStatus muted" title={statusSubtitle}>
-                        {statusSubtitle}
+                    <div className="chatItemRight">
+                      <div className="chatItemTime" aria-hidden={!timeLabel}>
+                        {timeLabel}
+                      </div>
+                      {unreadLabel ? (
+                        <div className="chatItemBadgeRow">
+                          <span className="chatUnreadBadge" aria-label={t("unreadBadgeAria").replace("{count}", unreadLabel)}>
+                            {unreadLabel}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="chatItemBadgeRow" aria-hidden />
+                      )}
+                    </div>
+                  </div>
+                </button>
+                {showDesktopChatMenu ? (
+                  <div className="chatListItemMenuCol">
+                    <button
+                      type="button"
+                      className="chatListItemMoreBtn"
+                      aria-label={t("menu")}
+                      aria-expanded={desktopChatMenuId === c.id}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setDesktopChatMenuId((id) => (id === c.id ? null : c.id));
+                      }}
+                    >
+                      <IconEllipsis size={18} />
+                    </button>
+                    {desktopChatMenuId === c.id ? (
+                      <div className="chatListItemDropdown" role="menu">
+                        <button
+                          type="button"
+                          className="chatListItemDropdownItem chatListItemDropdownItem--danger"
+                          role="menuitem"
+                          onClick={() => {
+                            setDesktopChatMenuId(null);
+                            setDeleteConfirmId(c.id);
+                          }}
+                        >
+                          {t("chatListSwipeDelete")}
+                        </button>
                       </div>
                     ) : null}
-                    {c.last ? (
-                      <div className="chatLast">{c.last.text}</div>
-                    ) : (
-                      <div className="chatLast muted">{t("noMessages")}</div>
-                    )}
                   </div>
-                  <div className="chatItemRight">
-                    <div className="chatItemTime" aria-hidden={!timeLabel}>
-                      {timeLabel}
-                    </div>
-                    {unreadLabel ? (
-                      <div className="chatItemBadgeRow">
-                        <span className="chatUnreadBadge" aria-label={t("unreadBadgeAria").replace("{count}", unreadLabel)}>
-                          {unreadLabel}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="chatItemBadgeRow" aria-hidden />
-                    )}
-                  </div>
-                </div>
-              </button>
+                ) : null}
+              </div>
             );
           })}
         </div>
@@ -957,6 +1012,7 @@ const Sidebar = forwardRef(function Sidebar(
 
       {groupModal}
       {channelModal}
+      {deleteConfirmModal}
     </aside>
   );
 });

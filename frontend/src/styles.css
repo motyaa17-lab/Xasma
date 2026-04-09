@@ -1546,6 +1546,86 @@ body.body--mobileConversationOpen {
   color: inherit;
 }
 
+.chatListItemRow {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  width: 100%;
+}
+
+.chatListItemRow .chatListItem {
+  flex: 1;
+  min-width: 0;
+}
+
+.chatListItemMenuCol {
+  flex: 0 0 auto;
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.chatListItemMoreBtn {
+  width: 36px;
+  margin: 6px 4px 6px 0;
+  border: none;
+  background: transparent;
+  color: rgba(148, 163, 184, 0.65);
+  cursor: pointer;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  opacity: 0;
+  transition: opacity 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+
+.chatListItemRow:hover .chatListItemMoreBtn,
+.chatListItemRow--menuOpen .chatListItemMoreBtn,
+.chatListItemMoreBtn:focus-visible {
+  opacity: 1;
+}
+
+.chatListItemMoreBtn:hover {
+  color: rgba(226, 232, 240, 0.92);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.chatListItemDropdown {
+  position: absolute;
+  top: 6px;
+  right: 4px;
+  min-width: 148px;
+  background: rgba(17, 27, 46, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
+  z-index: 40;
+}
+
+.chatListItemDropdownItem {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  color: rgba(226, 232, 240, 0.95);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.chatListItemDropdownItem:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.chatListItemDropdownItem--danger {
+  color: rgba(252, 165, 165, 0.98);
+}
+
 .chatItemTop {
   display: flex;
   align-items: center;
@@ -1578,7 +1658,7 @@ body.body--mobileConversationOpen {
   box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.14), 0 2px 8px rgba(0, 0, 0, 0.22);
 }
 
-.chatListItem:hover .chatItemTop {
+.chatListItemRow:hover .chatItemTop {
   border-color: rgba(37, 99, 235, 0.35);
 }
 
@@ -3442,6 +3522,11 @@ body.body--mobileConversationOpen {
   opacity: 1;
   transform: translate3d(0, -50%, 0) scale(1);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+}
+
+.swipeReplyIcon--own {
+  left: auto;
+  right: -18px;
 }
 
 .replyComposerBar {
@@ -5709,6 +5794,25 @@ body.body--mobileConversationOpen {
 
 .mobileChatRowSwipePad--delete {
   background: linear-gradient(135deg, rgba(239, 68, 68, 0.98), rgba(185, 28, 28, 0.98));
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+  pointer-events: auto;
+}
+
+.mobileChatRowSwipePad--filler {
+  flex: 0 0 64px;
+  min-width: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.mobileChatRowSwipePad--delete:active {
+  filter: brightness(1.06);
 }
 
 .mobileChatRowSwipeIcon {

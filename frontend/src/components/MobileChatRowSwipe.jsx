@@ -9,7 +9,7 @@ export const MOBILE_CHAT_SWIPE_ENABLED = true;
  * Rollout step: when false, only horizontal drag + snap-back (no pin/delete rails or commits).
  * Set to true when drag-only is stable on device.
  */
-export const MOBILE_SWIPE_ACTIONS_ENABLED = false;
+export const MOBILE_SWIPE_ACTIONS_ENABLED = true;
 
 /** Reveal width (px) — slightly softer than a full 76px rail. */
 const ACTION_PX = 62;
@@ -257,9 +257,9 @@ export default function MobileChatRowSwipe({
       const fullSwipePx = w * FULL_SWIPE_FRAC;
       const o = offsetRef.current;
 
+      /* Delete: reveal rail and hold — user must tap the red control (no instant delete on release). */
       if (canDelete && (o <= -fullSwipePx || o <= -RELEASE_COMMIT_PX)) {
-        snapTo(0);
-        onRequestDelete?.();
+        snapTo(-ACTION_PX);
       } else if (o >= fullSwipePx || o >= RELEASE_COMMIT_PX) {
         snapTo(0);
         onToggleListPin?.();
@@ -320,11 +320,26 @@ export default function MobileChatRowSwipe({
                 <SwipePinIcon />
               </span>
             </div>
-            <div className="mobileChatRowSwipePad mobileChatRowSwipePad--delete">
-              <span className="mobileChatRowSwipeIcon" title={t("chatListSwipeDelete")}>
-                <SwipeTrashIcon />
-              </span>
-            </div>
+            {canDelete ? (
+              <button
+                type="button"
+                className="mobileChatRowSwipePad mobileChatRowSwipePad--delete"
+                title={t("chatListSwipeDelete")}
+                aria-label={t("chatListSwipeDelete")}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onRequestDelete?.();
+                  snapTo(0);
+                }}
+              >
+                <span className="mobileChatRowSwipeIcon">
+                  <SwipeTrashIcon />
+                </span>
+              </button>
+            ) : (
+              <div className="mobileChatRowSwipePad mobileChatRowSwipePad--filler" aria-hidden />
+            )}
           </>
         ) : (
           <div className="mobileChatRowSwipeUnderNeutral" />
