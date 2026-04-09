@@ -101,6 +101,9 @@ export default function App() {
   const [mobileTab, setMobileTab] = useState("chats");
   const [installDownloadOpen, setInstallDownloadOpen] = useState(false);
   const [desktopCallsOpen, setDesktopCallsOpen] = useState(false);
+  const desktopUserMenuRef = useRef(null);
+  const desktopMenuClusterRef = useRef(null);
+  const [desktopMenuOpen, setDesktopMenuOpen] = useState(false);
   const [sendRateLimitNotice, setSendRateLimitNotice] = useState("");
   const [realtimeSendNotice, setRealtimeSendNotice] = useState("");
   const [call, setCall] = useState(() => ({
@@ -1952,7 +1955,26 @@ export default function App() {
             </span>
             <span className="topBarDownloadText">{t("downloadButton")}</span>
           </button>
-          <UserMenu {...userMenuProps} variant="dropdown" cleanSettingsTrigger />
+          <div className="desktopTopBarMenuGroup" ref={desktopMenuClusterRef}>
+            <button
+              type="button"
+              className={desktopMenuOpen ? "desktopSettingsBtn desktopSettingsBtn--open" : "desktopSettingsBtn"}
+              onClick={() => desktopUserMenuRef.current?.toggleDropdown()}
+              aria-haspopup="menu"
+              aria-expanded={desktopMenuOpen}
+              title={t("menu")}
+            >
+              <IconSettings />
+            </button>
+            <UserMenu
+              ref={desktopUserMenuRef}
+              {...userMenuProps}
+              variant="dropdown"
+              hideDropdownTrigger
+              menuClusterRef={desktopMenuClusterRef}
+              onDropdownOpenChange={setDesktopMenuOpen}
+            />
+          </div>
         </div>
       </div>
 
@@ -1979,9 +2001,6 @@ export default function App() {
                 </div>
               </div>
               <div className="mobileMainHeaderActions">
-                <span style={{ color: "red", fontWeight: 900, fontSize: 12 }} data-xasma-trace="mobile-inbox-header">
-                  TEST MOBILE HEADER
-                </span>
                 <button
                   type="button"
                   className="mobileDownloadBtn"
@@ -2114,31 +2133,7 @@ export default function App() {
 
   return (
     <AppRuntimeErrorBoundary>
-      <div
-        className={`appRoot${mobileConversationOpen ? " appRoot--mobileConversationOpen" : ""}`}
-        data-xasma-entry="frontend/src/main.jsx"
-        data-xasma-root="frontend/src/App.jsx"
-        data-xasma-layout={isMobile ? "mobile-shell" : "desktop-shell"}
-      >
-        {/* TRACE: always mounted if this bundle runs; shows which layout branch is active (see useIsMobile(900)). */}
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            zIndex: 2147483647,
-            background: "#dc2626",
-            color: "#fff",
-            padding: "6px 10px",
-            font: '700 12px/1.2 system-ui, -apple-system, sans-serif',
-            pointerEvents: "none",
-            maxWidth: "100%",
-            boxSizing: "border-box",
-          }}
-          data-xasma-trace="1"
-        >
-          TRACE: App.jsx | entry main.jsx | layout: {isMobile ? "mobile (≤900px)" : "desktop (>900px)"}
-        </div>
+      <div className={`appRoot${mobileConversationOpen ? " appRoot--mobileConversationOpen" : ""}`}>
         {isMobile ? (
           <MobileLayoutErrorBoundary fallback={desktopShell}>{mobileShell}</MobileLayoutErrorBoundary>
         ) : (

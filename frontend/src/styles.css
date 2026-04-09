@@ -254,6 +254,14 @@ body.body--mobileConversationOpen {
   gap: 10px;
 }
 
+/* Desktop: gear + UserMenu (dropdown only) share one positioned subtree */
+.desktopTopBarMenuGroup {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .topBarDownloadBtn {
   display: inline-flex;
   align-items: center;
@@ -351,43 +359,39 @@ body.body--mobileConversationOpen {
   justify-content: center;
 }
 
-/* Desktop header: dedicated settings trigger (no display toggles, no .appShell--desktop hacks) */
-.settingsBtn {
-  width: 32px;
-  height: 32px;
+/* Desktop top bar: settings gear (trigger lives in App.jsx, not UserMenu) */
+.desktopSettingsBtn {
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   padding: 0;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(15, 23, 42, 0.6);
-  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(15, 23, 42, 0.75);
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
-.settingsBtn svg {
+.desktopSettingsBtn svg {
   width: 20px;
   height: 20px;
-  color: #e2e8f0;
-  opacity: 0.9;
   display: block;
   flex-shrink: 0;
+  color: #e2e8f0;
+  opacity: 0.92;
 }
 
-.settingsBtn:hover {
+.desktopSettingsBtn:hover svg {
   opacity: 1;
 }
 
-.settingsBtn:hover svg {
-  opacity: 1;
-}
-
-.settingsBtn--active {
+.desktopSettingsBtn--open {
   border-color: rgba(37, 99, 235, 0.55);
-  background: rgba(37, 99, 235, 0.18);
-  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.18), 0 0 12px rgba(0, 130, 255, 0.08);
+  background: rgba(37, 99, 235, 0.2);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2), 0 0 12px rgba(0, 130, 255, 0.08);
 }
 
 .menuBtn.active {
@@ -429,6 +433,13 @@ body.body--mobileConversationOpen {
   overflow: hidden;
   box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
   z-index: 50;
+}
+
+/* External gear trigger: anchor menu under the top bar cluster, not an empty .userMenu box */
+.desktopTopBarMenuGroup .dropdown.dropdown--topBarCluster {
+  top: calc(100% + 6px);
+  right: 0;
+  left: auto;
 }
 
 .dropdownItem {
@@ -1493,6 +1504,15 @@ body.body--mobileConversationOpen {
   flex: 1;
   max-height: none;
   padding-right: 6px;
+}
+
+/* Desktop: wider chat list column (not cramped vs chat pane) */
+.appShell--desktop .sidebar {
+  width: min(420px, 34vw);
+  max-width: 480px;
+  min-width: 300px;
+  flex-shrink: 0;
+  padding: 14px 16px;
 }
 
 .chatListItem {

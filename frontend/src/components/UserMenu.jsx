@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import {
   adminBroadcastOfficial,
   adminListFlaggedMessages,
@@ -11,7 +11,6 @@ import {
   adminGrantPremium,
   adminRemovePremium,
 } from "../api.js";
-import { IconSettings } from "./Icons.jsx";
 import { compressImageFileToJpegDataUrl } from "../chatBackgroundImage.js";
 import { currentLanguageLabel, localeForLang } from "../i18n.js";
 import { DONATION_ALERTS_URL } from "../config/donation.js";
@@ -296,21 +295,42 @@ function MessageNotificationsSettings({ settings, onChangeSettings, t }) {
   );
 }
 
-export default function UserMenu({
-  me,
-  onLogout,
-  onChangeAvatar,
-  onChangeProfile,
-  settings,
-  onChangeSettings,
-  t,
-  variant = "dropdown",
-  /** Desktop header only: simple visible settings control (mobile keeps hamburger .menuBtn). */
-  cleanSettingsTrigger = false,
-}) {
+const UserMenu = forwardRef(function UserMenu(
+  {
+    me,
+    onLogout,
+    onChangeAvatar,
+    onChangeProfile,
+    settings,
+    onChangeSettings,
+    t,
+    variant = "dropdown",
+    /** When true, no built-in menu button; parent renders trigger and calls ref.toggleDropdown(). */
+    hideDropdownTrigger = false,
+    /** When using an external trigger, same DOM subtree as button (for outside-click + dropdown anchor). */
+    menuClusterRef = null,
+    /** Fires when dropdown open state changes (for external trigger aria-expanded). */
+    onDropdownOpenChange,
+  },
+  ref
+) {
   const [open, setOpen] = useState(false);
   const [panel, setPanel] = useState(null); // "profile" | "settings" | "admin" | null
   const rootRef = useRef(null);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      toggleDropdown: () => setOpen((v) => !v),
+      openDropdown: () => setOpen(true),
+      closeDropdown: () => setOpen(false),
+    }),
+    []
+  );
+
+  useEffect(() => {
+    onDropdownOpenChange?.(open);
+  }, [open, onDropdownOpenChange]);
   const fileInputRef = useRef(null);
   const [avatarPreview, setAvatarPreview] = useState("");
   const [avatarBusy, setAvatarBusy] = useState(false);
@@ -344,9 +364,9 @@ export default function UserMenu({
   useEffect(() => {
     function onDocMouseDown(e) {
       if (!open) return;
-      const root = rootRef.current;
-      if (!root) return;
-      if (!root.contains(e.target)) setOpen(false);
+      const boundary = menuClusterRef?.current || rootRef.current;
+      if (!boundary) return;
+      if (!boundary.contains(e.target)) setOpen(false);
     }
 
     function onKeyDown(e) {
@@ -363,7 +383,7 @@ export default function UserMenu({
       document.removeEventListener("mousedown", onDocMouseDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [open, panel]);
+  }, [open, panel, menuClusterRef]);
 
   useEffect(() => {
     if (panel !== "profile") return;
@@ -1336,18 +1356,7 @@ export default function UserMenu({
 
   return (
     <div className="userMenu" ref={rootRef}>
-      {cleanSettingsTrigger ? (
-        <button
-          type="button"
-          className={open ? "settingsBtn settingsBtn--active" : "settingsBtn"}
-          onClick={() => setOpen((v) => !v)}
-          aria-haspopup="menu"
-          aria-expanded={open}
-          title={t("menu")}
-        >
-          <IconSettings />
-        </button>
-      ) : (
+      {hideDropdownTrigger ? null : (
         <button
           className={open ? "menuBtn active" : "menuBtn"}
           type="button"
@@ -1365,7 +1374,10 @@ export default function UserMenu({
       )}
 
       {open ? (
-        <div className="dropdown" role="menu">
+        <div
+          className={hideDropdownTrigger ? "dropdown dropdown--topBarCluster" : "dropdown"}
+          role="menu"
+        >
           <button
             className="dropdownItem"
             type="button"
@@ -2086,7 +2098,10 @@ export default function UserMenu({
       ) : null}
     </div>
   );
-}
+});
+
+UserMenu.displayName = "UserMenu";
+export default UserMenu;
 
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
