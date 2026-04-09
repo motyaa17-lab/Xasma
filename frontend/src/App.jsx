@@ -1928,6 +1928,7 @@ export default function App() {
           </div>
         </div>
         <div className="topBarRight">
+          <div style={{ color: "red", fontWeight: 900 }}>TEST BUTTON</div>
           <button
             type="button"
             className="topBarDownloadBtn"
