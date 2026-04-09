@@ -37,6 +37,9 @@ import {
 } from "./syncViewport.js";
 import { tryShowIncomingMessageNotification } from "./messageNotifications.js";
 
+/** Set `true` temporarily to verify stacking: fixed red "TEST SETTINGS" (then set back to `false`). */
+const DEBUG_DESKTOP_SETTINGS_FIXED_TEST = false;
+
 export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem("token") || "");
   const [me, setMe] = useState(null);
@@ -1956,16 +1959,35 @@ export default function App() {
             <span className="topBarDownloadText">{t("downloadButton")}</span>
           </button>
           <div className="desktopTopBarMenuGroup" ref={desktopMenuClusterRef}>
-            <button
-              type="button"
-              className={desktopMenuOpen ? "desktopSettingsBtn desktopSettingsBtn--open" : "desktopSettingsBtn"}
-              onClick={() => desktopUserMenuRef.current?.toggleDropdown()}
-              aria-haspopup="menu"
-              aria-expanded={desktopMenuOpen}
-              title={t("menu")}
-            >
-              <IconSettings />
-            </button>
+            {DEBUG_DESKTOP_SETTINGS_FIXED_TEST ? (
+              <button
+                type="button"
+                style={{
+                  position: "fixed",
+                  top: "20px",
+                  right: "20px",
+                  zIndex: 999999,
+                  background: "red",
+                  color: "white",
+                  padding: "10px",
+                  fontSize: "16px",
+                }}
+                onClick={() => desktopUserMenuRef.current?.toggleDropdown()}
+              >
+                TEST SETTINGS
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={desktopMenuOpen ? "desktopSettingsBtn desktopSettingsBtn--open" : "desktopSettingsBtn"}
+                onClick={() => desktopUserMenuRef.current?.toggleDropdown()}
+                aria-haspopup="menu"
+                aria-expanded={desktopMenuOpen}
+                title={t("menu")}
+              >
+                <IconSettings />
+              </button>
+            )}
             <UserMenu
               ref={desktopUserMenuRef}
               {...userMenuProps}

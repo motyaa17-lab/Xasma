@@ -240,26 +240,41 @@ body.body--mobileConversationOpen {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  overflow: visible;
 }
 
 .topBarLeft {
   display: flex;
   gap: 12px;
   align-items: baseline;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .topBarRight {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 5;
 }
 
 /* Desktop: gear + UserMenu (dropdown only) share one positioned subtree */
 .desktopTopBarMenuGroup {
-  position: relative;
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
   gap: 8px;
+}
+
+.desktopTopBarMenuGroup .userMenu {
+  flex: 0 0 auto;
+  min-width: 0;
+  width: auto;
 }
 
 .topBarDownloadBtn {
@@ -275,6 +290,7 @@ body.body--mobileConversationOpen {
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .topBarDownloadIcon svg {
@@ -366,13 +382,18 @@ body.body--mobileConversationOpen {
   display: flex;
   align-items: center;
   justify-content: center;
+  background: rgba(30, 40, 60, 0.8);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
   cursor: pointer;
   padding: 0;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(15, 23, 42, 0.75);
   flex-shrink: 0;
   box-sizing: border-box;
+  position: relative;
+  z-index: 20;
+  color: #e2e8f0;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .desktopSettingsBtn svg {
@@ -381,7 +402,8 @@ body.body--mobileConversationOpen {
   display: block;
   flex-shrink: 0;
   color: #e2e8f0;
-  opacity: 0.92;
+  opacity: 1;
+  stroke: currentColor;
 }
 
 .desktopSettingsBtn:hover svg {
