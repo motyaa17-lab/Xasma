@@ -379,14 +379,23 @@ body.body--mobileConversationOpen {
 
 /* Desktop: show explicit settings icon; keep hamburger as fallback. */
 .appShell--desktop .menuBtnIcon {
-  display: inline-flex;
+  display: inline-flex !important;
   align-items: center;
   justify-content: center;
-  color: var(--text);
+  color: rgba(226, 232, 240, 0.95);
 }
 
 .appShell--desktop .hamburger {
   display: none;
+}
+
+/* Ensure the SVG actually paints on desktop (some browsers inherit odd defaults). */
+.appShell--desktop .menuBtnIcon svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+  color: currentColor;
+  opacity: 1;
 }
 
 /* Desktop safety: ensure header/menu icons stay visible */
@@ -1439,6 +1448,27 @@ body.body--mobileConversationOpen {
   max-height: 360px;
   overflow: auto;
   padding-right: 4px;
+}
+
+/* Desktop: sidebar list should use full height, not a boxed mini-card. */
+.appShell--desktop .sidebarSection:not(.sidebarNewChat) {
+  border: none;
+  background: transparent;
+  padding: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.appShell--desktop .sidebarSection:not(.sidebarNewChat) .sidebarChatsRow {
+  padding: 0 4px;
+}
+
+.appShell--desktop .sidebarSection:not(.sidebarNewChat) .chatList {
+  flex: 1;
+  max-height: none;
+  padding-right: 6px;
 }
 
 .chatListItem {
