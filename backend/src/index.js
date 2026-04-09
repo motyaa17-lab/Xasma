@@ -1503,64 +1503,6 @@ app.get("/api/users", authRequired, (req, res) => {
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });
 
-app.get("/api/users/:userId", authRequired, (req, res) => {
-  const uid = Number(req.params.userId);
-  if (!uid) return res.status(400).json({ error: "Invalid user id" });
-  (async () => {
-    const botId = getOfficialAnnounceUserId();
-    if (botId && uid === botId) {
-      return res.json({
-        user: {
-          id: botId,
-          username: "Xasma",
-          avatar: "",
-          auraColor: DEFAULT_AURA_COLOR,
-          isOnline: false,
-          lastSeenAt: null,
-          statusKind: "",
-          statusText: "",
-          about: "",
-          messageCount: 0,
-          tag: null,
-          tagColor: DEFAULT_TAG_COLOR,
-          tagStyle: "solid",
-          registrationDate: null,
-          isEarlyTester: false,
-        },
-      });
-    }
-    const r = await query(
-      `SELECT id, username, avatar_url, aura_color, is_online, last_seen_at, status_kind, status_text, about, messages_sent_count,
-              user_tag, tag_color, tag_style, created_at
-       FROM users
-       WHERE id = $1`,
-      [uid]
-    );
-    const u = r.rows[0];
-    if (!u) return res.status(404).json({ error: "User not found" });
-    const tg = buildSenderTagsFromRow(u, false);
-    return res.json({
-      user: {
-        id: Number(u.id),
-        username: u.username,
-        avatar: u.avatar_url || "",
-        auraColor: normalizeAuraColorApi(u.aura_color),
-        isOnline: Boolean(u.is_online),
-        lastSeenAt: u.last_seen_at,
-        statusKind: u.status_kind || "",
-        statusText: u.status_text || "",
-        about: u.about || "",
-        messageCount: Math.max(0, Number(u.messages_sent_count) || 0),
-        tag: tg.tag,
-        tagColor: tg.tagColor,
-        tagStyle: tg.tagStyle,
-        registrationDate: registrationDateIso(u.created_at),
-        isEarlyTester: isEarlyTesterUser(Number(u.id), u.created_at),
-      },
-    });
-  })().catch(() => res.status(500).json({ error: "Server error" }));
-});
-
 app.get("/api/chats", authRequired, (req, res) => {
   const meId = req.user.id;
 

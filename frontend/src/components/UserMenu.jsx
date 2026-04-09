@@ -1342,13 +1342,9 @@ export default function UserMenu({
         aria-expanded={open}
         title={t("menu")}
       >
-        <span className="menuBtnIcon" aria-hidden>
-          <IconSettings size={18} />
-        </span>
-        <span className="hamburger" aria-hidden="true">
-          <span />
-          <span />
-          <span />
+        {/* Always render a visible gear — do not rely on .appShell--desktop toggling .menuBtnIcon */}
+        <span className="menuBtnGear" aria-hidden>
+          <IconSettings size={20} />
         </span>
       </button>
 

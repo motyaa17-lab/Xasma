@@ -42,7 +42,19 @@ export default function UserProfileModal({ open, userId, onClose, t, lang = "en"
     (async () => {
       try {
         const u = await getUserById(userId);
-        if (!cancelled) setUser(u);
+        if (!cancelled) {
+          if (import.meta.env.DEV) {
+            // eslint-disable-next-line no-console
+            console.debug("[UserProfileModal] loaded user", userId, {
+              profileBackground: u?.profileBackground,
+              profileBgUrl: u?.profileBgUrl,
+              profile_bg_url: u?.profile_bg_url,
+              isPremium: u?.isPremium,
+              premiumExpiresAt: u?.premiumExpiresAt,
+            });
+          }
+          setUser(u);
+        }
       } catch (e) {
         if (!cancelled) setErr(e.message || t("errorGeneric"));
       } finally {
@@ -84,6 +96,7 @@ export default function UserProfileModal({ open, userId, onClose, t, lang = "en"
   const memberSince = user?.registrationDate ? formatMemberSince(user.registrationDate, lang) : "";
   const premiumMode = isPremiumActive(user);
   const profileBg = String(user?.profileBackground || user?.profileBgUrl || user?.profile_bg_url || "").trim();
+  const hasBgImage = Boolean(profileBg);
   const rootClass = `userProfileModal${premiumMode ? " userProfileModal--premium" : ""}${
     phase === "out" ? " userProfileModal--out" : " userProfileModal--in"
   }`;
@@ -116,7 +129,7 @@ export default function UserProfileModal({ open, userId, onClose, t, lang = "en"
           {user ? (
             <div className={`userProfileCard${premiumMode ? " userProfileCard--premium" : ""}`}>
               <div
-                className={`userProfileHero${premiumMode && profileBg ? " userProfileHero--hasBg" : ""}${
+                className={`userProfileHero${hasBgImage ? " userProfileHero--hasBg" : ""}${
                   premiumMode ? " userProfileHero--premium" : ""
                 }`}
               >
@@ -128,7 +141,7 @@ export default function UserProfileModal({ open, userId, onClose, t, lang = "en"
                     <span />
                   </div>
                 ) : null}
-                {premiumMode && profileBg ? (
+                {hasBgImage ? (
                   <div
                     className="userProfileBg"
                     style={{ backgroundImage: `url(${profileBg})` }}

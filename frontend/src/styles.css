@@ -351,6 +351,23 @@ body.body--mobileConversationOpen {
   justify-content: center;
 }
 
+/* Settings/menu trigger: always visible (gear), independent of .appShell--desktop rules */
+.menuBtnGear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  color: rgba(226, 232, 240, 0.96);
+}
+
+.menuBtnGear svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: inherit;
+}
+
 .menuBtn.active {
   border-color: rgba(37, 99, 235, 0.55);
   background: rgba(37, 99, 235, 0.18);
@@ -750,9 +767,29 @@ body.body--mobileConversationOpen {
   pointer-events: none;
 }
 
-.userProfileHero > * {
-  position: relative;
+/* Decorative layers must stay position:absolute; a blanket `> * { position:relative }` was
+   collapsing `.userProfileBg` (empty div) to zero height so backgrounds never appeared. */
+.userProfileHero > .userProfileBg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.userProfileHero > .userProfileBgOverlay {
+  position: absolute;
+  inset: 0;
   z-index: 1;
+}
+
+.userProfileHero > .userProfilePremiumGlow,
+.userProfileHero > .userProfilePremiumParticles {
+  position: absolute;
+  z-index: 1;
+}
+
+.userProfileHero > *:not(.userProfileBg):not(.userProfileBgOverlay):not(.userProfilePremiumGlow):not(.userProfilePremiumParticles) {
+  position: relative;
+  z-index: 2;
 }
 
 .profileBgPreviewRow {
