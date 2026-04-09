@@ -100,6 +100,7 @@ export default function App() {
   const isMobile = useIsMobile(900);
   const [mobileTab, setMobileTab] = useState("chats");
   const [installDownloadOpen, setInstallDownloadOpen] = useState(false);
+  const [desktopCallsOpen, setDesktopCallsOpen] = useState(false);
   const [sendRateLimitNotice, setSendRateLimitNotice] = useState("");
   const [realtimeSendNotice, setRealtimeSendNotice] = useState("");
   const [call, setCall] = useState(() => ({
@@ -1902,6 +1903,18 @@ export default function App() {
           <button
             type="button"
             className="topBarDownloadBtn"
+            onClick={() => setDesktopCallsOpen(true)}
+            aria-label={t("navCalls")}
+            title={t("navCalls")}
+          >
+            <span className="topBarDownloadIcon" aria-hidden>
+              <IconPhone size={18} />
+            </span>
+            <span className="topBarDownloadText">{t("navCalls")}</span>
+          </button>
+          <button
+            type="button"
+            className="topBarDownloadBtn"
             onClick={() => setInstallDownloadOpen(true)}
             aria-label={t("downloadButton")}
             title={t("downloadButton")}
@@ -2078,6 +2091,37 @@ export default function App() {
         )}
       </div>
       {callOverlay}
+      {desktopCallsOpen && !isMobile ? (
+        <div className="modalBackdrop modalBackdrop--app" role="dialog" aria-modal="true">
+          <div className="modalCard modalCard--mobileFriendly" style={{ maxWidth: 560, width: "min(560px, calc(100vw - 24px))" }}>
+            <div className="modalHeader">
+              <div className="modalTitle">{t("navCalls")}</div>
+              <button className="ghostBtn" type="button" onClick={() => setDesktopCallsOpen(false)}>
+                {t("close")}
+              </button>
+            </div>
+            <div className="modalBody">
+              <CallsScreen
+                t={t}
+                lang={settings.lang}
+                logs={callLogs}
+                onOpenChat={(cid) => {
+                  if (!cid) return;
+                  setDesktopCallsOpen(false);
+                  void selectChat(cid);
+                }}
+                onRedial={(cid) => {
+                  const row = chatsRef.current.find((c) => Number(c.id) === Number(cid));
+                  if (!row?.other?.id) return;
+                  setDesktopCallsOpen(false);
+                  void selectChat(cid);
+                  beginOutgoingCall({ chatId: cid, other: row.other });
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
       <audio
         ref={remoteAudioRef}
         autoPlay
