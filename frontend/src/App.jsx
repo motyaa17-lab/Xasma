@@ -326,13 +326,6 @@ export default function App() {
     setCall((prev) => ({ ...prev, phase: "connecting", connectedAtMs: 0 }));
     upsertActiveCallLog({ status: "answered" });
     clearCallTimers();
-    callConnectedTimerRef.current = window.setTimeout(() => {
-      setCall((prev) =>
-        prev.phase === "connecting"
-          ? { ...prev, phase: "connected", connectedAtMs: prev.connectedAtMs || Date.now() }
-          : prev
-      );
-    }, 900);
   }
 
   function rejectIncomingCall() {
@@ -465,8 +458,20 @@ export default function App() {
       if (el) {
         try {
           el.srcObject = stream;
-          const p = el.play?.();
-          if (p && typeof p.catch === "function") p.catch(() => {});
+          el.muted = false;
+          el.volume = 1;
+          // Some WebViews/Safari won't start playback if the element is `display:none`.
+          // Also, calling play in the same tick can fail; defer slightly.
+          const tryPlay = () => {
+            try {
+              const p = el.play?.();
+              if (p && typeof p.catch === "function") p.catch(() => {});
+            } catch {
+              // ignore
+            }
+          };
+          requestAnimationFrame(tryPlay);
+          window.setTimeout(tryPlay, 60);
         } catch {
           // ignore
         }
@@ -485,6 +490,21 @@ export default function App() {
       }
       if (st === "failed" || st === "disconnected") {
         debugLog("webrtc connectionState", st);
+        endOrCancelCall();
+      }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      const st = pc.iceConnectionState;
+      if (st === "connected" || st === "completed") {
+        setCall((prev) =>
+          prev.phase === "connecting"
+            ? { ...prev, phase: "connected", connectedAtMs: prev.connectedAtMs || Date.now() }
+            : prev
+        );
+      }
+      if (st === "failed") {
+        debugLog("webrtc iceConnectionState", st);
         endOrCancelCall();
       }
     };
@@ -513,6 +533,19 @@ export default function App() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [call.phase]);
+
+  useEffect(() => {
+    // Apply mute to the actual microphone track (UI + media stay consistent).
+    const stream = localStreamRef.current;
+    if (!stream) return;
+    try {
+      stream.getAudioTracks().forEach((tr) => {
+        tr.enabled = !call.muted;
+      });
+    } catch {
+      // ignore
+    }
+  }, [call.muted]);
 
   useEffect(() => {
     // Start WebRTC setup when entering "connecting".
@@ -901,13 +934,6 @@ export default function App() {
       setCall((prev) => ({ ...prev, phase: "connecting" }));
       upsertActiveCallLog({ status: "answered" });
       clearCallTimers();
-      callConnectedTimerRef.current = window.setTimeout(() => {
-        setCall((prev) =>
-          prev.phase === "connecting"
-            ? { ...prev, phase: "connected", connectedAtMs: prev.connectedAtMs || Date.now() }
-            : prev
-        );
-      }, 900);
     });
 
     socket.on("call:connecting", ({ callId } = {}) => {
@@ -915,13 +941,6 @@ export default function App() {
       if (!c.callId || String(callId || "") !== String(c.callId)) return;
       setCall((prev) => ({ ...prev, phase: "connecting" }));
       clearCallTimers();
-      callConnectedTimerRef.current = window.setTimeout(() => {
-        setCall((prev) =>
-          prev.phase === "connecting"
-            ? { ...prev, phase: "connected", connectedAtMs: prev.connectedAtMs || Date.now() }
-            : prev
-        );
-      }, 900);
     });
 
     socket.on("call:reject", ({ callId, reason } = {}) => {
@@ -1994,7 +2013,13 @@ export default function App() {
         )}
       </div>
       {callOverlay}
-      <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: "none" }} />
+      <audio
+        ref={remoteAudioRef}
+        autoPlay
+        playsInline
+        // Avoid `display:none` (can break playback on Safari/WebViews).
+        style={{ position: "fixed", left: "-9999px", top: "-9999px", width: "1px", height: "1px", opacity: 0 }}
+      />
       <InstallDownloadPanel open={installDownloadOpen} onClose={() => setInstallDownloadOpen(false)} t={t} />
     </AppRuntimeErrorBoundary>
   );
