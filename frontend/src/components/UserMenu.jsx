@@ -391,7 +391,8 @@ export default function UserMenu({
             : "",
         about: profileAbout,
         auraColor: profileAuraColor,
-        ...(profileBgPreview ? { profileBackground: profileBgPreview } : {}),
+        // Allow clearing profile background (empty string) by sending it explicitly.
+        ...(me?.isPremium ? { profileBackground: String(profileBgPreview || "") } : {}),
       });
     } catch (e) {
       setProfileSaveError(e.message || t("errorGeneric"));

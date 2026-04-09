@@ -1054,6 +1054,7 @@ app.put("/api/me/profile", authRequired, (req, res) => {
   const statusKindRaw = typeof req.body?.statusKind === "string" ? req.body.statusKind.trim() : "";
   const statusTextRaw = typeof req.body?.statusText === "string" ? req.body.statusText.trim() : "";
   const aboutRaw = typeof req.body?.about === "string" ? req.body.about.trim() : "";
+  const profileBackgroundFieldPresent = Object.prototype.hasOwnProperty.call(req.body || {}, "profileBackground");
   const profileBackgroundRaw =
     typeof req.body?.profileBackground === "string" ? req.body.profileBackground.trim() : "";
 
@@ -1068,7 +1069,11 @@ app.put("/api/me/profile", authRequired, (req, res) => {
   (async () => {
     const uid = Number(req.user.id);
     let profileBg = null;
-    if (profileBackgroundRaw) {
+    if (profileBackgroundFieldPresent) {
+      // Allow clearing background (empty string) regardless of premium status.
+      if (!profileBackgroundRaw) {
+        profileBg = null;
+      } else {
       const isDataUrl = profileBackgroundRaw.startsWith("data:image/");
       if (!isDataUrl) return res.status(400).json({ error: "Profile background must be an image data URL" });
       if (profileBackgroundRaw.length > 1_200_000) {
@@ -1078,10 +1083,11 @@ app.put("/api/me/profile", authRequired, (req, res) => {
       const expMs = prem.rows[0]?.premium_expires_at ? new Date(prem.rows[0].premium_expires_at).getTime() : 0;
       if (!(expMs && expMs > Date.now())) return res.status(403).json({ error: "Premium required" });
       profileBg = profileBackgroundRaw;
+      }
     }
 
     if (auraParsed.skip) {
-      if (profileBg !== null) {
+      if (profileBackgroundFieldPresent) {
         await query(`UPDATE users SET status_kind = $1, status_text = $2, about = $3, profile_bg_url = $4 WHERE id = $5`, [
           statusKind || null,
           statusText || null,
@@ -1098,7 +1104,7 @@ app.put("/api/me/profile", authRequired, (req, res) => {
         ]);
       }
     } else {
-      if (profileBg !== null) {
+      if (profileBackgroundFieldPresent) {
         await query(
           `UPDATE users SET status_kind = $1, status_text = $2, about = $3, aura_color = $4, profile_bg_url = $5 WHERE id = $6`,
           [statusKind || null, statusText || null, about || null, auraParsed.value, profileBg, uid]
