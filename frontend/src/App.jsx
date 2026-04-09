@@ -195,16 +195,44 @@ export default function App() {
     const cid = Number(chatId);
     const fetched = Array.isArray(fetchedList) ? fetchedList : [];
     const prev = Array.isArray(prevList) ? prevList : [];
-    const out = fetched.slice();
-    const ids = new Set(out.map((m) => Number(m?.id)).filter((x) => Number.isFinite(x)));
+    const prevById = new Map();
+    for (const m of prev) {
+      if (!m || typeof m !== "object") continue;
+      if (Number(m.chatId) !== cid) continue;
+      const mid = Number(m.id);
+      if (!Number.isFinite(mid) || mid <= 0) continue;
+      prevById.set(mid, m);
+    }
+
+    // Start from fetched (authoritative shape), but never allow it to "downgrade" fields
+    // that were already updated via realtime while the fetch was in-flight.
+    const out = fetched.map((m) => {
+      const mid = Number(m?.id);
+      if (!Number.isFinite(mid) || mid <= 0) return m;
+      const existing = prevById.get(mid);
+      return existing ? { ...m, ...existing } : m;
+    });
+
+    const ids = new Set(out.map((m) => Number(m?.id)).filter((x) => Number.isFinite(x) && x > 0));
+
     // Keep any messages that arrived via realtime/optimistic while fetch was in-flight.
     for (const m of prev) {
       if (!m || typeof m !== "object") continue;
       if (Number(m.chatId) !== cid) continue;
       const mid = Number(m.id);
-      if (Number.isFinite(mid) && ids.has(mid)) continue;
+      if (Number.isFinite(mid) && mid > 0 && ids.has(mid)) continue;
       out.push(m);
     }
+
+    // Ensure chronological order, even when we appended optimistic/realtime items.
+    out.sort((a, b) => {
+      const at = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bt = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
+      if (at !== bt) return at - bt;
+      const aid = Number(a?.id) || 0;
+      const bid = Number(b?.id) || 0;
+      return aid - bid;
+    });
     return out;
   }
 
