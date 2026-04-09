@@ -2262,19 +2262,22 @@ app.get("/api/chats/:chatId/messages", authRequired, (req, res) => {
     LEFT JOIN messages rm ON rm.id = m.reply_to_message_id
     LEFT JOIN users ru ON ru.id = rm.sender_id
     WHERE m.chat_id = $1
-    ORDER BY m.created_at ASC, m.id ASC
+    ORDER BY m.created_at DESC, m.id DESC
     LIMIT $2
   `,
     [chatId, limit]
   );
 
-  const textMessageIds = messages.rows
+  // We fetch newest-first for performance; return oldest-first for rendering.
+  const rows = messages.rows.slice().reverse();
+
+  const textMessageIds = rows
     .filter((m) => (m.message_type || "text") === "text")
     .map((m) => Number(m.id));
   const reactionsByMessageId = await getGroupedReactionsForMessages(textMessageIds, uid);
 
   return res.json({
-    messages: messages.rows.map((m) =>
+    messages: rows.map((m) =>
       messageRowToApi(m, reactionsByMessageId.get(Number(m.id)) || [])
     ),
   });
