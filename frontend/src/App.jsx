@@ -383,6 +383,9 @@ export default function App() {
   const remoteStreamRef = useRef(null); // MediaStream | null
   const remoteAudioRef = useRef(null); // HTMLAudioElement | null
   const pendingIceRef = useRef([]); // RTCIceCandidateInit[]
+  const remoteTrackSeenRef = useRef(false);
+  const audioResumeArmedRef = useRef(false);
+  const audioResumeCleanupRef = useRef(null);
 
   function cleanupWebrtc() {
     try {
@@ -390,6 +393,7 @@ export default function App() {
         pcRef.current.onicecandidate = null;
         pcRef.current.ontrack = null;
         pcRef.current.onconnectionstatechange = null;
+        pcRef.current.oniceconnectionstatechange = null;
         try {
           pcRef.current.close();
         } catch {
@@ -409,6 +413,7 @@ export default function App() {
     }
 
     remoteStreamRef.current = null;
+    remoteTrackSeenRef.current = false;
     pendingIceRef.current = [];
 
     const el = remoteAudioRef.current;
@@ -419,6 +424,16 @@ export default function App() {
         // ignore
       }
     }
+
+    audioResumeArmedRef.current = false;
+    if (audioResumeCleanupRef.current) {
+      try {
+        audioResumeCleanupRef.current();
+      } catch {
+        // ignore
+      }
+    }
+    audioResumeCleanupRef.current = null;
   }
 
   async function ensureLocalAudioOrFail() {
@@ -435,6 +450,34 @@ export default function App() {
     }
   }
 
+  function tryPlayRemoteAudio() {
+    const el = remoteAudioRef.current;
+    if (!el) return;
+    try {
+      el.muted = false;
+      el.volume = 1;
+      const p = el.play?.();
+      if (p && typeof p.catch === "function") p.catch(() => {});
+    } catch {
+      // ignore
+    }
+  }
+
+  function markConnectedIfReady(pc) {
+    if (!pc) return;
+    const connected =
+      pc.connectionState === "connected" ||
+      pc.iceConnectionState === "connected" ||
+      pc.iceConnectionState === "completed";
+    if (!connected) return;
+    if (!remoteTrackSeenRef.current) return;
+    setCall((prev) =>
+      prev.phase === "connecting"
+        ? { ...prev, phase: "connected", connectedAtMs: prev.connectedAtMs || Date.now() }
+        : prev
+    );
+  }
+
   function ensurePeerConnection(callId) {
     if (pcRef.current) return pcRef.current;
     const id = String(callId || "");
@@ -445,15 +488,34 @@ export default function App() {
       iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
     });
 
+    // Helps some browsers/WebViews reliably negotiate audio receive.
+    try {
+      pc.addTransceiver?.("audio", { direction: "sendrecv" });
+    } catch {
+      // ignore
+    }
+
     pc.onicecandidate = (ev) => {
       if (!ev.candidate) return;
       socket.emit("webrtc:ice-candidate", { callId: id, candidate: ev.candidate.toJSON() });
     };
 
     pc.ontrack = (ev) => {
-      const stream = ev.streams && ev.streams[0] ? ev.streams[0] : null;
+      const existing = remoteStreamRef.current;
+      const stream =
+        (ev.streams && ev.streams[0]) ||
+        existing ||
+        (typeof MediaStream !== "undefined" ? new MediaStream() : null);
       if (!stream) return;
+      if (!existing && ev.track) {
+        try {
+          stream.addTrack(ev.track);
+        } catch {
+          // ignore
+        }
+      }
       remoteStreamRef.current = stream;
+      remoteTrackSeenRef.current = true;
       const el = remoteAudioRef.current;
       if (el) {
         try {
@@ -462,32 +524,19 @@ export default function App() {
           el.volume = 1;
           // Some WebViews/Safari won't start playback if the element is `display:none`.
           // Also, calling play in the same tick can fail; defer slightly.
-          const tryPlay = () => {
-            try {
-              const p = el.play?.();
-              if (p && typeof p.catch === "function") p.catch(() => {});
-            } catch {
-              // ignore
-            }
-          };
-          requestAnimationFrame(tryPlay);
-          window.setTimeout(tryPlay, 60);
+          requestAnimationFrame(tryPlayRemoteAudio);
+          window.setTimeout(tryPlayRemoteAudio, 60);
         } catch {
           // ignore
         }
       }
+
+      markConnectedIfReady(pc);
     };
 
     pc.onconnectionstatechange = () => {
       const st = pc.connectionState;
-      if (st === "connected") {
-        // Do not rewrite phase logic; only advance from connecting if still there.
-        setCall((prev) =>
-          prev.phase === "connecting"
-            ? { ...prev, phase: "connected", connectedAtMs: prev.connectedAtMs || Date.now() }
-            : prev
-        );
-      }
+      if (st === "connected") markConnectedIfReady(pc);
       if (st === "failed" || st === "disconnected") {
         debugLog("webrtc connectionState", st);
         endOrCancelCall();
@@ -496,13 +545,7 @@ export default function App() {
 
     pc.oniceconnectionstatechange = () => {
       const st = pc.iceConnectionState;
-      if (st === "connected" || st === "completed") {
-        setCall((prev) =>
-          prev.phase === "connecting"
-            ? { ...prev, phase: "connected", connectedAtMs: prev.connectedAtMs || Date.now() }
-            : prev
-        );
-      }
+      if (st === "connected" || st === "completed") markConnectedIfReady(pc);
       if (st === "failed") {
         debugLog("webrtc iceConnectionState", st);
         endOrCancelCall();
@@ -574,7 +617,7 @@ export default function App() {
       // Caller creates and sends offer.
       if (call.direction === "outgoing") {
         try {
-          const offer = await pc.createOffer({ offerToReceiveAudio: true });
+          const offer = await pc.createOffer();
           if (cancelled) return;
           await pc.setLocalDescription(offer);
           socketRef.current?.emit("webrtc:offer", { callId: String(call.callId), sdp: pc.localDescription });
@@ -590,6 +633,27 @@ export default function App() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [call.phase, call.callId, call.direction]);
+
+  useEffect(() => {
+    // WebViews may block autoplay even for off-screen audio; retry playback on the next user gesture.
+    if (call.phase !== "connecting" && call.phase !== "connected") return;
+    if (!remoteStreamRef.current) return;
+    if (audioResumeArmedRef.current) return;
+    audioResumeArmedRef.current = true;
+
+    const onGesture = () => tryPlayRemoteAudio();
+    document.addEventListener("pointerdown", onGesture, { passive: true });
+    document.addEventListener("touchstart", onGesture, { passive: true });
+    audioResumeCleanupRef.current = () => {
+      document.removeEventListener("pointerdown", onGesture);
+      document.removeEventListener("touchstart", onGesture);
+    };
+    return () => {
+      if (audioResumeCleanupRef.current) audioResumeCleanupRef.current();
+      audioResumeCleanupRef.current = null;
+      audioResumeArmedRef.current = false;
+    };
+  }, [call.phase]);
 
   function makeClientTempId() {
     try {
