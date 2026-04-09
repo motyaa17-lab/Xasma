@@ -5,6 +5,7 @@ import { localeForLang } from "../i18n.js";
 import { formatUserStatusLine } from "../userStatusLine.js";
 import ActivityBadge from "./ActivityBadge.jsx";
 import UserTagBadge from "./UserTagBadge.jsx";
+import { isPremiumActive } from "../premium.js";
 
 const Sidebar = forwardRef(function Sidebar(
   {
@@ -762,14 +763,14 @@ const Sidebar = forwardRef(function Sidebar(
       <div className="sidebarHeader">
         <div className="meRow">
           <AvatarAura auraColor={me?.auraColor}>
-            <div className={me?.isPremium ? "avatarSm avatarPremium" : "avatarSm"} title={me.username}>
+            <div className={isPremiumActive(me) ? "avatarSm avatarPremium" : "avatarSm"} title={me.username}>
               {me.avatar ? <img src={me.avatar} alt="" /> : <span>{initials(me.username)}</span>}
             </div>
           </AvatarAura>
           <div className="meName">
-            <span className={me?.isPremium ? "premiumName" : undefined}>
+            <span className={isPremiumActive(me) ? "premiumName" : undefined}>
               {me.username}
-              {me?.isPremium ? <span className="premiumBadge">💎</span> : null}
+              {isPremiumActive(me) ? <span className="premiumBadge">💎</span> : null}
             </span>
             <UserTagBadge tag={me?.tag} tagColor={me?.tagColor} tagStyle={me?.tagStyle} />
             <ActivityBadge messageCount={me?.messageCount} t={t} />
@@ -828,7 +829,7 @@ const Sidebar = forwardRef(function Sidebar(
                     <AvatarAura skip={isRoom || isOfficial} auraColor={other?.auraColor}>
                       <div
                         className={`${!isRoom && online ? "avatarSm presence online" : "avatarSm presence"}${
-                          !isRoom && !isOfficial && other?.isPremium ? " avatarPremium" : ""
+                          !isRoom && !isOfficial && isPremiumActive(other) ? " avatarPremium" : ""
                         }`}
                       >
                         {isRoom && c.avatar ? (
@@ -851,9 +852,9 @@ const Sidebar = forwardRef(function Sidebar(
                   <div className="chatOther">
                     <div className="chatOtherNameRow">
                       <div className="chatOtherName">
-                        <span className={!isRoom && !isOfficial && other?.isPremium ? "premiumName" : undefined}>
+                        <span className={!isRoom && !isOfficial && isPremiumActive(other) ? "premiumName" : undefined}>
                           {label}
-                          {!isRoom && !isOfficial && other?.isPremium ? (
+                          {!isRoom && !isOfficial && isPremiumActive(other) ? (
                             <span className="premiumBadge">💎</span>
                           ) : null}
                         </span>
@@ -932,9 +933,9 @@ const Sidebar = forwardRef(function Sidebar(
                 </AvatarAura>
                 <div>
                   <div className="searchUser">
-                    <span className={u?.isPremium ? "premiumName" : undefined}>
+                    <span className={isPremiumActive(u) ? "premiumName" : undefined}>
                       {u.username}
-                      {u?.isPremium ? <span className="premiumBadge">💎</span> : null}
+                      {isPremiumActive(u) ? <span className="premiumBadge">💎</span> : null}
                     </span>
                     <UserTagBadge tag={u.tag} tagColor={u.tagColor} tagStyle={u.tagStyle} />
                   </div>

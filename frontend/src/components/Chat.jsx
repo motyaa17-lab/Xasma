@@ -8,6 +8,7 @@ import CircleVideoMessage from "./CircleVideoMessage.jsx";
 import UserProfileModal from "./UserProfileModal.jsx";
 import ActivityBadge from "./ActivityBadge.jsx";
 import UserTagBadge from "./UserTagBadge.jsx";
+import { isPremiumActive } from "../premium.js";
 import { IconEllipsis, IconPhone } from "./Icons.jsx";
 import { localeForLang } from "../i18n.js";
 import { formatUserStatusLine } from "../userStatusLine.js";
@@ -2317,7 +2318,7 @@ export default function Chat({
                     m.sender && typeof m.sender === "object"
                       ? m.sender
                       : usersMap.get(Number(m.senderId)) || null;
-                  const senderIsPremium = Boolean(sender?.isPremium);
+                  const senderIsPremium = isPremiumActive(sender);
                   const bubblePremiumClass = senderIsPremium ? " msgPremium" : "";
 
                   return (

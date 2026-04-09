@@ -5,6 +5,7 @@ import { formatUserStatusLine } from "../userStatusLine.js";
 import { localeForLang } from "../i18n.js";
 import ActivityBadge from "./ActivityBadge.jsx";
 import UserTagBadge from "./UserTagBadge.jsx";
+import { isPremiumActive } from "../premium.js";
 
 function initials(name) {
   const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
@@ -81,7 +82,7 @@ export default function UserProfileModal({ open, userId, onClose, t, lang = "en"
   if (!visible) return null;
 
   const memberSince = user?.registrationDate ? formatMemberSince(user.registrationDate, lang) : "";
-  const premiumMode = Boolean(user?.isPremium);
+  const premiumMode = isPremiumActive(user);
   const rootClass = `userProfileModal${premiumMode ? " userProfileModal--premium" : ""}${
     phase === "out" ? " userProfileModal--out" : " userProfileModal--in"
   }`;

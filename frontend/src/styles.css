@@ -1301,17 +1301,29 @@ body.body--mobileConversationOpen {
   -webkit-text-fill-color: transparent;
   color: transparent;
   animation: premiumNameFlow 4s linear infinite;
+  /* Make the effect readable on dark UI. */
+  text-shadow: 0 0 10px rgba(122, 162, 255, 0.10), 0 0 18px rgba(192, 132, 252, 0.08);
 }
 
 .premiumBadge {
-  margin-left: 6px;
-  font-size: 0.95em;
+  margin-left: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 12px;
   line-height: 1;
-  filter:
-    drop-shadow(0 0 6px rgba(140, 180, 255, 0.65))
-    drop-shadow(0 0 14px rgba(192, 132, 252, 0.22));
+  letter-spacing: 0.01em;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.35), rgba(192, 132, 252, 0.28));
+  border: 1px solid rgba(160, 170, 255, 0.38);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.18), 0 6px 18px rgba(120, 140, 255, 0.12);
+  transform: translateY(-1px);
+  filter: drop-shadow(0 0 8px rgba(140, 180, 255, 0.55));
   -webkit-text-fill-color: initial;
-  color: rgba(226, 232, 240, 0.95);
+  color: rgba(240, 245, 255, 0.98);
 }
 
 @keyframes avatarGlow {
@@ -3512,9 +3524,12 @@ body.body--mobileConversationOpen {
 
 .msgPremium {
   position: relative;
-  background: linear-gradient(135deg, rgba(80, 120, 255, 0.18), rgba(140, 80, 255, 0.16));
-  border: 1px solid rgba(120, 140, 255, 0.32);
-  box-shadow: 0 0 12px rgba(120, 140, 255, 0.16);
+  background: linear-gradient(135deg, rgba(80, 120, 255, 0.26), rgba(140, 80, 255, 0.22));
+  border: 1px solid rgba(150, 170, 255, 0.42);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.18),
+    0 0 16px rgba(120, 140, 255, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   animation: premiumGlow 3.2s ease-in-out infinite;
@@ -3525,8 +3540,8 @@ body.body--mobileConversationOpen {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.10), transparent);
-  opacity: 0.35;
+  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.14), transparent);
+  opacity: 0.45;
   pointer-events: none;
 }
 
@@ -3535,10 +3550,10 @@ body.body--mobileConversationOpen {
   position: absolute;
   top: 8px;
   right: 10px;
-  font-size: 11px;
-  opacity: 0.55;
+  font-size: 12px;
+  opacity: 0.72;
   pointer-events: none;
-  filter: drop-shadow(0 2px 6px rgba(120, 140, 255, 0.18));
+  filter: drop-shadow(0 2px 8px rgba(120, 140, 255, 0.24));
 }
 
 @media (prefers-reduced-motion: reduce) {

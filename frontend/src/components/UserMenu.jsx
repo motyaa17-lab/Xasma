@@ -20,6 +20,7 @@ import { USER_STATUS_TEXT_MAX } from "../userStatusLine.js";
 import AvatarAura from "./AvatarAura.jsx";
 import ActivityBadge from "./ActivityBadge.jsx";
 import UserTagBadge from "./UserTagBadge.jsx";
+import { isPremiumActive } from "../premium.js";
 
 function formatShortDate(iso) {
   const d = new Date(iso);
@@ -568,15 +569,15 @@ export default function UserMenu({
       <div className="settingsScreen settingsScreen--mobile" ref={rootRef}>
         <button type="button" className="settingsTopProfile" onClick={() => setPanel("profile")}>
           <span className="settingsTopAvatar">
-            <span className={me?.isPremium ? "avatarPremium" : undefined}>
+            <span className={isPremiumActive(me) ? "avatarPremium" : undefined}>
               {me?.avatar ? <img src={me.avatar} alt="" /> : <span>{initials(me?.username)}</span>}
             </span>
           </span>
           <span className="settingsTopMain">
             <span className="settingsTopName">
-              <span className={me?.isPremium ? "premiumName" : undefined}>
+              <span className={isPremiumActive(me) ? "premiumName" : undefined}>
                 {me?.username}
-                {me?.isPremium ? <span className="premiumBadge">💎</span> : null}
+                {isPremiumActive(me) ? <span className="premiumBadge">💎</span> : null}
               </span>
               <ActivityBadge messageCount={me?.messageCount} t={t} />
             </span>
