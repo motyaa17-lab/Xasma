@@ -1952,7 +1952,7 @@ export default function App() {
             </span>
             <span className="topBarDownloadText">{t("downloadButton")}</span>
           </button>
-          <UserMenu {...userMenuProps} variant="dropdown" />
+          <UserMenu {...userMenuProps} variant="dropdown" cleanSettingsTrigger />
         </div>
       </div>
 

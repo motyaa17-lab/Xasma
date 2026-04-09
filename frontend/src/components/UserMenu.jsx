@@ -305,6 +305,8 @@ export default function UserMenu({
   onChangeSettings,
   t,
   variant = "dropdown",
+  /** Desktop header only: simple visible settings control (mobile keeps hamburger .menuBtn). */
+  cleanSettingsTrigger = false,
 }) {
   const [open, setOpen] = useState(false);
   const [panel, setPanel] = useState(null); // "profile" | "settings" | "admin" | null
@@ -1334,19 +1336,33 @@ export default function UserMenu({
 
   return (
     <div className="userMenu" ref={rootRef}>
-      <button
-        className={open ? "menuBtn active" : "menuBtn"}
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        title={t("menu")}
-      >
-        {/* Always render a visible gear — do not rely on .appShell--desktop toggling .menuBtnIcon */}
-        <span className="menuBtnGear" aria-hidden>
-          <IconSettings size={20} />
-        </span>
-      </button>
+      {cleanSettingsTrigger ? (
+        <button
+          type="button"
+          className={open ? "settingsBtn settingsBtn--active" : "settingsBtn"}
+          onClick={() => setOpen((v) => !v)}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          title={t("menu")}
+        >
+          <IconSettings />
+        </button>
+      ) : (
+        <button
+          className={open ? "menuBtn active" : "menuBtn"}
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          title={t("menu")}
+        >
+          <span className="hamburger" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </span>
+        </button>
+      )}
 
       {open ? (
         <div className="dropdown" role="menu">

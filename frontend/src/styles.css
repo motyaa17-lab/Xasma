@@ -351,21 +351,43 @@ body.body--mobileConversationOpen {
   justify-content: center;
 }
 
-/* Settings/menu trigger: always visible (gear), independent of .appShell--desktop rules */
-.menuBtnGear {
-  display: inline-flex;
+/* Desktop header: dedicated settings trigger (no display toggles, no .appShell--desktop hacks) */
+.settingsBtn {
+  width: 32px;
+  height: 32px;
+  display: flex;
   align-items: center;
   justify-content: center;
-  line-height: 0;
-  color: rgba(226, 232, 240, 0.96);
+  cursor: pointer;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(15, 23, 42, 0.6);
+  color: #e2e8f0;
+  flex-shrink: 0;
 }
 
-.menuBtnGear svg {
-  display: block;
+.settingsBtn svg {
   width: 20px;
   height: 20px;
+  color: #e2e8f0;
+  opacity: 0.9;
+  display: block;
   flex-shrink: 0;
-  color: inherit;
+}
+
+.settingsBtn:hover {
+  opacity: 1;
+}
+
+.settingsBtn:hover svg {
+  opacity: 1;
+}
+
+.settingsBtn--active {
+  border-color: rgba(37, 99, 235, 0.55);
+  background: rgba(37, 99, 235, 0.18);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.18), 0 0 12px rgba(0, 130, 255, 0.08);
 }
 
 .menuBtn.active {
@@ -388,41 +410,6 @@ body.body--mobileConversationOpen {
   border-radius: 999px;
   background: currentColor;
   opacity: 1;
-}
-
-.menuBtnIcon {
-  display: none;
-}
-
-/* Desktop: show explicit settings icon; keep hamburger as fallback. */
-.appShell--desktop .menuBtnIcon {
-  display: inline-flex !important;
-  align-items: center;
-  justify-content: center;
-  color: rgba(226, 232, 240, 0.95);
-}
-
-.appShell--desktop .hamburger {
-  display: none;
-}
-
-/* Ensure the SVG actually paints on desktop (some browsers inherit odd defaults). */
-.appShell--desktop .menuBtnIcon svg {
-  display: block;
-  width: 20px;
-  height: 20px;
-  color: currentColor;
-  opacity: 1;
-}
-
-/* Desktop safety: ensure header/menu icons stay visible */
-.topBarRight .menuBtn {
-  color: var(--text);
-}
-
-.topBarRight .hamburger span {
-  background: currentColor !important;
-  opacity: 1 !important;
 }
 
 .msgMenuBtn svg,
