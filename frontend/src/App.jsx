@@ -777,10 +777,11 @@ export default function App() {
     socket.on("chat:message", (msg) => {
       const msgId = msg?.id != null ? Number(msg.id) : 0;
       const temp = typeof msg?.clientTempId === "string" ? msg.clientTempId : "";
+      const msgChatId = msg?.chatId != null ? Number(msg.chatId) : 0;
 
       // Update open chat immediately; otherwise refresh chat list.
       const openChatId = selectedChatIdRef.current;
-      if (openChatId && msg.chatId === openChatId) {
+      if (openChatId && msgChatId && Number(openChatId) === msgChatId) {
         setMessages((prev) => {
           // If this is the server-confirmation of an optimistic message, replace it in-place.
           if (temp && me?.id && Number(msg?.senderId) === Number(me.id)) {
@@ -826,7 +827,7 @@ export default function App() {
       // Keep chat list fresh without full refresh:
       // update the affected chat row (last preview, time, unread count) and bump it to top of its section.
       setChats((prev) => {
-        const cid = Number(msg?.chatId);
+        const cid = msgChatId;
         if (!cid) return prev;
         const now = Date.now();
         const open = Number(openChatId || 0);
