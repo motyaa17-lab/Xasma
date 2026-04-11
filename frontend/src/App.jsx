@@ -572,7 +572,8 @@ export default function App() {
     pc.onconnectionstatechange = () => {
       const st = pc.connectionState;
       if (st === "connected") markConnectedIfReady(pc);
-      if (st === "failed" || st === "disconnected") {
+      // "disconnected" is often transient (ICE restart / network blip); only "failed" is a hard stop.
+      if (st === "failed") {
         debugLog("webrtc connectionState", st);
         endOrCancelCall();
       }

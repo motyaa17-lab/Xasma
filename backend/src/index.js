@@ -211,6 +211,11 @@ app.use((req, _res, next) => {
 
 const DEV_ALLOWED_ORIGINS = new Set([
   "http://localhost:5173",
+  "http://localhost:5174",
+  "http://localhost:5175",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "http://192.168.31.112:3000",
   "http://localhost",
   "https://localhost",
   "capacitor://localhost",
@@ -235,6 +240,13 @@ function isOriginAllowed(origin) {
   if (!IS_PROD) {
     if (!o || o === "null") return true; // Native WebViews / file:// / some emulator cases.
     if (DEV_ALLOWED_ORIGINS.has(o)) return true;
+    // Allow any localhost port during local development (Vite can pick a new port if busy).
+    if (/^https?:\/\/localhost:\d{2,5}$/i.test(o)) return true;
+    if (/^https?:\/\/127\.0\.0\.1:\d{2,5}$/i.test(o)) return true;
+    // Allow same-LAN testing (explicitly scoped to private IPv4 ranges).
+    if (/^https?:\/\/192\.168\.\d{1,3}\.\d{1,3}:\d{2,5}$/i.test(o)) return true;
+    if (/^https?:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{2,5}$/i.test(o)) return true;
+    if (/^https?:\/\/172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}:\d{2,5}$/i.test(o)) return true;
   }
 
   return false;

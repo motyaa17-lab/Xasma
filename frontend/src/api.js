@@ -6,6 +6,31 @@ function normalizeBaseUrl(raw) {
   return v.endsWith("/") ? v.slice(0, -1) : v;
 }
 
+/** Prefer `VITE_API_URL`, then legacy `VITE_API_BASE`. */
+function apiUrlFromEnv() {
+  const a = normalizeBaseUrl(import.meta.env.VITE_API_URL);
+  if (a) return a;
+  return normalizeBaseUrl(import.meta.env.VITE_API_BASE);
+}
+
+/**
+ * Some setups mistakenly used the static-file port (3000) as the API base.
+ * If the URL is origin-only on port 3000, rewrite to 4000 (this app's backend port).
+ */
+function fixMisconfiguredApiPort(base) {
+  const b = normalizeBaseUrl(base);
+  if (!b) return b;
+  try {
+    const u = new URL(b);
+    if (u.port !== "3000") return b;
+    if (u.pathname && u.pathname !== "/") return b;
+    u.port = "4000";
+    return normalizeBaseUrl(u.origin);
+  } catch {
+    return b;
+  }
+}
+
 function isCapacitorAndroid() {
   if (typeof window === "undefined") return false;
   const cap = window.Capacitor;
@@ -23,8 +48,8 @@ function isCordovaAndroid() {
 }
 
 function computeApiBase() {
-  // Production/public deployments MUST set VITE_API_BASE (Vercel, APK production build, etc).
-  const envBase = normalizeBaseUrl(import.meta.env.VITE_API_BASE);
+  // Deployments: set `VITE_API_URL` (preferred) or legacy `VITE_API_BASE` to your public API origin.
+  const envBase = fixMisconfiguredApiPort(apiUrlFromEnv());
   if (envBase) return envBase;
 
   // Local development fallbacks only.
@@ -33,6 +58,15 @@ function computeApiBase() {
 }
 
 const API_BASE = computeApiBase();
+
+if (import.meta.env.DEV) {
+  // eslint-disable-next-line no-console
+  console.log("[Xasma] API_BASE resolved", {
+    VITE_API_URL: import.meta.env.VITE_API_URL,
+    VITE_API_BASE: import.meta.env.VITE_API_BASE,
+    API_BASE,
+  });
+}
 
 export function getApiBase() {
   return API_BASE;

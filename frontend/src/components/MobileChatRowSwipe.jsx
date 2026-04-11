@@ -18,7 +18,7 @@ const HORIZONTAL_LOCK_PX = 15;
 /** Early vertical scroll detection (px): beats weak diagonals. */
 const VERTICAL_BIAS_PX = 8;
 /** |dx| must exceed |dy| * this to count as horizontal swipe. */
-const HORIZONTAL_DOMINANCE = 1.55;
+const HORIZONTAL_DOMINANCE = 1.38;
 /** |dy| > |dx| * this → scroll wins while still undecided. */
 const VERTICAL_DOMINANCE = 1.12;
 /** Release past this offset (px) commits an action. */
@@ -89,6 +89,7 @@ export default function MobileChatRowSwipe({
   scrollCloseNonce = 0,
   t,
 }) {
+  const swipeRootRef = useRef(null);
   const frontRef = useRef(null);
   const offsetRef = useRef(0);
   const startXRef = useRef(0);
@@ -114,6 +115,11 @@ export default function MobileChatRowSwipe({
       ? "transform 0.24s cubic-bezier(0.25, 0.82, 0.2, 1)"
       : "none";
     el.style.transform = `translate3d(${px}px,0,0)`;
+    const root = swipeRootRef.current;
+    if (root) {
+      if (Math.abs(px) > 2) root.classList.add("mobileChatRowSwipe--rails");
+      else root.classList.remove("mobileChatRowSwipe--rails");
+    }
   }, []);
 
   const snapTo = useCallback(
@@ -306,6 +312,7 @@ export default function MobileChatRowSwipe({
 
   return (
     <div
+      ref={swipeRootRef}
       className={`mobileChatRowSwipe${listPinned ? " mobileChatRowSwipe--pinned" : ""}`}
       data-chat-swipe-id={chatId}
     >

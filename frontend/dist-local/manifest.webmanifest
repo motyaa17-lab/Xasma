@@ -1,0 +1,18 @@
+{
+  "name": "Xasma",
+  "short_name": "Xasma",
+  "description": "Xasma messenger",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
+  "icons": [
+    {
+      "src": "/xasma-icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

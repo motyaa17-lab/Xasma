@@ -7,6 +7,9 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    host: true,
+    // Allow ngrok / LAN Host headers (Vite type: string[] | true; `true` = any host — dev-only risk, see vite.dev)
+    allowedHosts: true,
   },
 });
 

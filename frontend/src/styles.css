@@ -5751,9 +5751,11 @@ body.body--mobileConversationOpen {
   margin-bottom: 3px;
   border-radius: 14px;
   flex-shrink: 0;
+  /* Tighter rounded clip helps avoid subpixel bleed of the underlay at rest (Safari/Chrome). */
+  clip-path: inset(0 round 14px);
   /* Do NOT use contain: paint / isolation here — iOS Safari can blank the chat list (white layer)
      when many swipe rows sit inside .mobileChatListScroll. Clipping comes from overflow + radius;
-     idle opacity is handled by .mobileChatRowSwipeFront.mobileChatRow opaque background. */
+     underlay stays hidden via opacity until .mobileChatRowSwipe--rails. */
 }
 
 .mobileChatRowSwipeUnder {
@@ -5765,7 +5767,12 @@ body.body--mobileConversationOpen {
   align-items: stretch;
   pointer-events: none;
   z-index: 0;
-  /* Only visible where the front layer has moved away (swipe); never “through” an opaque card */
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.mobileChatRowSwipe--rails .mobileChatRowSwipeUnder {
+  opacity: 1;
 }
 
 .mobileChatRowSwipeUnder--dragOnly {
@@ -5835,23 +5842,24 @@ body.body--mobileConversationOpen {
   width: 100%;
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
-  /* Gesture direction is decided in JS; manipulation avoids 300ms tap delay without forcing pan-y (which can fight horizontal swipe). */
-  touch-action: manipulation;
+  /* pan-y: browser handles vertical list scroll; horizontal goes to our listener after lock (passive: false). */
+  touch-action: pan-y;
   backface-visibility: hidden;
 }
 
-/* Swipe rows: opaque card — base .mobileChatRow uses rgba(..., 0.55) which lets pin/delete pads show through at rest. */
+/* Swipe rows: slightly lighter card; pin/delete rails only visible while swiping (.mobileChatRowSwipe--rails). */
 .mobileChatRowSwipeFront.mobileChatRow {
   margin-bottom: 0;
-  background-color: rgb(14, 20, 34);
-  background-image: linear-gradient(180deg, rgb(14, 20, 34), rgb(10, 15, 27));
-  border: 1px solid rgba(255, 255, 255, 0.055);
+  background-color: rgba(24, 32, 52, 0.92);
+  background-image: linear-gradient(180deg, rgba(26, 34, 54, 0.96), rgba(20, 28, 46, 0.94));
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 0 0 1px rgba(11, 16, 28, 0.35);
 }
 
 .mobileChatRowSwipeFront.mobileChatRow:active {
-  background-color: rgb(17, 26, 44);
-  background-image: linear-gradient(180deg, rgb(17, 26, 44), rgb(12, 18, 32));
-  border-color: rgba(148, 163, 184, 0.14);
+  background-color: rgba(28, 38, 60, 0.95);
+  background-image: linear-gradient(180deg, rgba(30, 40, 62, 0.98), rgba(24, 32, 52, 0.96));
+  border-color: rgba(148, 163, 184, 0.12);
 }
 
 .mobileChatRowSwipe--pinned .mobileChatRowSwipePad--pin {
@@ -5872,8 +5880,8 @@ body.body--mobileConversationOpen {
   margin-bottom: 3px;
   border: none;
   border-radius: 14px;
-  background: rgba(10, 15, 27, 0.46);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(18, 26, 42, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.065);
   color: inherit;
   text-align: left;
   cursor: pointer;
@@ -5881,8 +5889,8 @@ body.body--mobileConversationOpen {
 }
 
 .mobileChatRow:active {
-  background: rgba(30, 41, 59, 0.55);
-  border-color: rgba(148, 163, 184, 0.16);
+  background: rgba(28, 38, 58, 0.48);
+  border-color: rgba(148, 163, 184, 0.12);
 }
 
 .mobileChatRowAvatar {
@@ -6129,8 +6137,16 @@ body.body--mobileConversationOpen {
   font-size: 15px;
 }
 
+.appShell--mobile .chatMain {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
 .appShell--mobile .messages {
   padding: 12px 12px 0;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+  touch-action: pan-y;
 }
 
 /* Long-press message menu: avoid Safari text selection / link & image callouts on bubbles */
@@ -6158,6 +6174,8 @@ body.body--mobileConversationOpen {
 .appShell--mobile .bubble {
   padding: 8px 10px;
   border-radius: 13px;
+  /* Avoid browser/page horizontal pan; swipe-to-reply stays on the bubble via JS. */
+  touch-action: pan-y;
 }
 
 .appShell--mobile .bubbleText {

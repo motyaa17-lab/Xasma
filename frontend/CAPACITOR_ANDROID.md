@@ -50,10 +50,10 @@ Install on a device: copy the APK or use **Run** with a device/emulator.
 
 ## Pointing the app at your server
 
-The web client uses `VITE_API_BASE` (see `src/api.js`). For a real device you must build with your backend URL:
+The web client uses `VITE_API_URL` (preferred) or legacy `VITE_API_BASE` (see `src/api.js`). For a real device you must build with your backend URL:
 
-1. Copy `frontend/.env.production.example` to `frontend/.env.production`.
-2. Set `VITE_API_BASE=https://your-api-host` (HTTPS recommended).
+1. Copy `frontend/.env.production.example` to `frontend/.env.production` (or use `.env.production.local`).
+2. Set `VITE_API_URL=https://your-api-host` (HTTPS recommended).
 3. Run `npm run android:sync` so the bundled JS includes that URL.
 
 **HTTP / LAN:** Android blocks cleartext HTTP by default. For `http://` APIs you must add a network security config or `android:usesCleartextTraffic="true"` (dev only).
@@ -88,6 +88,6 @@ The app does **not** use React Router with URL paths; UI state is in React. **Au
 
 ## Troubleshooting
 
-- **Blank WebView:** run `npm run android:sync` after every web change; confirm `VITE_API_BASE` is reachable from the device.
+- **Blank WebView:** run `npm run android:sync` after every web change; confirm `VITE_API_URL` (or `VITE_API_BASE`) is reachable from the device.
 - **White screen after deploy:** often wrong API URL or mixed content; check HTTPS and CORS/socket.io on the server.
 - **Synced web assets:** `android/.gitignore` ignores `app/src/main/assets/public`; always run `cap sync` locally before building.
