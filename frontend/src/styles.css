@@ -126,9 +126,11 @@ body.body--mobileConversationOpen {
 
 .authBootSplash {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   width: 100%;
+  gap: 28px;
 }
 
 .authBootSplashCard {
@@ -136,42 +138,55 @@ body.body--mobileConversationOpen {
   flex-direction: column;
   align-items: center;
   max-width: 320px;
-  padding: 28px 24px 32px;
+  padding: 22px 24px 28px;
   border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(17, 27, 46, 0.72);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(17, 27, 46, 0.52);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+}
+
+/* Glow + pulse on shell so drop-shadow is not tied to the bitmap’s rectangular bounds. */
+.bootLogoShell {
+  flex-shrink: 0;
+  animation: logoPulse 2.6s ease-in-out infinite;
+  filter: drop-shadow(0 0 18px rgba(34, 211, 238, 0.12));
+}
+
+.bootLogoCrop {
+  display: block;
+  width: 108px;
+  height: 108px;
+  border-radius: 28%;
+  overflow: hidden;
+  background: transparent;
+}
+
+.bootLogoCrop .bootLogo {
+  display: block;
+  width: 118%;
+  height: 118%;
+  max-width: none;
+  margin: -9% 0 0 -9%;
+  object-fit: cover;
+  object-position: 50% 50%;
 }
 
 @keyframes logoPulse {
-  0% {
-    transform: scale(1);
+  0%,
+  100% {
     opacity: 0.9;
+    filter: drop-shadow(0 0 14px rgba(34, 211, 238, 0.1));
   }
   50% {
-    transform: scale(1.05);
     opacity: 1;
+    filter: drop-shadow(0 0 26px rgba(34, 211, 238, 0.2));
   }
-  100% {
-    transform: scale(1);
-    opacity: 0.9;
-  }
-}
-
-.bootLogo {
-  display: block;
-  width: 90px;
-  height: 90px;
-  margin-bottom: 16px;
-  object-fit: contain;
-  filter: drop-shadow(0 0 12px rgba(0, 200, 255, 0.4));
-  animation: logoPulse 2.2s ease-in-out infinite;
 }
 
 .authBootSplashSpinner {
   width: 36px;
   height: 36px;
-  margin-top: 18px;
+  margin-top: 0;
   border-radius: 50%;
   border: 3px solid rgba(255, 255, 255, 0.1);
   border-top-color: rgba(59, 130, 246, 0.9);
@@ -191,9 +206,10 @@ body.body--mobileConversationOpen {
     opacity: 0.9;
   }
 
-  .bootLogo {
+  .bootLogoShell {
     animation: none;
     opacity: 1;
+    filter: drop-shadow(0 0 14px rgba(34, 211, 238, 0.12));
   }
 }
 
@@ -246,12 +262,33 @@ body.body--mobileConversationOpen {
   color: transparent;
 }
 
-.appLogo {
+/* Header/auth: clip + slight zoom past baked-in icon padding; glow on shell not on img (avoids rectangular halo). */
+.appLogoShell {
+  display: inline-flex;
+  flex-shrink: 0;
+  vertical-align: middle;
+  filter: drop-shadow(0 1px 14px rgba(34, 211, 238, 0.1));
+}
+
+.appLogoCrop {
   width: 36px;
   height: 36px;
-  object-fit: contain;
-  flex-shrink: 0;
-  filter: drop-shadow(0 0 10px rgba(34, 211, 238, 0.22));
+  border-radius: 31%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+
+.appLogoCrop .appLogo {
+  display: block;
+  width: 118%;
+  height: 118%;
+  max-width: none;
+  object-fit: cover;
+  object-position: 50% 50%;
+  margin: -9% 0 0 -9%;
 }
 
 .segmented {
@@ -2921,17 +2958,24 @@ body.body--mobileConversationOpen {
   font-weight: 800;
 }
 
-.xasmaBrandMark {
-  width: 70%;
-  height: 70%;
-  object-fit: contain;
-  filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.35));
+.avatarSm .xasmaBrandMark {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  object-fit: cover;
+  object-position: 50% 50%;
+  transform: scale(1.14);
+  filter: drop-shadow(0 0 5px rgba(34, 211, 238, 0.18));
 }
 
 .mobileChatRowAvatar img.xasmaBrandMark {
-  width: 62%;
-  height: 62%;
-  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  object-fit: cover;
+  object-position: 50% 50%;
+  transform: scale(1.12);
+  filter: drop-shadow(0 0 5px rgba(34, 211, 238, 0.16));
 }
 
 .searchInput {

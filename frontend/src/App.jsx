@@ -1973,7 +1973,11 @@ export default function App() {
       <div className="topBar">
         <div className="topBarLeft">
           <div className="appTitleRow">
-            <img src={XASMA_LOGO_SRC} alt="" className="appLogo" width={36} height={36} decoding="async" />
+            <span className="appLogoShell" aria-hidden>
+              <span className="appLogoCrop">
+                <img src={XASMA_LOGO_SRC} alt="" className="appLogo" decoding="async" />
+              </span>
+            </span>
             <span className="appTitle">{t("appTitle")}</span>
             <span className="appBetaBadge">BETA</span>
           </div>
@@ -2063,7 +2067,11 @@ export default function App() {
             <header className="mobileMainHeader">
               <div className="mobileMainHeaderText">
                 <div className="mobileBrandRow">
-                  <img src={XASMA_LOGO_SRC} alt="" className="appLogo" width={36} height={36} decoding="async" />
+                  <span className="appLogoShell" aria-hidden>
+                    <span className="appLogoCrop">
+                      <img src={XASMA_LOGO_SRC} alt="" className="appLogo" decoding="async" />
+                    </span>
+                  </span>
                   <span className="mobileBrandTitle">{t("appTitle")}</span>
                   <span className="appBetaBadge">BETA</span>
                 </div>

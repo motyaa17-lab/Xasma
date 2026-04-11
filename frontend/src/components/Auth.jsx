@@ -31,7 +31,11 @@ export default function Auth({ onLogin, onRegister, error, t }) {
     <div className="authWrap">
       <div className="authCard">
         <h1 className="authTitle authTitle--brand">
-          <img src={XASMA_LOGO_SRC} alt="" className="appLogo" width={36} height={36} decoding="async" />
+          <span className="appLogoShell" aria-hidden>
+            <span className="appLogoCrop">
+              <img src={XASMA_LOGO_SRC} alt="" className="appLogo" decoding="async" />
+            </span>
+          </span>
           <span className="authTitleWordmark">Xasma</span>
         </h1>
 
