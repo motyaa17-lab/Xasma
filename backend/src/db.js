@@ -161,6 +161,11 @@ async function initDb() {
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS user_tag TEXT`);
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS tag_color TEXT`);
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS tag_style TEXT`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS username_style TEXT`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_ring TEXT`);
+
+  // Unique @handle (stored lowercase, no "@"); `username` remains the visible display name + login by display.
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS user_handle TEXT`);
 
   // Referrals (MVP).
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code TEXT`);
@@ -231,7 +236,7 @@ async function initDb() {
 
   await query(`ALTER TABLE chat_members ADD COLUMN IF NOT EXISTS list_pinned_at TIMESTAMPTZ`);
 
-  // Backfill message counts from existing text messages (system messages excluded).
+  // Backfill message counts from existing text messages (system excluded).
   await query(`
     UPDATE users u
     SET messages_sent_count = COALESCE(s.cnt, 0)
@@ -243,6 +248,61 @@ async function initDb() {
     ) s
     WHERE u.id = s.sender_id
   `);
+
+  const RESERVED_HANDLES = new Set([
+    "xasma",
+    "xasma_official",
+    "admin",
+    "system",
+    "official",
+    "support",
+    "xasmaofficial",
+  ]);
+
+  function randomUserHandleCandidate() {
+    return `user${1000000 + Math.floor(Math.random() * 9000000)}`;
+  }
+
+  // Official bot account: stable public handle.
+  await query(
+    `UPDATE users SET user_handle = 'xasma' WHERE username = 'xasma_official' AND (user_handle IS NULL OR TRIM(COALESCE(user_handle, '')) = '')`
+  );
+
+  for (let rounds = 0; rounds < 200; rounds++) {
+    const r = await query(
+      `SELECT id FROM users WHERE user_handle IS NULL OR TRIM(COALESCE(user_handle, '')) = '' LIMIT 150`
+    );
+    if (!r.rows.length) break;
+    for (const row of r.rows) {
+      const uid = Number(row.id);
+      if (!uid) continue;
+      let set = false;
+      for (let attempt = 0; attempt < 40 && !set; attempt++) {
+        const h = randomUserHandleCandidate();
+        if (RESERVED_HANDLES.has(h)) continue;
+        try {
+          const up = await query(
+            `UPDATE users SET user_handle = $1 WHERE id = $2 AND (user_handle IS NULL OR TRIM(COALESCE(user_handle, '')) = '')`,
+            [h, uid]
+          );
+          if (up.rowCount > 0) set = true;
+        } catch (e) {
+          const msg = String(e?.message || "").toLowerCase();
+          if (msg.includes("duplicate") || msg.includes("unique")) continue;
+          throw e;
+        }
+      }
+    }
+  }
+
+  const leftNull = await query(
+    `SELECT COUNT(*)::int AS n FROM users WHERE user_handle IS NULL OR TRIM(COALESCE(user_handle, '')) = ''`
+  );
+  if (Number(leftNull.rows[0]?.n) === 0) {
+    await query(`ALTER TABLE users ALTER COLUMN user_handle SET NOT NULL`);
+  }
+
+  await query(`CREATE UNIQUE INDEX IF NOT EXISTS users_user_handle_uidx ON users (user_handle)`);
 
   // Ensure initial admin (safe if user doesn't exist).
   await query(`UPDATE users SET role = 'admin' WHERE username = 'Xasma'`);

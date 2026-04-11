@@ -138,7 +138,17 @@ export async function updateMyAvatar(avatar) {
   return data.user;
 }
 
-export async function updateMyProfile({ statusKind, statusText, about, auraColor } = {}) {
+export async function updateMyProfile({
+  statusKind,
+  statusText,
+  about,
+  auraColor,
+  userTag,
+  tagColor,
+  tagStyle,
+  usernameStyle,
+  avatarRing,
+} = {}) {
   const st =
     typeof statusText === "string" ? statusText.trim().slice(0, USER_STATUS_TEXT_MAX) : "";
   const body = {
@@ -150,6 +160,12 @@ export async function updateMyProfile({ statusKind, statusText, about, auraColor
   if (typeof arguments[0]?.profileBackground === "string") {
     body.profileBackground = arguments[0].profileBackground;
   }
+  const a0 = arguments[0] || {};
+  if (Object.prototype.hasOwnProperty.call(a0, "userTag")) body.userTag = typeof userTag === "string" ? userTag : "";
+  if (Object.prototype.hasOwnProperty.call(a0, "tagColor")) body.tagColor = typeof tagColor === "string" ? tagColor : "";
+  if (Object.prototype.hasOwnProperty.call(a0, "tagStyle")) body.tagStyle = tagStyle === "gradient" ? "gradient" : "solid";
+  if (Object.prototype.hasOwnProperty.call(a0, "usernameStyle")) body.usernameStyle = typeof usernameStyle === "string" ? usernameStyle : "";
+  if (Object.prototype.hasOwnProperty.call(a0, "avatarRing")) body.avatarRing = typeof avatarRing === "string" ? avatarRing : "";
   const data = await apiFetch("/api/me/profile", {
     method: "PUT",
     body,

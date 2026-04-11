@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { formatAtUserHandle } from "../userHandleDisplay.js";
 
 function initials(name) {
   const s = String(name || "").trim();
@@ -50,7 +51,7 @@ export default function CallOverlay({
   if (!visible) return null;
 
   const name = String(call?.peerUsername || "");
-  const username = name ? `@${name}` : "";
+  const atHandle = call?.peerUserHandle ? formatAtUserHandle(call.peerUserHandle) : "";
   const avatar = String(call?.peerAvatar || "");
   const showAcceptReject = call.phase === "ringing";
   const showCancel = call.phase === "calling";
@@ -86,7 +87,7 @@ export default function CallOverlay({
           </div>
 
           <div className="callPeerName callPeerName--hero">{name || t("displayNameUser")}</div>
-          {username ? <div className="callPeerUsername">{username}</div> : null}
+          {atHandle ? <div className="callPeerUsername muted small">{atHandle}</div> : null}
 
           <div className="callMeta">
             <div className="callSubtitle">

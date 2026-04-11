@@ -13,6 +13,9 @@ import { IconEllipsis, IconPhone } from "./Icons.jsx";
 import { localeForLang } from "../i18n.js";
 import { formatUserStatusLine } from "../userStatusLine.js";
 import { XASMA_LOGO_SRC } from "../branding.js";
+import { readMessageDraft, writeMessageDraft, clearMessageDraft } from "../messageDrafts.js";
+import { avatarRingWrapClass, usernameDisplayClass } from "../userPersonalization.js";
+import { formatAtUserHandle } from "../userHandleDisplay.js";
 
 const MAX_VIDEO_NOTE_SEC = 60;
 const QUICK_REACTION_EMOJIS = ["❤️", "👍", "😂", "😮", "😢", "🔥"];
@@ -304,7 +307,45 @@ export default function Chat({
   }, [chat, meId, isOfficial, isAdmin, isBanned]);
 
   const [text, setText] = useState("");
+  const textRef = useRef("");
+  useLayoutEffect(() => {
+    textRef.current = text;
+  }, [text]);
+
   const [editingMessageId, setEditingMessageId] = useState(null);
+
+  const draftDebounceRef = useRef(null);
+  const prevChatForDraftRef = useRef(null);
+
+  useEffect(() => {
+    const prev = prevChatForDraftRef.current;
+    if (prev != null && prev !== chatId) {
+      const t = textRef.current;
+      if (String(t).trim()) writeMessageDraft(prev, t);
+      else clearMessageDraft(prev);
+    }
+    prevChatForDraftRef.current = chatId;
+    if (!chatId) {
+      setText("");
+      return;
+    }
+    setText(readMessageDraft(chatId));
+  }, [chatId]);
+
+  useEffect(() => {
+    if (!chatId || editingMessageId) return;
+    if (draftDebounceRef.current) window.clearTimeout(draftDebounceRef.current);
+    draftDebounceRef.current = window.setTimeout(() => {
+      draftDebounceRef.current = null;
+      const t = String(text ?? "");
+      if (t.trim()) writeMessageDraft(chatId, t);
+      else clearMessageDraft(chatId);
+    }, 400);
+    return () => {
+      if (draftDebounceRef.current) window.clearTimeout(draftDebounceRef.current);
+    };
+  }, [text, chatId, editingMessageId]);
+
   const [menuMessageId, setMenuMessageId] = useState(null);
   const [reportTargetMessage, setReportTargetMessage] = useState(null);
   const [reportBusy, setReportBusy] = useState(false);
@@ -1979,7 +2020,7 @@ export default function Chat({
         return;
       }
       setEditingMessageId(null);
-      setText("");
+      setText(readMessageDraft(chatId) || "");
       return;
     }
     if (!pendingImageUrl && !trimmed) return;
@@ -1992,6 +2033,7 @@ export default function Chat({
       ...(replyToMessage?.id ? { replyToMessageId: replyToMessage.id } : {}),
     });
     setText("");
+    if (chatId) clearMessageDraft(chatId);
     clearPendingImage();
     setReplyToMessage(null);
   }
@@ -2210,27 +2252,43 @@ export default function Chat({
               ) : (
                 <div className="chatHeaderLeft">
                   <AvatarAura auraColor={chat?.other?.auraColor}>
-                    <button
-                      type="button"
-                      className={`avatarSm avatarTapBtn${chat?.other?.isPremium ? " avatarPremium" : ""}`}
-                      onClick={() => chat?.other?.id && setProfileUserId(Number(chat.other.id))}
-                      aria-label={t("profile")}
-                    >
-                      {chat?.other?.avatar ? (
-                        <img src={chat.other.avatar} alt="" />
-                      ) : (
-                        <span>{initials(chat?.other?.username || "")}</span>
-                      )}
-                    </button>
+                    {(() => {
+                      const ringC = avatarRingWrapClass(
+                        isPremiumActive(chat?.other) ? chat?.other?.avatarRing : ""
+                      );
+                      const btn = (
+                        <button
+                          type="button"
+                          className={`avatarSm avatarTapBtn${chat?.other?.isPremium ? " avatarPremium" : ""}`}
+                          onClick={() => chat?.other?.id && setProfileUserId(Number(chat.other.id))}
+                          aria-label={t("profile")}
+                        >
+                          {chat?.other?.avatar ? (
+                            <img src={chat.other.avatar} alt="" />
+                          ) : (
+                            <span>{initials(chat?.other?.username || "")}</span>
+                          )}
+                        </button>
+                      );
+                      return ringC ? <span className={ringC}>{btn}</span> : btn;
+                    })()}
                   </AvatarAura>
                   <div className="chatHeaderInfo">
                     <div className="chatHeaderName">
-                      <span className={chat?.other?.isPremium ? "premiumName" : undefined}>
+                      <span className={usernameDisplayClass(chat?.other) || undefined}>
                         {chat?.other?.username || ""}
                         {chat?.other?.isPremium ? <span className="premiumBadge">💎</span> : null}
                       </span>
+                      <UserTagBadge
+                        tag={chat?.other?.tag}
+                        tagColor={chat?.other?.tagColor}
+                        tagStyle={chat?.other?.tagStyle}
+                      />
                       <ActivityBadge messageCount={chat?.other?.messageCount} t={t} />
                     </div>
+                    {chat?.other?.userHandle ? (
+                      <div className="chatHeaderAtHandle muted small">{formatAtUserHandle(chat.other.userHandle)}</div>
+                    ) : null}
                     <div className="chatHeaderStatus">
                       {otherTyping ? t("typing") : formatUserStatusLine(chat?.other, t, lang)}
                     </div>
@@ -2380,23 +2438,29 @@ export default function Chat({
                   }`}
                 >
                   <AvatarAura auraColor={msgAura}>
-                    <button
-                      type="button"
-                      className={`msgAvatar avatarTapBtn${senderIsPremium ? " avatarPremium" : ""}`}
-                      title={sender?.username || ""}
-                      onClick={() => {
-                        const uid = Number(m.senderId);
-                        if (!uid || uid === Number(meId)) return;
-                        setProfileUserId(uid);
-                      }}
-                      aria-label={t("profile")}
-                    >
-                      {getAvatarSrc(m, meId, meAvatar) ? (
-                        <img src={getAvatarSrc(m, meId, meAvatar)} alt="" />
-                      ) : (
-                        <span>{initials(getDisplayName(m, meId, meUsername, t))}</span>
-                      )}
-                    </button>
+                    {(() => {
+                      const ringC = avatarRingWrapClass(senderIsPremium ? sender?.avatarRing : "");
+                      const btn = (
+                        <button
+                          type="button"
+                          className={`msgAvatar avatarTapBtn${senderIsPremium ? " avatarPremium" : ""}`}
+                          title={sender?.username || ""}
+                          onClick={() => {
+                            const uid = Number(m.senderId);
+                            if (!uid || uid === Number(meId)) return;
+                            setProfileUserId(uid);
+                          }}
+                          aria-label={t("profile")}
+                        >
+                          {getAvatarSrc(m, meId, meAvatar) ? (
+                            <img src={getAvatarSrc(m, meId, meAvatar)} alt="" />
+                          ) : (
+                            <span>{initials(getDisplayName(m, meId, meUsername, t))}</span>
+                          )}
+                        </button>
+                      );
+                      return ringC ? <span className={ringC}>{btn}</span> : btn;
+                    })()}
                   </AvatarAura>
                   <div
                     className={
@@ -2528,7 +2592,9 @@ export default function Chat({
                     ) : null}
                     {isRoom ? (
                       <div className="msgSenderName">
-                        {m.sender?.username || "?"}
+                        <span className={usernameDisplayClass(sender) || undefined}>
+                          {m.sender?.username || "?"}
+                        </span>
                         <UserTagBadge
                           tag={m.sender?.tag}
                           tagColor={m.sender?.tagColor}
@@ -2872,7 +2938,7 @@ export default function Chat({
                     if (e.key === "Escape" && editingMessageId) {
                       e.preventDefault();
                       setEditingMessageId(null);
-                      setText("");
+                      setText(readMessageDraft(chatId) || "");
                       onTyping?.(false);
                       return;
                     }

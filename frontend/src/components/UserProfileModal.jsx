@@ -6,6 +6,8 @@ import { localeForLang } from "../i18n.js";
 import ActivityBadge from "./ActivityBadge.jsx";
 import UserTagBadge from "./UserTagBadge.jsx";
 import { isPremiumActive } from "../premium.js";
+import { avatarRingWrapClass, usernameDisplayClass } from "../userPersonalization.js";
+import { formatAtUserHandle } from "../userHandleDisplay.js";
 
 function initials(name) {
   const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
@@ -150,9 +152,19 @@ export default function UserProfileModal({ open, userId, onClose, t, lang = "en"
                 ) : null}
                 <div className="userProfileBgOverlay" aria-hidden />
                 <AvatarAura auraColor={user.auraColor}>
-                  <div className={`profileAvatar userProfileAvatar userProfileAvatar--xl${premiumMode ? " avatarPremium userProfileAvatar--wow" : ""}`}>
-                    {user.avatar ? <img src={user.avatar} alt="" /> : <span>{initials(user.username)}</span>}
-                  </div>
+                  {(() => {
+                    const ringC = avatarRingWrapClass(premiumMode ? user.avatarRing : "");
+                    const inner = (
+                      <div
+                        className={`profileAvatar userProfileAvatar userProfileAvatar--xl${
+                          premiumMode ? " avatarPremium userProfileAvatar--wow" : ""
+                        }`}
+                      >
+                        {user.avatar ? <img src={user.avatar} alt="" /> : <span>{initials(user.username)}</span>}
+                      </div>
+                    );
+                    return ringC ? <span className={ringC}>{inner}</span> : inner;
+                  })()}
                 </AvatarAura>
                 {user.isEarlyTester ? (
                   <span className="userProfileEarlyBadge">{t("earlyTesterBadge")}</span>
@@ -161,7 +173,7 @@ export default function UserProfileModal({ open, userId, onClose, t, lang = "en"
 
               <div className="userProfileNameBlock">
                 <h2 className="userProfileDisplayName">
-                  <span className={premiumMode ? "premiumName" : undefined}>
+                  <span className={usernameDisplayClass(user) || undefined}>
                     {user.username}
                     {premiumMode ? (
                       <span className={`premiumBadge${premiumMode ? " premiumBadge--pop" : ""}`}>💎</span>
@@ -172,6 +184,12 @@ export default function UserProfileModal({ open, userId, onClose, t, lang = "en"
                   <UserTagBadge tag={user.tag} tagColor={user.tagColor} tagStyle={user.tagStyle} />
                   <ActivityBadge messageCount={user.messageCount} t={t} />
                 </div>
+                {user.userHandle ? (
+                  <div className="userProfileHandleRow muted small">
+                    <span className="userProfileHandleLabel">{t("profileUserHandleLabel")}</span>
+                    <span className="userAtHandle">{formatAtUserHandle(user.userHandle)}</span>
+                  </div>
+                ) : null}
               </div>
 
               <div className="userProfileSections">

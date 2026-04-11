@@ -60,8 +60,11 @@ export default function Auth({ onLogin, onRegister, error, t }) {
 
         <form onSubmit={submit} className="authForm">
           <label className="field">
-            <span>{t("username")}</span>
+            <span>{t("authDisplayNameLabel")}</span>
             <input value={username} onChange={(e) => setUsername(e.target.value)} required />
+            <span className="muted small authFieldHint">
+              {mode === "login" ? t("authLoginDisplayOrHandleHint") : t("authRegisterHandleAutoHint")}
+            </span>
           </label>
 
           <label className="field">

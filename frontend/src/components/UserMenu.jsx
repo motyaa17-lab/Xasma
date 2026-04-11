@@ -20,6 +20,14 @@ import AvatarAura from "./AvatarAura.jsx";
 import ActivityBadge from "./ActivityBadge.jsx";
 import UserTagBadge from "./UserTagBadge.jsx";
 import { isPremiumActive } from "../premium.js";
+import {
+  TAG_COLOR_PRESETS,
+  USERNAME_STYLE_PRESETS,
+  AVATAR_RING_PRESETS,
+  avatarRingWrapClass,
+  usernameStyleClass,
+} from "../userPersonalization.js";
+import { formatAtUserHandle } from "../userHandleDisplay.js";
 import { Capacitor } from "@capacitor/core";
 import {
   getNativeAndroidPostNotificationDisplay,
@@ -44,15 +52,129 @@ async function fileToJpegDataUrl(file, { maxSizeBytes } = {}) {
   return compressImageFileToJpegDataUrl(file);
 }
 
+function ProfilePersonalizationFields({
+  t,
+  me,
+  profileUserTag,
+  setProfileUserTag,
+  profileTagColor,
+  setProfileTagColor,
+  profileTagStyle,
+  setProfileTagStyle,
+  profileUsernameStyle,
+  setProfileUsernameStyle,
+  profileAvatarRing,
+  setProfileAvatarRing,
+}) {
+  const prem = isPremiumActive(me);
+  const normalizedPreview = String(profileUserTag || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 4);
+  const showPreview = normalizedPreview.length >= 2;
+
+  return (
+    <div className="settingsSection settingsSection--padded profilePersonalizationSection">
+      <div className="settingsTitle">{t("profileUserTagLabel")}</div>
+      <input
+        className="searchInput"
+        value={profileUserTag}
+        onChange={(e) =>
+          setProfileUserTag(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4))
+        }
+        placeholder="TAG"
+        maxLength={4}
+        aria-label={t("profileUserTagLabel")}
+      />
+      <p className="muted small">{t("profileUserTagHint")}</p>
+      {showPreview ? (
+        <div className="profileTagPreviewRow">
+          <span className="muted small">{t("profileTagPreviewLabel")}</span>
+          <UserTagBadge
+            tag={normalizedPreview}
+            tagColor={prem ? profileTagColor : "#64748b"}
+            tagStyle={prem ? profileTagStyle : "solid"}
+          />
+        </div>
+      ) : null}
+      {prem ? (
+        <>
+          <div className="settingsTitle">{t("profileTagColorLabel")}</div>
+          <div className="personalizationPresetRow" role="list">
+            {TAG_COLOR_PRESETS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className={`personalizationColorSwatch${
+                  profileTagColor === p.id ? " personalizationColorSwatch--active" : ""
+                }`}
+                style={{ background: p.id }}
+                title={p.label}
+                aria-label={p.label}
+                onClick={() => setProfileTagColor(p.id)}
+              />
+            ))}
+          </div>
+          <div className="settingsTitle">{t("profileTagStyleLabel")}</div>
+          <div className="pillRow">
+            <button
+              type="button"
+              className={profileTagStyle === "solid" ? "pillBtn active" : "pillBtn"}
+              onClick={() => setProfileTagStyle("solid")}
+            >
+              {t("userTagSolid")}
+            </button>
+            <button
+              type="button"
+              className={profileTagStyle === "gradient" ? "pillBtn active" : "pillBtn"}
+              onClick={() => setProfileTagStyle("gradient")}
+            >
+              {t("userTagGradient")}
+            </button>
+          </div>
+          <div className="settingsTitle">{t("profileUsernameStyleLabel")}</div>
+          <div className="personalizationNameStyleRow">
+            {USERNAME_STYLE_PRESETS.map((p) => (
+              <button
+                key={p.id || "default"}
+                type="button"
+                className={profileUsernameStyle === p.id ? "pillBtn active" : "pillBtn"}
+                onClick={() => setProfileUsernameStyle(p.id)}
+              >
+                {t(p.labelKey)}
+              </button>
+            ))}
+          </div>
+          <div className="settingsTitle">{t("profileAvatarRingLabel")}</div>
+          <div className="personalizationNameStyleRow">
+            {AVATAR_RING_PRESETS.map((p) => (
+              <button
+                key={p.id || "none"}
+                type="button"
+                className={profileAvatarRing === p.id ? "pillBtn active" : "pillBtn"}
+                onClick={() => setProfileAvatarRing(p.id)}
+              >
+                {t(p.labelKey)}
+              </button>
+            ))}
+          </div>
+        </>
+      ) : (
+        <p className="muted small">{t("profilePersonalizationPremiumHint")}</p>
+      )}
+    </div>
+  );
+}
+
 function AdminUserTagEditor({ user, onUpdate, t }) {
   const [tag, setTag] = useState(user.tag || "");
-  const [tagColor, setTagColor] = useState(user.tagColor || "#6366f1");
+  const [tagColor, setTagColor] = useState(user.tagColor || "#38bdf8");
   const [tagStyle, setTagStyle] = useState(user.tagStyle === "gradient" ? "gradient" : "solid");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     setTag(user.tag || "");
-    setTagColor(user.tagColor || "#6366f1");
+    setTagColor(user.tagColor || "#38bdf8");
     setTagStyle(user.tagStyle === "gradient" ? "gradient" : "solid");
   }, [user.id, user.tag, user.tagColor, user.tagStyle]);
 
@@ -66,10 +188,6 @@ function AdminUserTagEditor({ user, onUpdate, t }) {
     }
   }
 
-  const colorVal = /^#[0-9a-fA-F]{6}$/.test(String(tagColor || "").trim())
-    ? String(tagColor).trim()
-    : "#6366f1";
-
   return (
     <div className="adminUserTagRow">
       <input
@@ -78,16 +196,24 @@ function AdminUserTagEditor({ user, onUpdate, t }) {
         placeholder={t("userTagLabel")}
         aria-label={t("userTagLabel")}
         value={tag}
-        onChange={(e) => setTag(e.target.value)}
-        maxLength={40}
+        onChange={(e) => setTag(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4))}
+        maxLength={4}
       />
-      <input
-        type="color"
-        className="adminTagColor"
-        aria-label={t("userTagLabel")}
-        value={colorVal}
-        onChange={(e) => setTagColor(e.target.value)}
-      />
+      <div className="personalizationPresetRow adminTagPresetRow" role="list">
+        {TAG_COLOR_PRESETS.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            className={`personalizationColorSwatch personalizationColorSwatch--sm${
+              tagColor === p.id ? " personalizationColorSwatch--active" : ""
+            }`}
+            style={{ background: p.id }}
+            title={p.label}
+            aria-label={p.label}
+            onClick={() => setTagColor(p.id)}
+          />
+        ))}
+      </div>
       <div className="adminTagStyleToggle" role="group">
         <button
           type="button"
@@ -413,6 +539,11 @@ const UserMenu = forwardRef(function UserMenu(
   const [profileStatusText, setProfileStatusText] = useState("");
   const [profileAbout, setProfileAbout] = useState("");
   const [profileAuraColor, setProfileAuraColor] = useState(DEFAULT_AURA_COLOR);
+  const [profileUserTag, setProfileUserTag] = useState("");
+  const [profileTagColor, setProfileTagColor] = useState("#64748b");
+  const [profileTagStyle, setProfileTagStyle] = useState("solid");
+  const [profileUsernameStyle, setProfileUsernameStyle] = useState("");
+  const [profileAvatarRing, setProfileAvatarRing] = useState("");
   const [profileBgPreview, setProfileBgPreview] = useState("");
   const [profileBgBusy, setProfileBgBusy] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
@@ -471,9 +602,26 @@ const UserMenu = forwardRef(function UserMenu(
     setProfileStatusText(String(me?.statusText || ""));
     setProfileAbout(String(me?.about || ""));
     setProfileAuraColor(String(me?.auraColor || "").trim() || DEFAULT_AURA_COLOR);
+    setProfileUserTag(me?.tag ? String(me.tag) : "");
+    setProfileTagColor(String(me?.tagColor || "#64748b"));
+    setProfileTagStyle(me?.tagStyle === "gradient" ? "gradient" : "solid");
+    setProfileUsernameStyle(String(me?.usernameStyle || ""));
+    setProfileAvatarRing(String(me?.avatarRing || ""));
     setProfileBgPreview(String(me?.profileBackground || ""));
     setProfileSaveError("");
-  }, [panel, me?.statusKind, me?.statusText, me?.about, me?.auraColor, me?.profileBackground]);
+  }, [
+    panel,
+    me?.statusKind,
+    me?.statusText,
+    me?.about,
+    me?.auraColor,
+    me?.profileBackground,
+    me?.tag,
+    me?.tagColor,
+    me?.tagStyle,
+    me?.usernameStyle,
+    me?.avatarRing,
+  ]);
 
   async function saveProfile() {
     if (!onChangeProfile) return;
@@ -488,6 +636,11 @@ const UserMenu = forwardRef(function UserMenu(
             : "",
         about: profileAbout,
         auraColor: profileAuraColor,
+        userTag: profileUserTag.trim(),
+        tagColor: profileTagColor,
+        tagStyle: profileTagStyle,
+        usernameStyle: profileUsernameStyle,
+        avatarRing: profileAvatarRing,
         // Allow clearing profile background (empty string) by sending it explicitly.
         ...(me?.isPremium ? { profileBackground: String(profileBgPreview || "") } : {}),
       });
@@ -833,16 +986,41 @@ const UserMenu = forwardRef(function UserMenu(
                 {avatarError ? <div className="authError">{avatarError}</div> : null}
                 <div className="settingsProfileHeader">
                   <AvatarAura auraColor={profileAuraColor}>
-                    <div className="settingsProfileAvatar">
-                      {avatarPreview || me?.avatar ? (
-                        <img src={avatarPreview || me.avatar} alt="" />
-                      ) : (
-                        <span>{initials(me?.username)}</span>
-                      )}
-                    </div>
+                    {(() => {
+                      const ringC = avatarRingWrapClass(isPremiumActive(me) ? profileAvatarRing : "");
+                      const inner = (
+                        <div className="settingsProfileAvatar">
+                          {avatarPreview || me?.avatar ? (
+                            <img src={avatarPreview || me.avatar} alt="" />
+                          ) : (
+                            <span>{initials(me?.username)}</span>
+                          )}
+                        </div>
+                      );
+                      return ringC ? <span className={ringC}>{inner}</span> : inner;
+                    })()}
                   </AvatarAura>
                   <div className="settingsProfileMain">
-                    <div className="settingsProfileName">{me?.username}</div>
+                    <div
+                      className={`settingsProfileName ${
+                        usernameStyleClass(profileUsernameStyle) ||
+                        (isPremiumActive(me) ? "premiumName" : "")
+                      }`.trim()}
+                    >
+                      {me?.username}
+                      {isPremiumActive(me) ? <span className="premiumBadge">💎</span> : null}
+                    </div>
+                    <div className="settingsProfileNameRow">
+                      <UserTagBadge
+                        tag={profileUserTag.trim().length >= 2 ? profileUserTag : null}
+                        tagColor={isPremiumActive(me) ? profileTagColor : "#64748b"}
+                        tagStyle={isPremiumActive(me) ? profileTagStyle : "solid"}
+                      />
+                      <ActivityBadge messageCount={me?.messageCount} t={t} />
+                    </div>
+                    {me?.userHandle ? (
+                      <div className="settingsProfileAt muted small">{formatAtUserHandle(me.userHandle)}</div>
+                    ) : null}
                     <div className="settingsProfileStatus muted small">{statusLine}</div>
                   </div>
                 </div>
@@ -906,6 +1084,21 @@ const UserMenu = forwardRef(function UserMenu(
                     </div>
                   </div>
                 </div>
+
+                <ProfilePersonalizationFields
+                  t={t}
+                  me={me}
+                  profileUserTag={profileUserTag}
+                  setProfileUserTag={setProfileUserTag}
+                  profileTagColor={profileTagColor}
+                  setProfileTagColor={setProfileTagColor}
+                  profileTagStyle={profileTagStyle}
+                  setProfileTagStyle={setProfileTagStyle}
+                  profileUsernameStyle={profileUsernameStyle}
+                  setProfileUsernameStyle={setProfileUsernameStyle}
+                  profileAvatarRing={profileAvatarRing}
+                  setProfileAvatarRing={setProfileAvatarRing}
+                />
 
                 <div className="settingsSection">
                   <div className="settingsTitle">{t("profileBgTitle")}</div>
@@ -1249,7 +1442,12 @@ const UserMenu = forwardRef(function UserMenu(
                       <div key={u.id} className="adminUserRow">
                         <div className="adminUserMain">
                           <div className="adminUserNameRow">
-                            <div className="adminUserName">{u.username}</div>
+                            <div className="adminUserNameCol">
+                              <div className="adminUserName">{u.username}</div>
+                              {u.userHandle ? (
+                                <div className="adminUserAt muted small">{formatAtUserHandle(u.userHandle)}</div>
+                              ) : null}
+                            </div>
                             <UserTagBadge tag={u.tag} tagColor={u.tagColor} tagStyle={u.tagStyle} />
                             <div className={u.is_online ? "presenceDot online" : "presenceDot"} />
                           </div>
@@ -1503,19 +1701,44 @@ const UserMenu = forwardRef(function UserMenu(
               {avatarError ? <div className="authError">{avatarError}</div> : null}
               <div className="profilePanel">
                 <AvatarAura auraColor={profileAuraColor}>
-                  <div className="profileAvatar">
-                    {avatarPreview ? (
-                      <img src={avatarPreview} alt="" />
-                    ) : (
-                      <span>{initials(me.username)}</span>
-                    )}
-                  </div>
+                  {(() => {
+                    const ringC = avatarRingWrapClass(isPremiumActive(me) ? profileAvatarRing : "");
+                    const inner = (
+                      <div className="profileAvatar">
+                        {avatarPreview ? (
+                          <img src={avatarPreview} alt="" />
+                        ) : (
+                          <span>{initials(me.username)}</span>
+                        )}
+                      </div>
+                    );
+                    return ringC ? <span className={ringC}>{inner}</span> : inner;
+                  })()}
                 </AvatarAura>
 
                 <div className="profileInfo">
-                  <div className="profileLabel">{t("username")}</div>
-                  <div className="profileValue">
+                  <div className="profileLabel">{t("profileDisplayNameLabel")}</div>
+                  <div
+                    className={`profileValue ${
+                      usernameStyleClass(profileUsernameStyle) ||
+                      (isPremiumActive(me) ? "premiumName" : "")
+                    }`.trim()}
+                  >
                     {me.username}
+                    {isPremiumActive(me) ? <span className="premiumBadge">💎</span> : null}
+                  </div>
+                  {me?.userHandle ? (
+                    <div className="profileHandleRow muted small">
+                      <span className="profileHandleLabel">{t("profileUserHandleLabel")}</span>
+                      <span className="userAtHandle">{formatAtUserHandle(me.userHandle)}</span>
+                    </div>
+                  ) : null}
+                  <div className="profileValue profileValue--badges">
+                    <UserTagBadge
+                      tag={profileUserTag.trim().length >= 2 ? profileUserTag : null}
+                      tagColor={isPremiumActive(me) ? profileTagColor : "#64748b"}
+                      tagStyle={isPremiumActive(me) ? profileTagStyle : "solid"}
+                    />
                     <ActivityBadge messageCount={me?.messageCount} t={t} />
                   </div>
                   <div className="profileHint muted small">
@@ -1642,6 +1865,21 @@ const UserMenu = forwardRef(function UserMenu(
                   </div>
                 </div>
               </div>
+
+              <ProfilePersonalizationFields
+                t={t}
+                me={me}
+                profileUserTag={profileUserTag}
+                setProfileUserTag={setProfileUserTag}
+                profileTagColor={profileTagColor}
+                setProfileTagColor={setProfileTagColor}
+                profileTagStyle={profileTagStyle}
+                setProfileTagStyle={setProfileTagStyle}
+                profileUsernameStyle={profileUsernameStyle}
+                setProfileUsernameStyle={setProfileUsernameStyle}
+                profileAvatarRing={profileAvatarRing}
+                setProfileAvatarRing={setProfileAvatarRing}
+              />
 
               <div className="settingsSection">
                 <div className="settingsTitle">{t("statusLabel")}</div>
@@ -1995,7 +2233,12 @@ const UserMenu = forwardRef(function UserMenu(
                     <div key={u.id} className="adminUserRow">
                       <div className="adminUserMain">
                         <div className="adminUserNameRow">
-                          <div className="adminUserName">{u.username}</div>
+                          <div className="adminUserNameCol">
+                            <div className="adminUserName">{u.username}</div>
+                            {u.userHandle ? (
+                              <div className="adminUserAt muted small">{formatAtUserHandle(u.userHandle)}</div>
+                            ) : null}
+                          </div>
                           <UserTagBadge tag={u.tag} tagColor={u.tagColor} tagStyle={u.tagStyle} />
                           <div className={u.is_online ? "presenceDot online" : "presenceDot"} />
                         </div>

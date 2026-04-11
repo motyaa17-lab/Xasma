@@ -1054,6 +1054,19 @@ body.body--mobileConversationOpen {
   min-height: 1.5em;
 }
 
+.userProfileHandleRow {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.35em;
+}
+
+.userProfileHandleLabel {
+  color: var(--muted);
+}
+
 .userProfileSections {
   width: 100%;
   display: flex;
@@ -1166,6 +1179,23 @@ body.body--mobileConversationOpen {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 0.35em;
+}
+
+.profileHandleRow {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35em;
+}
+
+.profileHandleLabel {
+  color: var(--muted);
+}
+
+.userAtHandle {
+  font-weight: 600;
+  color: rgba(148, 163, 184, 0.95);
 }
 
 .activityBadge {
@@ -1373,8 +1403,17 @@ body.body--mobileConversationOpen {
   gap: 8px;
 }
 
+.adminUserNameCol {
+  min-width: 0;
+  flex: 1;
+}
+
 .adminUserName {
   font-weight: 900;
+}
+
+.adminUserAt {
+  margin-top: 2px;
 }
 
 .adminActions {
@@ -1593,6 +1632,156 @@ body.body--mobileConversationOpen {
   .avatarPremium::after {
     animation: none !important;
   }
+}
+
+/* ----- Identity tag / username presets / avatar ring ----- */
+.profilePersonalizationSection .pillRow,
+.personalizationNameStyleRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.personalizationPresetRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.personalizationColorSwatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.14);
+  padding: 0;
+  cursor: pointer;
+}
+
+.personalizationColorSwatch--sm {
+  width: 22px;
+  height: 22px;
+}
+
+.personalizationColorSwatch--active {
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.65);
+}
+
+.adminTagPresetRow {
+  flex: 1;
+  min-width: 0;
+}
+
+.profileTagPreviewRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.settingsProfileNameRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.profileValue--badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.avatarRingWrap {
+  display: inline-flex;
+  border-radius: 50%;
+  line-height: 0;
+  vertical-align: middle;
+}
+
+.avatarRingWrap .avatarSm,
+.avatarRingWrap .msgAvatar,
+.avatarRingWrap .settingsProfileAvatar,
+.avatarRingWrap .profileAvatar,
+.avatarRingWrap .userProfileAvatar,
+.avatarRingWrap .mobileChatRowAvatar {
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.avatarRingWrap--gradient {
+  padding: 2px;
+  background: linear-gradient(135deg, #38bdf8, #a78bfa, #f472b6);
+}
+
+.avatarRingWrap--neon {
+  padding: 2px;
+  box-shadow:
+    0 0 0 1px rgba(56, 189, 248, 0.65),
+    0 0 14px rgba(56, 189, 248, 0.35);
+}
+
+.avatarRingWrap--diamond {
+  padding: 2px;
+  background: linear-gradient(
+    135deg,
+    rgba(248, 250, 252, 0.95),
+    rgba(148, 163, 184, 0.88),
+    rgba(226, 232, 240, 0.92),
+    rgba(100, 116, 139, 0.75)
+  );
+}
+
+.avatarRingWrap--soft {
+  padding: 2px;
+  box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.45);
+}
+
+.usernameStyle.usernameStyle--silver {
+  background: linear-gradient(180deg, #f1f5f9, #94a3b8);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: none !important;
+  text-shadow: none;
+}
+
+.usernameStyle.usernameStyle--neon-blue {
+  color: #7dd3fc;
+  -webkit-text-fill-color: #7dd3fc;
+  text-shadow: 0 0 8px rgba(56, 189, 248, 0.45);
+  background: none !important;
+  animation: none !important;
+}
+
+.usernameStyle.usernameStyle--violet-glow {
+  color: #c4b5fd;
+  -webkit-text-fill-color: #c4b5fd;
+  text-shadow: 0 0 10px rgba(167, 139, 250, 0.5);
+  background: none !important;
+  animation: none !important;
+}
+
+.usernameStyle.usernameStyle--platinum {
+  background: linear-gradient(90deg, #e2e8f0, #f8fafc, #cbd5e1);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: none !important;
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.25));
+}
+
+.usernameStyle.usernameStyle--soft-glow {
+  color: rgba(226, 232, 240, 0.98);
+  -webkit-text-fill-color: rgba(226, 232, 240, 0.98);
+  text-shadow: 0 0 12px rgba(148, 163, 184, 0.55);
+  background: none !important;
+  animation: none !important;
 }
 
 .themeLabel {
@@ -3020,6 +3209,28 @@ body.body--mobileConversationOpen {
 .searchUser {
   font-weight: 700;
   font-size: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35em;
+  min-width: 0;
+}
+
+.searchResultTextCol {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.searchUserAt {
+  font-weight: 600;
+}
+
+.groupMemberAt {
+  margin-top: 2px;
 }
 
 .chatMain {
@@ -7036,6 +7247,11 @@ body.body--mobileConversationOpen {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.settingsProfileAt {
+  margin-top: 2px;
+  font-weight: 600;
 }
 
 .settingsProfileStatus {

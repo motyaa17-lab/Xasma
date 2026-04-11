@@ -34,6 +34,21 @@ function parseAuraColorBody(body) {
 }
 
 const DEFAULT_TAG_COLOR = "#6366f1";
+/** Non-premium users always show this tag color in API output. */
+const NEUTRAL_TAG_GRAY = "#64748b";
+
+const TAG_COLOR_PRESETS = new Set([
+  "#64748b",
+  "#38bdf8",
+  "#a78bfa",
+  "#f472b6",
+  "#34d399",
+  "#fbbf24",
+  "#f87171",
+]);
+
+const USERNAME_STYLE_ALLOWED = new Set(["", "silver", "neonBlue", "violetGlow", "platinum", "softGlow"]);
+const AVATAR_RING_ALLOWED = new Set(["", "gradient", "neon", "diamond", "soft"]);
 
 function normalizeTagColorApi(raw) {
   if (raw == null || raw === "") return DEFAULT_TAG_COLOR;
@@ -44,6 +59,36 @@ function normalizeTagColorApi(raw) {
     return `#${x[0]}${x[0]}${x[1]}${x[1]}${x[2]}${x[2]}`.toLowerCase();
   }
   return DEFAULT_TAG_COLOR;
+}
+
+function normalizeTagColorPreset(raw) {
+  const n = normalizeTagColorApi(raw);
+  if (TAG_COLOR_PRESETS.has(n)) return n;
+  return "#38bdf8";
+}
+
+function isPremiumActiveRow(row) {
+  const exp = row?.premium_expires_at;
+  if (!exp) return false;
+  const ms = new Date(exp).getTime();
+  return Number.isFinite(ms) && ms > Date.now();
+}
+
+/** 2–4 uppercase A–Z / 0–9 only (for user-set tags). */
+function normalizeTagTextForApi(raw) {
+  const s = String(raw || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (s.length < 2) return null;
+  return s.slice(0, 4);
+}
+
+function normalizeUsernameStyleApi(raw) {
+  const s = String(raw || "").trim();
+  return USERNAME_STYLE_ALLOWED.has(s) ? s : "";
+}
+
+function normalizeAvatarRingApi(raw) {
+  const s = String(raw || "").trim();
+  return AVATAR_RING_ALLOWED.has(s) ? s : "";
 }
 
 function computePremiumInfo(row) {
@@ -69,24 +114,131 @@ function normalizeTagStyleApi(raw) {
 
 /** Tag badge fields for API sender/other objects (from users row joined as mr). */
 function buildSenderTagsFromRow(mr, fromOfficial) {
-  if (fromOfficial) return { tag: null, tagColor: DEFAULT_TAG_COLOR, tagStyle: "solid" };
+  if (fromOfficial) return { tag: null, tagColor: NEUTRAL_TAG_GRAY, tagStyle: "solid" };
   const rawTag = mr.user_tag != null ? String(mr.user_tag).trim() : "";
-  if (!rawTag) return { tag: null, tagColor: DEFAULT_TAG_COLOR, tagStyle: "solid" };
+  const canonical = rawTag ? normalizeTagTextForApi(rawTag) : null;
+  if (!canonical) return { tag: null, tagColor: NEUTRAL_TAG_GRAY, tagStyle: "solid" };
+  const displayTag = canonical;
+  const prem = isPremiumActiveRow(mr);
+  if (!prem) {
+    return { tag: displayTag, tagColor: NEUTRAL_TAG_GRAY, tagStyle: "solid" };
+  }
   return {
-    tag: rawTag.length > 40 ? rawTag.slice(0, 40) : rawTag,
-    tagColor: normalizeTagColorApi(mr.tag_color),
+    tag: displayTag,
+    tagColor: normalizeTagColorPreset(mr.tag_color),
     tagStyle: normalizeTagStyleApi(mr.tag_style),
+  };
+}
+
+function senderPersonalizationFromRow(mr, fromOfficial) {
+  if (fromOfficial) return { usernameStyle: "", avatarRing: "" };
+  const prem = isPremiumActiveRow(mr);
+  if (!prem) return { usernameStyle: "", avatarRing: "" };
+  return {
+    usernameStyle: normalizeUsernameStyleApi(mr.username_style),
+    avatarRing: normalizeAvatarRingApi(mr.avatar_ring),
   };
 }
 
 function buildOtherUserTagsFromChatRow(c) {
   const rawTag = c.other_user_tag != null ? String(c.other_user_tag).trim() : "";
-  if (!rawTag) return { tag: null, tagColor: DEFAULT_TAG_COLOR, tagStyle: "solid" };
+  const canonical = rawTag ? normalizeTagTextForApi(rawTag) : null;
+  if (!canonical) return { tag: null, tagColor: NEUTRAL_TAG_GRAY, tagStyle: "solid" };
+  const displayTag = canonical;
+  const prem = isPremiumActiveRow({
+    premium_expires_at: c.other_premium_expires_at,
+    premium_type: c.other_premium_type,
+  });
+  if (!prem) {
+    return { tag: displayTag, tagColor: NEUTRAL_TAG_GRAY, tagStyle: "solid" };
+  }
   return {
-    tag: rawTag.length > 40 ? rawTag.slice(0, 40) : rawTag,
-    tagColor: normalizeTagColorApi(c.other_tag_color),
+    tag: displayTag,
+    tagColor: normalizeTagColorPreset(c.other_tag_color),
     tagStyle: normalizeTagStyleApi(c.other_tag_style),
   };
+}
+
+function personalizationSocketPayload(userId, userRow) {
+  const botId = getOfficialAnnounceUserId();
+  const fromOfficial = Boolean(botId && Number(userId) === Number(botId));
+  const tags = buildSenderTagsFromRow(userRow, fromOfficial);
+  const pers = senderPersonalizationFromRow(userRow, fromOfficial);
+  return {
+    userId: Number(userId),
+    tag: tags.tag,
+    tagColor: tags.tagColor,
+    tagStyle: tags.tagStyle,
+    usernameStyle: pers.usernameStyle,
+    avatarRing: pers.avatarRing,
+  };
+}
+
+async function applyPersonalizationFromProfileBody(uid, body) {
+  const persKeys = ["userTag", "tagColor", "tagStyle", "usernameStyle", "avatarRing"];
+  if (!persKeys.some((k) => Object.prototype.hasOwnProperty.call(body || {}, k))) {
+    return { ok: true, changed: false };
+  }
+
+  const curR = await query(
+    `SELECT user_tag, tag_color, tag_style, username_style, avatar_ring, premium_expires_at FROM users WHERE id = $1`,
+    [uid]
+  );
+  const row = curR.rows[0];
+  if (!row) return { error: "User not found" };
+
+  const prem = isPremiumActiveRow(row);
+
+  let nextTag =
+    row.user_tag != null && String(row.user_tag).trim() !== ""
+      ? normalizeTagTextForApi(String(row.user_tag).trim())
+      : null;
+
+  if (Object.prototype.hasOwnProperty.call(body, "userTag")) {
+    const raw = typeof body.userTag === "string" ? body.userTag.trim() : "";
+    if (raw === "") nextTag = null;
+    else {
+      const c = normalizeTagTextForApi(raw);
+      if (!c) return { error: "Tag must be 2-4 letters or numbers" };
+      nextTag = c;
+    }
+  }
+
+  let nextTagColor = row.tag_color;
+  let nextTagStyle = row.tag_style;
+  const tagActive = Boolean(nextTag);
+  if (tagActive) {
+    if (prem) {
+      if (Object.prototype.hasOwnProperty.call(body, "tagColor")) nextTagColor = normalizeTagColorPreset(body.tagColor);
+      else nextTagColor = nextTagColor || "#38bdf8";
+      if (Object.prototype.hasOwnProperty.call(body, "tagStyle")) nextTagStyle = normalizeTagStyleApi(body.tagStyle);
+      else nextTagStyle = nextTagStyle || "solid";
+    } else {
+      nextTagColor = NEUTRAL_TAG_GRAY;
+      nextTagStyle = "solid";
+    }
+  } else {
+    nextTagColor = null;
+    nextTagStyle = null;
+  }
+
+  let nextUsernameStyle = row.username_style;
+  if (Object.prototype.hasOwnProperty.call(body, "usernameStyle")) {
+    const v = normalizeUsernameStyleApi(body.usernameStyle);
+    nextUsernameStyle = prem ? v || null : null;
+  }
+
+  let nextAvatarRing = row.avatar_ring;
+  if (Object.prototype.hasOwnProperty.call(body, "avatarRing")) {
+    const v = normalizeAvatarRingApi(body.avatarRing);
+    nextAvatarRing = prem ? v || null : null;
+  }
+
+  await query(
+    `UPDATE users SET user_tag = $1, tag_color = $2, tag_style = $3, username_style = $4, avatar_ring = $5 WHERE id = $6`,
+    [nextTag, nextTagColor, nextTagStyle, nextUsernameStyle || null, nextAvatarRing || null, uid]
+  );
+  return { ok: true, changed: true };
 }
 
 function registrationDateIso(createdAt) {
@@ -360,21 +512,72 @@ function normalizeChatUsers(a, b) {
 
 /** Internal account used only as sender_id for official Xasma announcements (not for login). */
 const OFFICIAL_SYSTEM_USERNAME = "xasma_official";
+const OFFICIAL_USER_HANDLE = "xasma";
+const RESERVED_USER_HANDLES = new Set([
+  OFFICIAL_USER_HANDLE,
+  "xasma_official",
+  "admin",
+  "system",
+  "official",
+  "support",
+]);
 let officialAnnounceUserId = null;
 
 function getOfficialAnnounceUserId() {
   return officialAnnounceUserId;
 }
 
+/** Public API: unique @handle without "@" (lowercase in DB). */
+function userHandleApi(row) {
+  const h = row?.user_handle;
+  return h != null && String(h).trim() !== "" ? String(h).trim() : "";
+}
+
+function loginHandleNormalized(loginInput) {
+  return String(loginInput || "")
+    .trim()
+    .replace(/^@+/, "")
+    .toLowerCase();
+}
+
+function escapeLikePattern(s) {
+  return String(s).replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}
+
+async function allocateUniqueUserHandle(dbRunner) {
+  const run = typeof dbRunner?.query === "function" ? (t, p) => dbRunner.query(t, p) : query;
+  for (let i = 0; i < 120; i++) {
+    const h = `user${1000000 + Math.floor(Math.random() * 9000000)}`;
+    if (RESERVED_USER_HANDLES.has(h)) continue;
+    const ex = await run(`SELECT 1 FROM users WHERE user_handle = $1`, [h]);
+    if (ex.rows[0]) continue;
+    return h;
+  }
+  throw new Error("Could not allocate user handle");
+}
+
 async function ensureOfficialAnnounceUser() {
   const existing = await query(`SELECT id FROM users WHERE username = $1`, [OFFICIAL_SYSTEM_USERNAME]);
   if (existing.rows[0]) return Number(existing.rows[0].id);
   const hash = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10);
-  const ins = await query(
-    `INSERT INTO users (username, password_hash, avatar_url, role, banned) VALUES ($1, $2, NULL, 'user', FALSE) RETURNING id`,
-    [OFFICIAL_SYSTEM_USERNAME, hash]
-  );
-  return Number(ins.rows[0].id);
+  try {
+    const ins = await query(
+      `INSERT INTO users (username, password_hash, avatar_url, role, banned, user_handle)
+       VALUES ($1, $2, NULL, 'user', FALSE, $3) RETURNING id`,
+      [OFFICIAL_SYSTEM_USERNAME, hash, OFFICIAL_USER_HANDLE]
+    );
+    return Number(ins.rows[0].id);
+  } catch (e) {
+    const msg = String(e?.message || "").toLowerCase();
+    if (!msg.includes("user_handle") && !msg.includes("duplicate") && !msg.includes("unique")) throw e;
+    const h2 = await allocateUniqueUserHandle();
+    const ins2 = await query(
+      `INSERT INTO users (username, password_hash, avatar_url, role, banned, user_handle)
+       VALUES ($1, $2, NULL, 'user', FALSE, $3) RETURNING id`,
+      [OFFICIAL_SYSTEM_USERNAME, hash, h2]
+    );
+    return Number(ins2.rows[0].id);
+  }
 }
 
 async function ensureOfficialChatForUser(userId) {
@@ -622,25 +825,31 @@ function messageRowToApi(mr, reactions = []) {
   const sid = Number(mr.sender_id);
   const fromOfficial = botId && sid === botId;
   const tagInfo = buildSenderTagsFromRow(mr, fromOfficial);
+  const pers = senderPersonalizationFromRow(mr, fromOfficial);
   const sender = fromOfficial
     ? {
         id: sid,
         username: "Xasma",
+        userHandle: OFFICIAL_USER_HANDLE,
         avatar: "",
         auraColor: DEFAULT_AURA_COLOR,
         messageCount: 0,
         tag: null,
-        tagColor: DEFAULT_TAG_COLOR,
+        tagColor: NEUTRAL_TAG_GRAY,
         tagStyle: "solid",
+        usernameStyle: "",
+        avatarRing: "",
         isPremium: false,
       }
     : {
         id: sid,
         username: mr.username,
+        userHandle: userHandleApi(mr),
         avatar: mr.avatar_url,
         auraColor: normalizeAuraColorApi(mr.aura_color),
         messageCount: Math.max(0, Number(mr.messages_sent_count) || 0),
         ...tagInfo,
+        ...pers,
         ...computePremiumInfo(mr),
       };
   const replyFromOfficial =
@@ -685,6 +894,8 @@ async function fetchMessageById(messageId) {
              m.message_type, m.system_kind, m.system_payload, m.image_url, m.audio_url, m.video_url,
              u.username, u.avatar_url, u.aura_color, u.messages_sent_count,
              u.user_tag, u.tag_color, u.tag_style,
+             u.username_style, u.avatar_ring,
+             u.user_handle,
              u.premium_type, u.premium_expires_at, u.premium_granted_at,
              rm.sender_id AS reply_to_sender_id,
              ru.username AS reply_to_sender_username,
@@ -847,21 +1058,23 @@ app.post("/api/register", async (req, res) => {
     let myCode = null;
     for (let attempt = 0; attempt < 10; attempt++) {
       const c = generateReferralCode();
+      const user_handle = await allocateUniqueUserHandle(client);
       try {
         const inserted = await client.query(
-          `INSERT INTO users (username, password_hash, avatar_url, referral_code, invited_by)
-           VALUES ($1, $2, $3, $4, $5)
+          `INSERT INTO users (username, password_hash, avatar_url, referral_code, invited_by, user_handle)
+           VALUES ($1, $2, $3, $4, $5, $6)
            RETURNING id, username, avatar_url, role, banned, aura_color, created_at,
                      referral_code, invited_by, referrals_count,
                      has_custom_bg, has_badge, has_reactions, has_premium_lite,
-                     premium_type, premium_expires_at, premium_granted_at, profile_bg_url`,
-          [uname, password_hash, avatar_url, c, inviterId]
+                     premium_type, premium_expires_at, premium_granted_at, profile_bg_url, user_handle`,
+          [uname, password_hash, avatar_url, c, inviterId, user_handle]
         );
         user = inserted.rows[0];
         myCode = c;
         break;
       } catch (e) {
         const msg = String(e?.message || "").toLowerCase();
+        if (msg.includes("user_handle") && (msg.includes("duplicate") || msg.includes("unique"))) continue;
         if (msg.includes("referral") && (msg.includes("duplicate") || msg.includes("unique"))) continue;
         if (msg.includes("users_username_key") || msg.includes("username")) throw e;
         // Any other error: rethrow.
@@ -936,14 +1149,17 @@ app.post("/api/register", async (req, res) => {
     user: {
       id: Number(user.id),
       username: user.username,
+      userHandle: userHandleApi(user),
       avatar: user.avatar_url,
       role: user.role,
       banned: Boolean(user.banned),
       auraColor: normalizeAuraColorApi(user.aura_color),
       messageCount: 0,
       tag: null,
-      tagColor: DEFAULT_TAG_COLOR,
+      tagColor: NEUTRAL_TAG_GRAY,
       tagStyle: "solid",
+      usernameStyle: "",
+      avatarRing: "",
       registrationDate: registrationDateIso(user.created_at),
       isEarlyTester: isEarlyTesterUser(Number(user.id), user.created_at),
       referralCode: user.referral_code || myCode || "",
@@ -961,15 +1177,18 @@ app.post("/api/login", async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: "username and password are required" });
 
+  const rawLogin = String(username).trim();
+  const handleGuess = loginHandleNormalized(username);
+
   const r = await query(
     `SELECT id, username, password_hash, avatar_url, role, banned, aura_color, messages_sent_count,
-            user_tag, tag_color, tag_style, created_at,
+            user_tag, tag_color, tag_style, username_style, avatar_ring, user_handle, created_at,
             referral_code, invited_by, referrals_count,
             has_custom_bg, has_badge, has_reactions, has_premium_lite,
             is_premium, premium_activated_at, profile_bg_url,
             premium_type, premium_expires_at, premium_granted_at
-     FROM users WHERE username = $1`,
-    [username.trim()]
+     FROM users WHERE username = $1 OR user_handle = $2`,
+    [rawLogin, handleGuess]
   );
   const user = r.rows[0];
   if (!user) return res.status(401).json({ error: "Invalid credentials" });
@@ -986,11 +1205,13 @@ app.post("/api/login", async (req, res) => {
 
   const token = signToken(user);
   const tags = buildSenderTagsFromRow(user, false);
+  const persLogin = senderPersonalizationFromRow(user, false);
   return res.json({
     token,
     user: {
       id: Number(user.id),
       username: user.username,
+      userHandle: userHandleApi(user),
       avatar: user.avatar_url,
       role: user.role,
       banned: Boolean(user.banned),
@@ -999,6 +1220,8 @@ app.post("/api/login", async (req, res) => {
       tag: tags.tag,
       tagColor: tags.tagColor,
       tagStyle: tags.tagStyle,
+      usernameStyle: persLogin.usernameStyle,
+      avatarRing: persLogin.avatarRing,
       registrationDate: registrationDateIso(user.created_at),
       isEarlyTester: isEarlyTesterUser(Number(user.id), user.created_at),
       referralCode: user.referral_code || "",
@@ -1017,8 +1240,8 @@ app.post("/api/login", async (req, res) => {
 app.get("/api/me", authRequired, (req, res) => {
   const uid = Number(req.user.id);
   return query(
-    `SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about, aura_color, messages_sent_count,
-            user_tag, tag_color, tag_style, created_at,
+    `SELECT id, username, user_handle, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about, aura_color, messages_sent_count,
+            user_tag, tag_color, tag_style, username_style, avatar_ring, created_at,
             referral_code, invited_by, referrals_count,
             has_custom_bg, has_badge, has_reactions, has_premium_lite,
             is_premium, premium_activated_at, profile_bg_url,
@@ -1029,10 +1252,12 @@ app.get("/api/me", authRequired, (req, res) => {
     const user = r.rows[0];
     if (!user) return res.status(404).json({ error: "User not found" });
     const tags = buildSenderTagsFromRow(user, false);
+    const persMe = senderPersonalizationFromRow(user, false);
     return res.json({
       user: {
         id: Number(user.id),
         username: user.username,
+        userHandle: userHandleApi(user),
         avatar: user.avatar_url,
         role: user.role,
         banned: Boolean(user.banned),
@@ -1046,6 +1271,8 @@ app.get("/api/me", authRequired, (req, res) => {
         tag: tags.tag,
         tagColor: tags.tagColor,
         tagStyle: tags.tagStyle,
+        usernameStyle: persMe.usernameStyle,
+        avatarRing: persMe.avatarRing,
         registrationDate: registrationDateIso(user.created_at),
         isEarlyTester: isEarlyTesterUser(Number(user.id), user.created_at),
         referralCode: user.referral_code || "",
@@ -1080,6 +1307,10 @@ app.put("/api/me/profile", authRequired, (req, res) => {
 
   (async () => {
     const uid = Number(req.user.id);
+    const persResult = await applyPersonalizationFromProfileBody(uid, req.body || {});
+    if (persResult.error === "User not found") return res.status(404).json({ error: persResult.error });
+    if (persResult.error) return res.status(400).json({ error: persResult.error });
+
     let profileBg = null;
     if (profileBackgroundFieldPresent) {
       // Allow clearing background (empty string) regardless of premium status.
@@ -1132,8 +1363,8 @@ app.put("/api/me/profile", authRequired, (req, res) => {
       }
     }
     const r = await query(
-      `SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about, aura_color, messages_sent_count,
-              user_tag, tag_color, tag_style, created_at,
+      `SELECT id, username, user_handle, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about, aura_color, messages_sent_count,
+              user_tag, tag_color, tag_style, username_style, avatar_ring, created_at,
               referral_code, invited_by, referrals_count,
               has_custom_bg, has_badge, has_reactions, has_premium_lite,
               is_premium, premium_activated_at, profile_bg_url,
@@ -1145,7 +1376,9 @@ app.put("/api/me/profile", authRequired, (req, res) => {
     if (!user) return res.status(404).json({ error: "User not found" });
     const auraColor = normalizeAuraColorApi(user.aura_color);
     const tags = buildSenderTagsFromRow(user, false);
+    const persOut = senderPersonalizationFromRow(user, false);
     if (!auraParsed.skip) emitToAll("user:auraColor", { userId: uid, auraColor });
+    if (persResult.changed) emitToAll("user:tagUpdated", personalizationSocketPayload(uid, user));
     emitToAll("user:profileStatus", {
       userId: uid,
       statusKind: user.status_kind || "",
@@ -1155,6 +1388,7 @@ app.put("/api/me/profile", authRequired, (req, res) => {
       user: {
         id: Number(user.id),
         username: user.username,
+        userHandle: userHandleApi(user),
         avatar: user.avatar_url,
         role: user.role,
         banned: Boolean(user.banned),
@@ -1168,6 +1402,8 @@ app.put("/api/me/profile", authRequired, (req, res) => {
         tag: tags.tag,
         tagColor: tags.tagColor,
         tagStyle: tags.tagStyle,
+        usernameStyle: persOut.usernameStyle,
+        avatarRing: persOut.avatarRing,
         registrationDate: registrationDateIso(user.created_at),
         isEarlyTester: isEarlyTesterUser(Number(user.id), user.created_at),
         referralCode: user.referral_code || "",
@@ -1266,8 +1502,8 @@ app.post("/api/me/premium/activate", authRequired, (req, res) => {
       [uid, exp]
     );
     const r = await query(
-      `SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about, aura_color, messages_sent_count,
-              user_tag, tag_color, tag_style, created_at,
+      `SELECT id, username, user_handle, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about, aura_color, messages_sent_count,
+              user_tag, tag_color, tag_style, username_style, avatar_ring, created_at,
               referral_code, invited_by, referrals_count,
               has_custom_bg, has_badge, has_reactions, has_premium_lite,
                is_premium, premium_activated_at, profile_bg_url,
@@ -1278,10 +1514,12 @@ app.post("/api/me/premium/activate", authRequired, (req, res) => {
     const user = r.rows[0];
     if (!user) return res.status(404).json({ error: "User not found" });
     const tags = buildSenderTagsFromRow(user, false);
+    const persPrem = senderPersonalizationFromRow(user, false);
     return res.json({
       user: {
         id: Number(user.id),
         username: user.username,
+        userHandle: userHandleApi(user),
         avatar: user.avatar_url,
         role: user.role,
         banned: Boolean(user.banned),
@@ -1295,6 +1533,8 @@ app.post("/api/me/premium/activate", authRequired, (req, res) => {
         tag: tags.tag,
         tagColor: tags.tagColor,
         tagStyle: tags.tagStyle,
+        usernameStyle: persPrem.usernameStyle,
+        avatarRing: persPrem.avatarRing,
         registrationDate: registrationDateIso(user.created_at),
         isEarlyTester: isEarlyTesterUser(Number(user.id), user.created_at),
         referralCode: user.referral_code || "",
@@ -1319,25 +1559,40 @@ app.get("/api/users", authRequired, (req, res) => {
 
   (async () => {
     const uid = Number(req.user.id);
+    const needle = q.replace(/^@+/, "").trim();
+    if (!needle) return res.json({ users: [] });
+    const likePat = `%${escapeLikePattern(needle)}%`;
+    const exactHandle = needle.toLowerCase();
+    const prefixPat = `${escapeLikePattern(needle.toLowerCase())}%`;
     const users = await query(
       `
-      SELECT id, username, avatar_url, aura_color, is_online, last_seen_at, status_kind, status_text, messages_sent_count,
-             user_tag, tag_color, tag_style
+      SELECT id, username, user_handle, avatar_url, aura_color, is_online, last_seen_at, status_kind, status_text, messages_sent_count,
+             user_tag, tag_color, tag_style,
+             username_style, avatar_ring,
+             premium_type, premium_expires_at, premium_granted_at
       FROM users
       WHERE id != $1
-        AND username != $4
-        AND username ILIKE $2
-      ORDER BY username ASC
-      LIMIT $3
+        AND username != $6
+        AND (
+          username ILIKE $2 ESCAPE '\\'
+          OR user_handle ILIKE $2 ESCAPE '\\'
+        )
+      ORDER BY
+        CASE WHEN LOWER(user_handle) = LOWER($3) THEN 0 ELSE 1 END,
+        CASE WHEN user_handle LIKE $4 ESCAPE '\\' THEN 0 ELSE 1 END,
+        username ASC
+      LIMIT $5
     `,
-      [uid, `%${q}%`, limit, OFFICIAL_SYSTEM_USERNAME]
+      [uid, likePat, exactHandle, prefixPat, limit, OFFICIAL_SYSTEM_USERNAME]
     );
     return res.json({
       users: users.rows.map((u) => {
         const tg = buildSenderTagsFromRow(u, false);
+        const pers = senderPersonalizationFromRow(u, false);
         return {
           id: Number(u.id),
           username: u.username,
+          userHandle: userHandleApi(u),
           avatar: u.avatar_url,
           auraColor: normalizeAuraColorApi(u.aura_color),
           isOnline: Boolean(u.is_online),
@@ -1348,6 +1603,9 @@ app.get("/api/users", authRequired, (req, res) => {
           tag: tg.tag,
           tagColor: tg.tagColor,
           tagStyle: tg.tagStyle,
+          usernameStyle: pers.usernameStyle,
+          avatarRing: pers.avatarRing,
+          ...computePremiumInfo(u),
         };
       }),
     });
@@ -1364,6 +1622,7 @@ app.get("/api/users/:userId", authRequired, (req, res) => {
         user: {
           id: botId,
           username: "Xasma",
+          userHandle: OFFICIAL_USER_HANDLE,
           avatar: "",
           auraColor: DEFAULT_AURA_COLOR,
           isOnline: false,
@@ -1373,16 +1632,18 @@ app.get("/api/users/:userId", authRequired, (req, res) => {
           about: "",
           messageCount: 0,
           tag: null,
-          tagColor: DEFAULT_TAG_COLOR,
+          tagColor: NEUTRAL_TAG_GRAY,
           tagStyle: "solid",
+          usernameStyle: "",
+          avatarRing: "",
           registrationDate: null,
           isEarlyTester: false,
         },
       });
     }
     const r = await query(
-      `SELECT id, username, avatar_url, aura_color, is_online, last_seen_at, status_kind, status_text, about, messages_sent_count,
-              user_tag, tag_color, tag_style, created_at,
+      `SELECT id, username, user_handle, avatar_url, aura_color, is_online, last_seen_at, status_kind, status_text, about, messages_sent_count,
+              user_tag, tag_color, tag_style, username_style, avatar_ring, created_at,
               is_premium, premium_activated_at, profile_bg_url,
               premium_type, premium_expires_at, premium_granted_at
        FROM users
@@ -1392,10 +1653,12 @@ app.get("/api/users/:userId", authRequired, (req, res) => {
     const u = r.rows[0];
     if (!u) return res.status(404).json({ error: "User not found" });
     const tg = buildSenderTagsFromRow(u, false);
+    const persU = senderPersonalizationFromRow(u, false);
     return res.json({
       user: {
         id: Number(u.id),
         username: u.username,
+        userHandle: userHandleApi(u),
         avatar: u.avatar_url || "",
         auraColor: normalizeAuraColorApi(u.aura_color),
         isOnline: Boolean(u.is_online),
@@ -1407,110 +1670,13 @@ app.get("/api/users/:userId", authRequired, (req, res) => {
         tag: tg.tag,
         tagColor: tg.tagColor,
         tagStyle: tg.tagStyle,
+        usernameStyle: persU.usernameStyle,
+        avatarRing: persU.avatarRing,
         registrationDate: registrationDateIso(u.created_at),
         isEarlyTester: isEarlyTesterUser(Number(u.id), u.created_at),
         ...computePremiumInfo(u),
         profileBackground: u.profile_bg_url || "",
       },
-    });
-  })().catch(() => res.status(500).json({ error: "Server error" }));
-});
-
-// (rest of file unchanged from working version)
-
-function emitToUser(userId, event, payload) {
-  const sockets = userSockets.get(userId);
-  if (!sockets) return;
-  sockets.forEach((sid) => io.to(sid).emit(event, payload));
-}
-
-function emitToAll(event, payload) {
-  userSockets.forEach((sids) => {
-    sids.forEach((sid) => io.to(sid).emit(event, payload));
-  });
-}
-
-function disconnectUserSockets(userId) {
-  const sids = userSockets.get(userId);
-  if (!sids) return;
-  sids.forEach((sid) => io.to(sid).disconnectSockets(true));
-  userSockets.delete(userId);
-}
-
-app.put("/api/me/avatar", authRequired, (req, res) => {
-  const avatar = typeof req.body?.avatar === "string" ? req.body.avatar.trim() : "";
-
-  // Allow clearing avatar with empty string.
-  if (avatar) {
-    // Keep it simple: accept base64 data URLs for now.
-    const isDataUrl = avatar.startsWith("data:image/");
-    if (!isDataUrl) return res.status(400).json({ error: "Avatar must be an image data URL" });
-    if (avatar.length > 400_000) return res.status(400).json({ error: "Avatar too large" });
-  }
-
-  (async () => {
-    const uid = Number(req.user.id);
-    await query(`UPDATE users SET avatar_url = $1 WHERE id = $2`, [avatar || null, uid]);
-    const r = await query(
-      `SELECT id, username, avatar_url, is_online, last_seen_at FROM users WHERE id = $1`,
-      [uid]
-    );
-    const user = r.rows[0];
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    emitToAll("user:avatar", { userId: Number(user.id), avatar: user.avatar_url || "" });
-
-    return res.json({
-      user: {
-        id: Number(user.id),
-        username: user.username,
-        avatar: user.avatar_url,
-        isOnline: Boolean(user.is_online),
-        lastSeenAt: user.last_seen_at,
-      },
-    });
-  })().catch(() => res.status(500).json({ error: "Server error" }));
-});
-
-app.get("/api/users", authRequired, (req, res) => {
-  const q = String(req.query.q || "").trim();
-  const limit = Math.min(parseInt(req.query.limit || "10", 10), 20);
-
-  if (!q) return res.json({ users: [] });
-
-  (async () => {
-    const uid = Number(req.user.id);
-    const users = await query(
-      `
-      SELECT id, username, avatar_url, aura_color, is_online, last_seen_at, status_kind, status_text, messages_sent_count,
-             user_tag, tag_color, tag_style
-      FROM users
-      WHERE id != $1
-        AND username != $4
-        AND username ILIKE $2
-      ORDER BY username ASC
-      LIMIT $3
-    `,
-      [uid, `%${q}%`, limit, OFFICIAL_SYSTEM_USERNAME]
-    );
-    return res.json({
-      users: users.rows.map((u) => {
-        const tg = buildSenderTagsFromRow(u, false);
-        return {
-          id: Number(u.id),
-          username: u.username,
-          avatar: u.avatar_url,
-          auraColor: normalizeAuraColorApi(u.aura_color),
-          isOnline: Boolean(u.is_online),
-          lastSeenAt: u.last_seen_at,
-          statusKind: u.status_kind || "",
-          statusText: u.status_text || "",
-          messageCount: Math.max(0, Number(u.messages_sent_count) || 0),
-          tag: tg.tag,
-          tagColor: tg.tagColor,
-          tagStyle: tg.tagStyle,
-        };
-      }),
     });
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });
@@ -1539,6 +1705,7 @@ app.get("/api/chats", authRequired, (req, res) => {
         c.user2_id,
         other.id AS other_id,
         other.username AS other_username,
+        other.user_handle AS other_user_handle,
         other.avatar_url AS other_avatar_url,
         other.aura_color AS other_aura_color,
         other.is_online AS other_is_online,
@@ -1549,6 +1716,8 @@ app.get("/api/chats", authRequired, (req, res) => {
         other.user_tag AS other_user_tag,
         other.tag_color AS other_tag_color,
         other.tag_style AS other_tag_style,
+        other.username_style AS other_username_style,
+        other.avatar_ring AS other_avatar_ring,
         other.premium_type AS other_premium_type,
         other.premium_expires_at AS other_premium_expires_at,
         other.premium_granted_at AS other_premium_granted_at,
@@ -1662,26 +1831,35 @@ app.get("/api/chats", authRequired, (req, res) => {
                   statusText: "",
                   messageCount: 0,
                   tag: null,
-                  tagColor: DEFAULT_TAG_COLOR,
+                  tagColor: NEUTRAL_TAG_GRAY,
                   tagStyle: "solid",
+                  usernameStyle: "",
+                  avatarRing: "",
+                  userHandle: OFFICIAL_USER_HANDLE,
                 }
-              : {
-                  id: Number(c.other_id),
-                  username: c.other_username,
-                  avatar: c.other_avatar_url,
-                  auraColor: normalizeAuraColorApi(c.other_aura_color),
-                  isOnline: Boolean(c.other_is_online),
-                  lastSeenAt: c.other_last_seen_at,
-                  statusKind: c.other_status_kind || "",
-                  statusText: c.other_status_text || "",
-                  messageCount: Math.max(0, Number(c.other_messages_sent_count) || 0),
-                  ...buildOtherUserTagsFromChatRow(c),
-                  ...computePremiumInfo({
+              : (() => {
+                  const otherPrem = computePremiumInfo({
                     premium_type: c.other_premium_type,
                     premium_expires_at: c.other_premium_expires_at,
                     premium_granted_at: c.other_premium_granted_at,
-                  }),
-                },
+                  });
+                  return {
+                    id: Number(c.other_id),
+                    username: c.other_username,
+                    userHandle: userHandleApi({ user_handle: c.other_user_handle }),
+                    avatar: c.other_avatar_url,
+                    auraColor: normalizeAuraColorApi(c.other_aura_color),
+                    isOnline: Boolean(c.other_is_online),
+                    lastSeenAt: c.other_last_seen_at,
+                    statusKind: c.other_status_kind || "",
+                    statusText: c.other_status_text || "",
+                    messageCount: Math.max(0, Number(c.other_messages_sent_count) || 0),
+                    ...buildOtherUserTagsFromChatRow(c),
+                    usernameStyle: otherPrem.isPremium ? normalizeUsernameStyleApi(c.other_username_style) : "",
+                    avatarRing: otherPrem.isPremium ? normalizeAvatarRingApi(c.other_avatar_ring) : "",
+                    ...otherPrem,
+                  };
+                })(),
           last: c.last_text
             ? {
                 id: c.last_id != null ? Number(c.last_id) : null,
@@ -1922,8 +2100,10 @@ app.get("/api/groups/:chatId", authRequired, (req, res) => {
 
     const members = await query(
       `
-      SELECT u.id, u.username, u.avatar_url, u.is_online, u.last_seen_at, u.messages_sent_count,
-             u.user_tag, u.tag_color, u.tag_style
+      SELECT u.id, u.username, u.user_handle, u.avatar_url, u.is_online, u.last_seen_at, u.messages_sent_count,
+             u.user_tag, u.tag_color, u.tag_style,
+             u.username_style, u.avatar_ring,
+             u.premium_type, u.premium_expires_at, u.premium_granted_at
       FROM chat_members cm
       JOIN users u ON u.id = cm.user_id
       WHERE cm.chat_id = $1
@@ -1947,9 +2127,11 @@ app.get("/api/groups/:chatId", authRequired, (req, res) => {
       },
       members: members.rows.map((u) => {
         const tg = buildSenderTagsFromRow(u, false);
+        const pers = senderPersonalizationFromRow(u, false);
         return {
           id: Number(u.id),
           username: u.username,
+          userHandle: userHandleApi(u),
           avatar: u.avatar_url,
           online: Boolean(u.is_online),
           isOnline: Boolean(u.is_online),
@@ -1959,6 +2141,9 @@ app.get("/api/groups/:chatId", authRequired, (req, res) => {
           tag: tg.tag,
           tagColor: tg.tagColor,
           tagStyle: tg.tagStyle,
+          usernameStyle: pers.usernameStyle,
+          avatarRing: pers.avatarRing,
+          ...computePremiumInfo(u),
         };
       }),
     });
@@ -2202,6 +2387,9 @@ app.get("/api/chats/:chatId/messages", authRequired, (req, res) => {
       u.user_tag,
       u.tag_color,
       u.tag_style,
+      u.username_style,
+      u.avatar_ring,
+      u.user_handle,
       u.premium_type,
       u.premium_expires_at,
       u.premium_granted_at,
@@ -2390,7 +2578,10 @@ app.put("/api/messages/:messageId", authRequired, (req, res) => {
       SELECT m.id, m.chat_id, m.sender_id, m.text, m.delivered_at, m.read_at, m.edited_at, m.created_at,
              m.message_type, m.system_kind, m.system_payload, m.image_url, m.audio_url, m.video_url,
              u.username, u.avatar_url, u.aura_color, u.messages_sent_count,
-             u.user_tag, u.tag_color, u.tag_style
+             u.user_tag, u.tag_color, u.tag_style,
+             u.username_style, u.avatar_ring,
+             u.user_handle,
+             u.premium_type, u.premium_expires_at, u.premium_granted_at
       FROM messages m
       JOIN users u ON u.id = m.sender_id
       WHERE m.id = $1
@@ -2555,7 +2746,7 @@ app.get("/api/admin/users", authRequired, requireAdmin, (req, res) => {
   (async () => {
     const r = await query(
       `
-      SELECT id, username, avatar_url, role, banned, is_online, last_seen_at, created_at, messages_sent_count,
+      SELECT id, username, user_handle, avatar_url, role, banned, is_online, last_seen_at, created_at, messages_sent_count,
              user_tag, tag_color, tag_style,
              premium_type, premium_expires_at, premium_granted_at
       FROM users
@@ -2571,6 +2762,7 @@ app.get("/api/admin/users", authRequired, requireAdmin, (req, res) => {
         return {
           id: Number(u.id),
           username: u.username,
+          userHandle: userHandleApi(u),
           avatar_url: u.avatar_url,
           role: u.role,
           banned: Boolean(u.banned),
@@ -2684,7 +2876,6 @@ app.patch("/api/admin/users/:userId/tag", authRequired, requireAdmin, (req, res)
   }
 
   const tagRaw = typeof req.body?.tag === "string" ? req.body.tag.trim() : "";
-  const tag = tagRaw.length > 40 ? tagRaw.slice(0, 40) : tagRaw;
   const tagColorIn = typeof req.body?.tagColor === "string" ? req.body.tagColor.trim() : "";
   const tagStyle = normalizeTagStyleApi(req.body?.tagStyle);
 
@@ -2692,26 +2883,25 @@ app.patch("/api/admin/users/:userId/tag", authRequired, requireAdmin, (req, res)
     let userTag = null;
     let tagColor = null;
     let tagStyleDb = null;
-    if (tag) {
-      userTag = tag;
-      tagColor = normalizeTagColorApi(tagColorIn);
+    if (tagRaw) {
+      const c = normalizeTagTextForApi(tagRaw);
+      if (!c) return res.status(400).json({ error: "Invalid tag (use 2-4 letters or digits)" });
+      userTag = c;
+      tagColor = normalizeTagColorPreset(tagColorIn);
       tagStyleDb = tagStyle;
     }
 
     const r = await query(
       `UPDATE users SET user_tag = $1, tag_color = $2, tag_style = $3 WHERE id = $4
-       RETURNING id, username, avatar_url, role, banned, is_online, last_seen_at, created_at, messages_sent_count, user_tag, tag_color, tag_style`,
+       RETURNING id, username, avatar_url, role, banned, is_online, last_seen_at, created_at, messages_sent_count,
+                 user_tag, tag_color, tag_style, username_style, avatar_ring,
+                 premium_type, premium_expires_at, premium_granted_at`,
       [userTag, tagColor, tagStyleDb, userId]
     );
     const u = r.rows[0];
     if (!u) return res.status(404).json({ error: "User not found" });
     const tg = buildSenderTagsFromRow(u, false);
-    emitToAll("user:tagUpdated", {
-      userId: Number(u.id),
-      tag: tg.tag,
-      tagColor: tg.tagColor,
-      tagStyle: tg.tagStyle,
-    });
+    emitToAll("user:tagUpdated", personalizationSocketPayload(Number(u.id), u));
     return res.json({
       user: {
         id: Number(u.id),

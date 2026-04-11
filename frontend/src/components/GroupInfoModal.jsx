@@ -3,6 +3,9 @@ import { localeForLang } from "../i18n.js";
 import { addGroupMember, getGroup, patchGroupAvatar, removeGroupMember, searchUsers } from "../api.js";
 import ActivityBadge from "./ActivityBadge.jsx";
 import UserTagBadge from "./UserTagBadge.jsx";
+import { isPremiumActive } from "../premium.js";
+import { avatarRingWrapClass, usernameDisplayClass } from "../userPersonalization.js";
+import { formatAtUserHandle } from "../userHandleDisplay.js";
 
 export default function GroupInfoModal({
   open,
@@ -267,18 +270,27 @@ export default function GroupInfoModal({
                 ) : (
                   members.map((m) => (
                     <div key={m.id} className="groupMemberRow">
-                      <div className={m.isOnline ? "avatarSm presence online" : "avatarSm presence"}>
-                        {m.avatar ? <img src={m.avatar} alt="" /> : <span>{initials(m.username)}</span>}
-                      </div>
+                      {(() => {
+                        const ringC = avatarRingWrapClass(isPremiumActive(m) ? m.avatarRing : "");
+                        const inner = (
+                          <div className={m.isOnline ? "avatarSm presence online" : "avatarSm presence"}>
+                            {m.avatar ? <img src={m.avatar} alt="" /> : <span>{initials(m.username)}</span>}
+                          </div>
+                        );
+                        return ringC ? <span className={ringC}>{inner}</span> : inner;
+                      })()}
                       <div className="groupMemberMain">
                         <div className="groupMemberNameRow">
                           <span className="groupMemberName">
-                            {m.username}
+                            <span className={usernameDisplayClass(m) || undefined}>{m.username}</span>
                             <UserTagBadge tag={m.tag} tagColor={m.tagColor} tagStyle={m.tagStyle} />
                             <ActivityBadge messageCount={m.messageCount} t={t} />
                           </span>
                           {m.isCreator ? <span className="creatorBadge">{t("groupCreator")}</span> : null}
                         </div>
+                        {m.userHandle ? (
+                          <div className="groupMemberAt muted small">{formatAtUserHandle(m.userHandle)}</div>
+                        ) : null}
                         <div className="muted small">{memberPresenceLine(m, t, lang)}</div>
                       </div>
                       {canManage && !m.isCreator ? (
@@ -316,12 +328,23 @@ export default function GroupInfoModal({
                           disabled={busyId === u.id}
                           onClick={() => handleAdd(u.id)}
                         >
-                          <div className="avatarSm">
-                            {u.avatar ? <img src={u.avatar} alt="" /> : <span>{initials(u.username)}</span>}
-                          </div>
-                          <div className="searchUser">
-                            {u.username}
-                            <UserTagBadge tag={u.tag} tagColor={u.tagColor} tagStyle={u.tagStyle} />
+                          {(() => {
+                            const ringC = avatarRingWrapClass(isPremiumActive(u) ? u.avatarRing : "");
+                            const inner = (
+                              <div className="avatarSm">
+                                {u.avatar ? <img src={u.avatar} alt="" /> : <span>{initials(u.username)}</span>}
+                              </div>
+                            );
+                            return ringC ? <span className={ringC}>{inner}</span> : inner;
+                          })()}
+                          <div className="searchResultTextCol">
+                            <div className="searchUser">
+                              <span className={usernameDisplayClass(u) || undefined}>{u.username}</span>
+                              <UserTagBadge tag={u.tag} tagColor={u.tagColor} tagStyle={u.tagStyle} />
+                            </div>
+                            {u.userHandle ? (
+                              <div className="searchUserAt muted small">{formatAtUserHandle(u.userHandle)}</div>
+                            ) : null}
                           </div>
                         </button>
                       ))}

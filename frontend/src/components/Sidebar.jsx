@@ -6,6 +6,8 @@ import { formatUserStatusLine } from "../userStatusLine.js";
 import ActivityBadge from "./ActivityBadge.jsx";
 import UserTagBadge from "./UserTagBadge.jsx";
 import { isPremiumActive } from "../premium.js";
+import { avatarRingWrapClass, usernameDisplayClass } from "../userPersonalization.js";
+import { formatAtUserHandle } from "../userHandleDisplay.js";
 import { IconEllipsis } from "./Icons.jsx";
 import { XASMA_LOGO_SRC } from "../branding.js";
 
@@ -350,9 +352,14 @@ const Sidebar = forwardRef(function Sidebar(
                       </div>
                     </AvatarAura>
                     <div className="searchResultMain">
-                      <div className="searchUser">
-                        {u.username}
-                        <UserTagBadge tag={u.tag} tagColor={u.tagColor} tagStyle={u.tagStyle} />
+                      <div className="searchResultTextCol">
+                        <div className="searchUser">
+                          {u.username}
+                          <UserTagBadge tag={u.tag} tagColor={u.tagColor} tagStyle={u.tagStyle} />
+                        </div>
+                        {u.userHandle ? (
+                          <div className="searchUserAt muted small">{formatAtUserHandle(u.userHandle)}</div>
+                        ) : null}
                       </div>
                       <div className="muted small">{memberSelected(u.id) ? "✓" : ""}</div>
                     </div>
@@ -480,9 +487,14 @@ const Sidebar = forwardRef(function Sidebar(
                       </div>
                     </AvatarAura>
                     <div className="searchResultMain">
-                      <div className="searchUser">
-                        {u.username}
-                        <UserTagBadge tag={u.tag} tagColor={u.tagColor} tagStyle={u.tagStyle} />
+                      <div className="searchResultTextCol">
+                        <div className="searchUser">
+                          {u.username}
+                          <UserTagBadge tag={u.tag} tagColor={u.tagColor} tagStyle={u.tagStyle} />
+                        </div>
+                        {u.userHandle ? (
+                          <div className="searchUserAt muted small">{formatAtUserHandle(u.userHandle)}</div>
+                        ) : null}
                       </div>
                       <div className="muted small">{channelMemberSelected(u.id) ? "✓" : ""}</div>
                     </div>
@@ -644,22 +656,31 @@ const Sidebar = forwardRef(function Sidebar(
               <>
                 <div className="mobileChatRowAvatarWrap">
                   <AvatarAura skip={isRoom || isOfficial} auraColor={other?.auraColor}>
-                    <div
-                      className={
-                        (online ? "mobileChatRowAvatar presence online" : "mobileChatRowAvatar presence") +
-                        (otherIsPremium ? " avatarPremium" : "")
-                      }
-                    >
-                      {isRoom && c.avatar ? (
-                        <img src={c.avatar} alt="" />
-                      ) : !isRoom && other?.avatar ? (
-                        <img src={other.avatar} alt="" />
-                      ) : isOfficial ? (
-                        <img src={XASMA_LOGO_SRC} alt="" className="xasmaBrandMark" decoding="async" />
-                      ) : (
-                        <span>{initials(isRoom || isOfficial ? label : other?.username || "")}</span>
-                      )}
-                    </div>
+                    {(() => {
+                      const ringC =
+                        !isRoom && !isOfficial
+                          ? avatarRingWrapClass(otherIsPremium ? other?.avatarRing : "")
+                          : "";
+                      const inner = (
+                        <div
+                          className={
+                            (online ? "mobileChatRowAvatar presence online" : "mobileChatRowAvatar presence") +
+                            (otherIsPremium ? " avatarPremium" : "")
+                          }
+                        >
+                          {isRoom && c.avatar ? (
+                            <img src={c.avatar} alt="" />
+                          ) : !isRoom && other?.avatar ? (
+                            <img src={other.avatar} alt="" />
+                          ) : isOfficial ? (
+                            <img src={XASMA_LOGO_SRC} alt="" className="xasmaBrandMark" decoding="async" />
+                          ) : (
+                            <span>{initials(isRoom || isOfficial ? label : other?.username || "")}</span>
+                          )}
+                        </div>
+                      );
+                      return ringC ? <span className={ringC}>{inner}</span> : inner;
+                    })()}
                   </AvatarAura>
                   {!isRoom && !isOfficial ? (
                     <span
@@ -672,7 +693,7 @@ const Sidebar = forwardRef(function Sidebar(
                   <div className="mobileChatRowTop">
                     <div className="mobileChatRowTitleBlock">
                       <span className="mobileChatRowName">
-                        <span className={otherIsPremium ? "premiumName" : undefined}>
+                        <span className={!isRoom && !isOfficial ? usernameDisplayClass(other) || undefined : undefined}>
                           {label}
                           {otherIsPremium ? <span className="premiumBadge">💎</span> : null}
                         </span>
@@ -691,6 +712,9 @@ const Sidebar = forwardRef(function Sidebar(
                           <ActivityBadge messageCount={other?.messageCount} t={t} />
                         ) : null}
                       </span>
+                      {!isRoom && !isOfficial && other?.userHandle ? (
+                        <div className="mobileChatRowAt muted small">{formatAtUserHandle(other.userHandle)}</div>
+                      ) : null}
                       {!isRoom && !isOfficial && statusSubtitle ? (
                         <span className="mobileChatRowStatus muted" title={statusSubtitle}>
                           {statusSubtitle}
@@ -788,17 +812,26 @@ const Sidebar = forwardRef(function Sidebar(
       <div className="sidebarHeader">
         <div className="meRow">
           <AvatarAura auraColor={me?.auraColor}>
-            <div className={isPremiumActive(me) ? "avatarSm avatarPremium" : "avatarSm"} title={me.username}>
-              {me.avatar ? <img src={me.avatar} alt="" /> : <span>{initials(me.username)}</span>}
-            </div>
+            {(() => {
+              const ringC = avatarRingWrapClass(isPremiumActive(me) ? me?.avatarRing : "");
+              const inner = (
+                <div className={isPremiumActive(me) ? "avatarSm avatarPremium" : "avatarSm"} title={me.username}>
+                  {me.avatar ? <img src={me.avatar} alt="" /> : <span>{initials(me.username)}</span>}
+                </div>
+              );
+              return ringC ? <span className={ringC}>{inner}</span> : inner;
+            })()}
           </AvatarAura>
           <div className="meName">
-            <span className={isPremiumActive(me) ? "premiumName" : undefined}>
+            <span className={usernameDisplayClass(me) || undefined}>
               {me.username}
               {isPremiumActive(me) ? <span className="premiumBadge">💎</span> : null}
             </span>
             <UserTagBadge tag={me?.tag} tagColor={me?.tagColor} tagStyle={me?.tagStyle} />
             <ActivityBadge messageCount={me?.messageCount} t={t} />
+            {me?.userHandle ? (
+              <div className="meAtHandle muted small">{formatAtUserHandle(me.userHandle)}</div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -861,21 +894,30 @@ const Sidebar = forwardRef(function Sidebar(
                   <div className="chatItemTop">
                     <div className="chatAvatarWrap">
                       <AvatarAura skip={isRoom || isOfficial} auraColor={other?.auraColor}>
-                        <div
-                          className={`${!isRoom && online ? "avatarSm presence online" : "avatarSm presence"}${
-                            !isRoom && !isOfficial && isPremiumActive(other) ? " avatarPremium" : ""
-                          }`}
-                        >
-                          {isRoom && c.avatar ? (
-                            <img src={c.avatar} alt="" />
-                          ) : !isRoom && other?.avatar ? (
-                            <img src={other.avatar} alt="" />
-                          ) : isOfficial ? (
-                            <img src={XASMA_LOGO_SRC} alt="" className="xasmaBrandMark" decoding="async" />
-                          ) : (
-                            <span>{initials(isRoom || isOfficial ? label : other?.username || "")}</span>
-                          )}
-                        </div>
+                        {(() => {
+                          const ringC =
+                            !isRoom && !isOfficial
+                              ? avatarRingWrapClass(isPremiumActive(other) ? other?.avatarRing : "")
+                              : "";
+                          const inner = (
+                            <div
+                              className={`${!isRoom && online ? "avatarSm presence online" : "avatarSm presence"}${
+                                !isRoom && !isOfficial && isPremiumActive(other) ? " avatarPremium" : ""
+                              }`}
+                            >
+                              {isRoom && c.avatar ? (
+                                <img src={c.avatar} alt="" />
+                              ) : !isRoom && other?.avatar ? (
+                                <img src={other.avatar} alt="" />
+                              ) : isOfficial ? (
+                                <img src={XASMA_LOGO_SRC} alt="" className="xasmaBrandMark" decoding="async" />
+                              ) : (
+                                <span>{initials(isRoom || isOfficial ? label : other?.username || "")}</span>
+                              )}
+                            </div>
+                          );
+                          return ringC ? <span className={ringC}>{inner}</span> : inner;
+                        })()}
                       </AvatarAura>
                       {!isRoom && !isOfficial ? (
                         <span
@@ -888,7 +930,11 @@ const Sidebar = forwardRef(function Sidebar(
                     <div className="chatOther">
                       <div className="chatOtherNameRow">
                         <div className="chatOtherName">
-                          <span className={!isRoom && !isOfficial && isPremiumActive(other) ? "premiumName" : undefined}>
+                          <span
+                            className={
+                              !isRoom && !isOfficial ? usernameDisplayClass(other) || undefined : undefined
+                            }
+                          >
                             {label}
                             {!isRoom && !isOfficial && isPremiumActive(other) ? (
                               <span className="premiumBadge">💎</span>
@@ -910,6 +956,9 @@ const Sidebar = forwardRef(function Sidebar(
                           ) : null}
                         </div>
                       </div>
+                      {!isRoom && !isOfficial && other?.userHandle ? (
+                        <div className="chatOtherAt muted small">{formatAtUserHandle(other.userHandle)}</div>
+                      ) : null}
                       {!isRoom && !isOfficial && statusSubtitle ? (
                         <div className="chatOtherStatus muted" title={statusSubtitle}>
                           {statusSubtitle}
@@ -996,18 +1045,27 @@ const Sidebar = forwardRef(function Sidebar(
                 onClick={() => onStartChat(u.id)}
               >
                 <AvatarAura auraColor={u.auraColor}>
-                  <div className={u?.isPremium ? "avatarSm avatarPremium" : "avatarSm"}>
-                    {u.avatar ? <img src={u.avatar} alt="" /> : <span>{initials(u.username)}</span>}
-                  </div>
+                  {(() => {
+                    const ringC = avatarRingWrapClass(isPremiumActive(u) ? u?.avatarRing : "");
+                    const inner = (
+                      <div className={u?.isPremium ? "avatarSm avatarPremium" : "avatarSm"}>
+                        {u.avatar ? <img src={u.avatar} alt="" /> : <span>{initials(u.username)}</span>}
+                      </div>
+                    );
+                    return ringC ? <span className={ringC}>{inner}</span> : inner;
+                  })()}
                 </AvatarAura>
                 <div>
                   <div className="searchUser">
-                    <span className={isPremiumActive(u) ? "premiumName" : undefined}>
+                    <span className={usernameDisplayClass(u) || undefined}>
                       {u.username}
                       {isPremiumActive(u) ? <span className="premiumBadge">💎</span> : null}
                     </span>
                     <UserTagBadge tag={u.tag} tagColor={u.tagColor} tagStyle={u.tagStyle} />
                   </div>
+                  {u.userHandle ? (
+                    <div className="searchUserAt muted small">{formatAtUserHandle(u.userHandle)}</div>
+                  ) : null}
                 </div>
               </button>
             ))}

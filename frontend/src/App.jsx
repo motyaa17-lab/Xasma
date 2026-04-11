@@ -142,6 +142,7 @@ export default function App() {
     chatId: null,
     peerUserId: null,
     peerUsername: "",
+    peerUserHandle: "",
     peerAvatar: "",
     muted: false,
     connectedAtMs: 0,
@@ -313,6 +314,7 @@ export default function App() {
       chatId: null,
       peerUserId: null,
       peerUsername: "",
+      peerUserHandle: "",
       peerAvatar: "",
       muted: false,
       connectedAtMs: 0,
@@ -359,6 +361,7 @@ export default function App() {
         endedAt: null,
         peerUserId: other?.id != null ? Number(other.id) : null,
         peerUsername: String(other?.username || ""),
+        peerUserHandle: String(other?.userHandle || ""),
         peerAvatar: String(other?.avatar || ""),
       },
       ...prev,
@@ -371,6 +374,7 @@ export default function App() {
       chatId: cid,
       peerUserId: other?.id != null ? Number(other.id) : null,
       peerUsername: String(other?.username || ""),
+      peerUserHandle: String(other?.userHandle || ""),
       peerAvatar: String(other?.avatar || ""),
       muted: false,
       connectedAtMs: 0,
@@ -1028,6 +1032,7 @@ export default function App() {
           endedAt: null,
           peerUserId: other?.id != null ? Number(other.id) : fromUserId != null ? Number(fromUserId) : null,
           peerUsername: String(other?.username || ""),
+          peerUserHandle: String(other?.userHandle || ""),
           peerAvatar: String(other?.avatar || ""),
         },
         ...prev,
@@ -1044,6 +1049,7 @@ export default function App() {
               ? Number(other.id)
               : null,
         peerUsername: String(other?.username || ""),
+        peerUserHandle: String(other?.userHandle || ""),
         peerAvatar: String(other?.avatar || ""),
         muted: false,
         connectedAtMs: 0,
@@ -1354,30 +1360,57 @@ export default function App() {
       );
     });
 
-    socket.on("user:tagUpdated", ({ userId, tag, tagColor, tagStyle } = {}) => {
-      const uid = Number(userId);
-      if (!uid) return;
-      const tg = typeof tag === "string" ? tag : "";
-      const tc = typeof tagColor === "string" ? tagColor : "";
-      const ts = tagStyle === "gradient" ? "gradient" : "solid";
-      setMe((prev) =>
-        prev && prev.id === uid ? { ...prev, tag: tg, tagColor: tc, tagStyle: ts } : prev
-      );
-      setChats((prev) =>
-        prev.map((c) =>
-          c.other?.id === uid
-            ? { ...c, other: { ...c.other, tag: tg, tagColor: tc, tagStyle: ts } }
-            : c
-        )
-      );
-      setMessages((prev) =>
-        prev.map((m) =>
-          Number(m.senderId) === uid && m.sender
-            ? { ...m, sender: { ...m.sender, tag: tg, tagColor: tc, tagStyle: ts } }
-            : m
-        )
-      );
-    });
+    socket.on(
+      "user:tagUpdated",
+      ({ userId, tag, tagColor, tagStyle, usernameStyle, avatarRing } = {}) => {
+        const uid = Number(userId);
+        if (!uid) return;
+        const tg = typeof tag === "string" ? tag : "";
+        const tc = typeof tagColor === "string" ? tagColor : "";
+        const ts = tagStyle === "gradient" ? "gradient" : "solid";
+        const us = typeof usernameStyle === "string" ? usernameStyle : "";
+        const ar = typeof avatarRing === "string" ? avatarRing : "";
+        setMe((prev) =>
+          prev && prev.id === uid
+            ? { ...prev, tag: tg || null, tagColor: tc, tagStyle: ts, usernameStyle: us, avatarRing: ar }
+            : prev
+        );
+        setChats((prev) =>
+          prev.map((c) =>
+            c.other?.id === uid
+              ? {
+                  ...c,
+                  other: {
+                    ...c.other,
+                    tag: tg || null,
+                    tagColor: tc,
+                    tagStyle: ts,
+                    usernameStyle: us,
+                    avatarRing: ar,
+                  },
+                }
+              : c
+          )
+        );
+        setMessages((prev) =>
+          prev.map((m) =>
+            Number(m.senderId) === uid && m.sender
+              ? {
+                  ...m,
+                  sender: {
+                    ...m.sender,
+                    tag: tg || null,
+                    tagColor: tc,
+                    tagStyle: ts,
+                    usernameStyle: us,
+                    avatarRing: ar,
+                  },
+                }
+              : m
+          )
+        );
+      }
+    );
 
     socket.on("user:profileStatus", ({ userId, statusKind, statusText } = {}) => {
       const uid = Number(userId);
@@ -1851,6 +1884,11 @@ export default function App() {
     const auraColor = next?.auraColor !== undefined ? next.auraColor : undefined;
     const profileBackground =
       typeof next?.profileBackground === "string" ? String(next.profileBackground) : undefined;
+    const userTag = typeof next?.userTag === "string" ? next.userTag : undefined;
+    const tagColor = typeof next?.tagColor === "string" ? next.tagColor : undefined;
+    const tagStyle = next?.tagStyle === "gradient" || next?.tagStyle === "solid" ? next.tagStyle : undefined;
+    const usernameStyle = typeof next?.usernameStyle === "string" ? next.usernameStyle : undefined;
+    const avatarRing = typeof next?.avatarRing === "string" ? next.avatarRing : undefined;
     setMe((prev) =>
       prev
         ? {
@@ -1860,6 +1898,11 @@ export default function App() {
             about,
             ...(auraColor !== undefined ? { auraColor } : {}),
             ...(profileBackground !== undefined ? { profileBackground } : {}),
+            ...(userTag !== undefined ? { tag: userTag.trim() ? userTag : null } : {}),
+            ...(tagColor !== undefined ? { tagColor } : {}),
+            ...(tagStyle !== undefined ? { tagStyle } : {}),
+            ...(usernameStyle !== undefined ? { usernameStyle } : {}),
+            ...(avatarRing !== undefined ? { avatarRing } : {}),
           }
         : prev
     );
@@ -1869,6 +1912,11 @@ export default function App() {
       about,
       ...(auraColor !== undefined ? { auraColor } : {}),
       ...(profileBackground !== undefined ? { profileBackground } : {}),
+      ...(userTag !== undefined ? { userTag } : {}),
+      ...(tagColor !== undefined ? { tagColor } : {}),
+      ...(tagStyle !== undefined ? { tagStyle } : {}),
+      ...(usernameStyle !== undefined ? { usernameStyle } : {}),
+      ...(avatarRing !== undefined ? { avatarRing } : {}),
     });
     setMe(updated);
   }
