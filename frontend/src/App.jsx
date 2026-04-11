@@ -2,6 +2,7 @@ import React, { Component, useEffect, useMemo, useRef, useState } from "react";
 import { io } from "socket.io-client";
 
 import Auth from "./components/Auth.jsx";
+import AuthBootSplash from "./components/AuthBootSplash.jsx";
 import Sidebar from "./components/Sidebar.jsx";
 import Chat from "./components/Chat.jsx";
 import UserMenu from "./components/UserMenu.jsx";
@@ -36,9 +37,14 @@ import {
   syncMobileChatVisualViewport,
 } from "./syncViewport.js";
 import { tryShowIncomingMessageNotification } from "./messageNotifications.js";
+import { shouldClearNotificationPreferenceDueToOs } from "./notifyPermissions.js";
+import { XASMA_LOGO_SRC } from "./branding.js";
 
 /** Set `true` temporarily to verify stacking: fixed red "TEST SETTINGS" (then set back to `false`). */
 const DEBUG_DESKTOP_SETTINGS_FIXED_TEST = false;
+
+/** After successful session restore, hold splash at least this long to avoid a jarring sub-frame flash (400–700ms). */
+const AUTH_BOOT_MIN_MS = 520;
 
 export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem("token") || "");
@@ -98,6 +104,26 @@ export default function App() {
   const mobileInboxSidebarRef = useRef(null);
   const settingsRef = useRef(settings);
   const openChatFromNotificationRef = useRef(() => {});
+
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+
+  useEffect(() => {
+    const syncOs = () => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      void (async () => {
+        if (!(await shouldClearNotificationPreferenceDueToOs(settingsRef.current))) return;
+        setSettings((s) => ({ ...s, messageNotificationsEnabled: false }));
+      })();
+    };
+    document.addEventListener("visibilitychange", syncOs);
+    window.addEventListener("focus", syncOs);
+    return () => {
+      document.removeEventListener("visibilitychange", syncOs);
+      window.removeEventListener("focus", syncOs);
+    };
+  }, []);
 
   const socketEndpoint = useMemo(() => getSocketEndpoint(), []);
   const isMobile = useIsMobile(900);
@@ -749,10 +775,6 @@ export default function App() {
   }, [settings]);
 
   useEffect(() => {
-    settingsRef.current = settings;
-  }, [settings]);
-
-  useEffect(() => {
     if (!token) {
       setMe(null);
       setChats([]);
@@ -762,12 +784,25 @@ export default function App() {
     }
 
     let cancelled = false;
+    let minSplashTimerId = null;
+    const bootStartedAt = Date.now();
+
     (async () => {
       setAuthError("");
       try {
         const meUser = await getMe();
         if (cancelled) return;
-        setMe(meUser);
+        const elapsed = Date.now() - bootStartedAt;
+        const remaining = Math.max(0, AUTH_BOOT_MIN_MS - elapsed);
+        const applyMe = () => {
+          if (cancelled) return;
+          setMe(meUser);
+        };
+        if (remaining > 0) {
+          minSplashTimerId = window.setTimeout(applyMe, remaining);
+        } else {
+          applyMe();
+        }
       } catch (e) {
         if (cancelled) return;
         setAuthError(e.message || tr(normalizeLang(settingsRef.current?.lang), "authSessionFailed"));
@@ -778,6 +813,7 @@ export default function App() {
 
     return () => {
       cancelled = true;
+      if (minSplashTimerId != null) window.clearTimeout(minSplashTimerId);
     };
   }, [token]);
 
@@ -953,7 +989,7 @@ export default function App() {
       });
 
       const lang = normalizeLang(settingsRef.current?.lang);
-      tryShowIncomingMessageNotification(msg, {
+      void tryShowIncomingMessageNotification(msg, {
         meId: me?.id,
         openChatId: selectedChatIdRef.current,
         settings: settingsRef.current,
@@ -1848,6 +1884,16 @@ export default function App() {
     setMessages([]);
   }
 
+  const sessionRestoring = Boolean(token) && me == null;
+
+  if (sessionRestoring) {
+    return (
+      <div className="appRoot appRoot--authBoot">
+        <AuthBootSplash t={t} />
+      </div>
+    );
+  }
+
   if (!me) {
     return (
       <div className="appRoot appRoot--auth">
@@ -1927,6 +1973,7 @@ export default function App() {
       <div className="topBar">
         <div className="topBarLeft">
           <div className="appTitleRow">
+            <img src={XASMA_LOGO_SRC} alt="" className="appLogo" width={36} height={36} decoding="async" />
             <span className="appTitle">{t("appTitle")}</span>
             <span className="appBetaBadge">BETA</span>
           </div>
@@ -2016,6 +2063,7 @@ export default function App() {
             <header className="mobileMainHeader">
               <div className="mobileMainHeaderText">
                 <div className="mobileBrandRow">
+                  <img src={XASMA_LOGO_SRC} alt="" className="appLogo" width={36} height={36} decoding="async" />
                   <span className="mobileBrandTitle">{t("appTitle")}</span>
                   <span className="appBetaBadge">BETA</span>
                 </div>

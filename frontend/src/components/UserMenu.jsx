@@ -20,6 +20,12 @@ import AvatarAura from "./AvatarAura.jsx";
 import ActivityBadge from "./ActivityBadge.jsx";
 import UserTagBadge from "./UserTagBadge.jsx";
 import { isPremiumActive } from "../premium.js";
+import { Capacitor } from "@capacitor/core";
+import {
+  getNativeAndroidPostNotificationDisplay,
+  openAndroidNotificationSettings,
+  requestAndroidPostNotifications,
+} from "../notifyPermissions.js";
 
 function formatShortDate(iso) {
   const d = new Date(iso);
@@ -240,29 +246,86 @@ function AdminOfficialBroadcast({ t, text, setText, busy, onSend }) {
 function MessageNotificationsSettings({ settings, onChangeSettings, t }) {
   const supported = typeof window !== "undefined" && "Notification" in window;
   const perm = supported ? Notification.permission : "unsupported";
-  const enabled = Boolean(settings?.messageNotificationsEnabled);
+  const prefOn = Boolean(settings?.messageNotificationsEnabled);
+  const isAndroid = Capacitor.getPlatform() === "android";
+  const [nativeDisplay, setNativeDisplay] = useState("unsupported");
   const [working, setWorking] = useState(false);
+
+  const refreshNative = useCallback(async () => {
+    const d = await getNativeAndroidPostNotificationDisplay();
+    setNativeDisplay(typeof d === "string" ? d : "unsupported");
+  }, []);
+
+  useEffect(() => {
+    void refreshNative();
+  }, [refreshNative]);
+
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "visible") void refreshNative();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [refreshNative]);
+
+  // On Android, only "granted" counts; never treat "unsupported" as OK (avoids fake-enabled if bridge fails).
+  const nativeOk = nativeDisplay === "granted" || (!isAndroid && nativeDisplay === "unsupported");
+  const deliveryOn = prefOn && supported && perm === "granted" && nativeOk;
+
+  const pillLabel = deliveryOn
+    ? t("notifyDisableButton")
+    : perm === "denied" && !isAndroid
+      ? t("notifyBlockedButton")
+      : isAndroid && nativeDisplay === "denied"
+        ? t("notifyBlockedInSystem")
+        : t("notifyEnableButton");
 
   async function onToggle() {
     if (!supported || working) return;
     setWorking(true);
     try {
-      if (enabled) {
+      if (deliveryOn) {
         onChangeSettings?.({ messageNotificationsEnabled: false });
         return;
       }
-      if (perm === "denied") return;
+      if (isAndroid && nativeDisplay === "denied") {
+        await openAndroidNotificationSettings();
+        await refreshNative();
+        return;
+      }
+      if (perm === "denied") {
+        if (isAndroid) await openAndroidNotificationSettings();
+        return;
+      }
+
+      await requestAndroidPostNotifications();
+      await refreshNative();
+      let nd = await getNativeAndroidPostNotificationDisplay();
+      if (isAndroid && (nd === "denied" || nd === "prompt")) {
+        return;
+      }
+
       let nextPerm = perm;
       if (nextPerm === "default") {
         nextPerm = await Notification.requestPermission();
       }
-      if (nextPerm === "granted") {
+      if (nextPerm === "granted" && (!isAndroid || nd === "granted" || nd === "unsupported")) {
         onChangeSettings?.({ messageNotificationsEnabled: true });
       }
     } finally {
       setWorking(false);
     }
   }
+
+  const mismatch = prefOn && !deliveryOn;
+  const blockedLabel =
+    perm === "denied"
+      ? isAndroid
+        ? t("notifyDeniedInAndroid")
+        : t("notifyDeniedInBrowser")
+      : isAndroid && nativeDisplay === "denied"
+        ? t("notifyDeniedInAndroid")
+        : null;
 
   return (
     <div className="settingsSection">
@@ -275,20 +338,31 @@ function MessageNotificationsSettings({ settings, onChangeSettings, t }) {
             <span className="settingsNotifyLabel">{t("notifyEnableLabel")}</span>
             <button
               type="button"
-              className={enabled ? "pillBtn active" : "pillBtn"}
+              className={deliveryOn ? "pillBtn active" : "pillBtn"}
               onClick={onToggle}
-              disabled={working || (!enabled && perm === "denied")}
-              aria-pressed={enabled}
+              disabled={working || (perm === "denied" && !isAndroid)}
+              aria-pressed={deliveryOn}
             >
-              {perm === "denied" && !enabled
-                ? t("notifyBlockedButton")
-                : enabled
-                  ? t("notifyDisableButton")
-                  : t("notifyEnableButton")}
+              {pillLabel}
             </button>
           </div>
           <p className="muted small settingsNotifyHint">{t("notifyEnableHint")}</p>
-          {perm === "denied" ? <p className="muted small settingsNotifyWarn">{t("notifyDeniedInBrowser")}</p> : null}
+          {isAndroid ? (
+            <p className="muted small settingsNotifyHint">{t("notifyAndroidHint")}</p>
+          ) : null}
+          {blockedLabel ? <p className="muted small settingsNotifyWarn">{blockedLabel}</p> : null}
+          {mismatch ? (
+            <p className="muted small settingsNotifyWarn">{t("notifyMismatchOsOff")}</p>
+          ) : null}
+          {isAndroid && (nativeDisplay === "denied" || perm === "denied" || mismatch) ? (
+            <button
+              type="button"
+              className="pillBtn settingsNotifyOpenOs"
+              onClick={() => void openAndroidNotificationSettings()}
+            >
+              {t("notifyOpenSystemSettings")}
+            </button>
+          ) : null}
         </>
       )}
     </div>
@@ -1009,21 +1083,7 @@ const UserMenu = forwardRef(function UserMenu(
               </div>
             ) : panel === "notifications" ? (
               <div className="settingsModalList">
-                <div className="settingsSection settingsSection--padded">
-                  <div className="muted small">{t("notifyEnableHint")}</div>
-                </div>
-                <div className="settingsSection">
-                  <SettingsChoiceRow
-                    label={t("notifyEnableButton")}
-                    selected={!!settings?.messageNotificationsEnabled}
-                    onClick={() => onChangeSettings?.({ messageNotificationsEnabled: true })}
-                  />
-                  <SettingsChoiceRow
-                    label={t("notifyDisableButton")}
-                    selected={!settings?.messageNotificationsEnabled}
-                    onClick={() => onChangeSettings?.({ messageNotificationsEnabled: false })}
-                  />
-                </div>
+                <MessageNotificationsSettings settings={settings} onChangeSettings={onChangeSettings} t={t} />
               </div>
             ) : panel === "chatBackground" ? (
               <div className="settingsModalList">

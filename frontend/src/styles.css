@@ -112,6 +112,99 @@ body.body--mobileConversationOpen {
   box-shadow: var(--glow-active);
 }
 
+.appRoot--authBoot {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  min-height: 100%;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+  background: radial-gradient(120% 80% at 50% 0%, rgba(37, 99, 235, 0.08), transparent 55%), var(--bg);
+}
+
+.authBootSplash {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.authBootSplashCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 320px;
+  padding: 28px 24px 32px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(17, 27, 46, 0.72);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+}
+
+@keyframes logoPulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+}
+
+.bootLogo {
+  display: block;
+  width: 90px;
+  height: 90px;
+  margin-bottom: 16px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 12px rgba(0, 200, 255, 0.4));
+  animation: logoPulse 2.2s ease-in-out infinite;
+}
+
+.authBootSplashSpinner {
+  width: 36px;
+  height: 36px;
+  margin-top: 18px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: rgba(59, 130, 246, 0.9);
+  animation: authBootSpinner 0.78s linear infinite;
+}
+
+@keyframes authBootSpinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .authBootSplashSpinner {
+    animation: none;
+    border-top-color: rgba(59, 130, 246, 0.55);
+    opacity: 0.9;
+  }
+
+  .bootLogo {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+.authBootSplashHint {
+  margin: 16px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(148, 163, 184, 0.95);
+  letter-spacing: 0.01em;
+}
+
 .authWrap {
   flex: 1;
   display: flex;
@@ -134,6 +227,31 @@ body.body--mobileConversationOpen {
 .authTitle {
   margin: 0 0 12px;
   font-size: 20px;
+}
+
+.authTitle--brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.authTitleWordmark {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, rgba(226, 232, 240, 0.98), rgba(147, 197, 253, 0.92));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.appLogo {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 10px rgba(34, 211, 238, 0.22));
 }
 
 .segmented {
@@ -314,12 +432,17 @@ body.body--mobileConversationOpen {
   display: inline-flex;
   align-items: center;
   min-width: 0;
-  gap: 0;
+  gap: 8px;
 }
 
 .appTitle {
   font-size: 18px;
   font-weight: 700;
+}
+
+.appTitleRow .appBetaBadge,
+.mobileBrandRow .appBetaBadge {
+  margin-left: 0;
 }
 
 .appBetaBadge {
@@ -1267,6 +1390,10 @@ body.body--mobileConversationOpen {
 
 .settingsNotifyWarn {
   color: rgba(252, 211, 77, 0.92);
+}
+
+.settingsNotifyOpenOs {
+  margin-top: 12px;
 }
 
 .pillRow {
@@ -2792,6 +2919,19 @@ body.body--mobileConversationOpen {
 .avatarSm span {
   font-size: 12px;
   font-weight: 800;
+}
+
+.xasmaBrandMark {
+  width: 70%;
+  height: 70%;
+  object-fit: contain;
+  filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.35));
+}
+
+.mobileChatRowAvatar img.xasmaBrandMark {
+  width: 62%;
+  height: 62%;
+  object-fit: contain;
 }
 
 .searchInput {
@@ -5661,6 +5801,7 @@ body.body--mobileConversationOpen {
   align-items: center;
   min-width: 0;
   max-width: 100%;
+  gap: 8px;
 }
 
 .mobileBrandTitle {
@@ -5920,7 +6061,7 @@ body.body--mobileConversationOpen {
   border-color: rgba(15, 23, 42, 0.9);
 }
 
-.mobileChatRowAvatar img {
+.mobileChatRowAvatar img:not(.xasmaBrandMark) {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -7030,5 +7171,141 @@ body.body--mobileConversationOpen {
 
 .appShell--mobile .chatEmptyStateText {
   font-size: 14px;
+}
+
+/* =============================================================================
+   Capacitor Android APK (html.cap-android) — WebView scroll/composite cost
+   Targets APK only; desktop and mobile browsers unchanged.
+   ============================================================================= */
+
+/* Stacking: avoid isolate + nested scroll/clip combos that glitch in Android WebView. */
+html.cap-android .chatMain {
+  isolation: auto;
+}
+
+html.cap-android .chatTheme-softBlur.chatMain > .chatBgParallax,
+html.cap-android .chatTheme-glass.chatMain > .chatBgParallax {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.94) 0%, rgba(15, 23, 42, 0.98) 100%);
+}
+
+html.cap-android .chatMain.chatTheme-darkGradient.theme-dark-animated > .chatBgParallax,
+html.cap-android .chatMain.chatTheme-night.theme-night-animated > .chatBgParallax,
+html.cap-android .chatMain.chatTheme-softBlur.theme-soft-animated > .chatBgParallax {
+  animation: none !important;
+  background-size: auto !important;
+}
+
+html.cap-android .chatMain.chatTheme-darkGradient.theme-dark-animated > .chatBgParallax::before,
+html.cap-android .chatMain.chatTheme-night.theme-night-animated > .chatBgParallax::before,
+html.cap-android .chatMain.chatTheme-softBlur.theme-soft-animated > .chatBgParallax::before {
+  animation: none !important;
+  transform: none !important;
+}
+
+/* Message thread + chat list: previous cap-android overflow-x / pan-y tweaks caused severe
+   Chromium WebView compositing corruption (ghost tiles, mirrored fragments) when combined
+   with .appShell--mobile. Reset scroll roots to symmetric overflow + default touch-action. */
+html.cap-android .appShell--mobile .chatMain {
+  overflow-x: visible;
+}
+
+html.cap-android .appShell--mobile .messages {
+  overflow: auto;
+  overscroll-behavior-x: auto;
+  touch-action: auto;
+}
+
+html.cap-android .appShell--mobile .bubble {
+  touch-action: auto;
+}
+
+/* clip-path on many scrolling rows → GPU layer bugs in Android WebView; overflow:hidden + radius clips enough. */
+html.cap-android .mobileChatRowSwipe {
+  clip-path: none;
+}
+
+/* Parallax transform on the huge bg layer during scroll = extra invalidation; keep bg static on APK. */
+html.cap-android .chatMain > .chatBgParallax {
+  transform: none !important;
+}
+
+/* Full-viewport and card blurs — very expensive vs solid fills in Android WebView. */
+html.cap-android .modalBackdrop--premiumProfile {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html.cap-android .userProfileBg {
+  filter: none;
+}
+
+html.cap-android .userProfileBgOverlay {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html.cap-android .userProfileHero--premium .userProfileBgOverlay {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html.cap-android .userProfilePremiumGlow {
+  animation: none !important;
+  opacity: 0.78;
+}
+
+html.cap-android .userProfilePremiumParticles span {
+  animation: none !important;
+  filter: none;
+}
+
+html.cap-android .callOverlay {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+html.cap-android .callCard--alive {
+  box-shadow: 0 14px 48px rgba(0, 0, 0, 0.5);
+}
+
+html.cap-android .reportModalOverlay {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: rgba(2, 6, 23, 0.88);
+}
+
+html.cap-android .videoNoteOverlayBackdrop {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: rgba(3, 7, 18, 0.82);
+}
+
+html.cap-android .mobileBottomNav {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Premium message row: drop backdrop + looping shadow animation. */
+html.cap-android .msgPremium {
+  animation: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.18),
+    0 2px 12px rgba(120, 140, 255, 0.14);
+}
+
+html.cap-android .msgPremium::after {
+  filter: none;
+}
+
+/* Avatar premium ring: blur + infinite opacity = extra layer work in lists. */
+html.cap-android .avatarPremium::after {
+  animation: none !important;
+  filter: blur(2px);
+  opacity: 0.42;
 }
 

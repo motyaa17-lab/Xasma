@@ -3,6 +3,8 @@
  * Fails silently when unsupported or permission denied.
  */
 
+import { canDeliverMessageNotifications } from "./notifyPermissions.js";
+
 export function notificationsSupported() {
   return typeof window !== "undefined" && typeof Notification !== "undefined";
 }
@@ -41,11 +43,10 @@ export function buildMessageNotificationBody(msg, t) {
 /**
  * Show a desktop notification for an incoming message (caller ensures filters).
  */
-export function tryShowIncomingMessageNotification(msg, { meId, openChatId, settings, t, onOpenChat }) {
+export async function tryShowIncomingMessageNotification(msg, { meId, openChatId, settings, t, onOpenChat }) {
   try {
     if (!notificationsSupported()) return;
-    if (!settings?.messageNotificationsEnabled) return;
-    if (Notification.permission !== "granted") return;
+    if (!(await canDeliverMessageNotifications(settings))) return;
     if (shouldSuppressMessageNotification(msg, { meId, openChatId })) return;
 
     const title = buildMessageNotificationTitle(msg, t);

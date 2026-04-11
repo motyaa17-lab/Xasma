@@ -1,8 +1,13 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { Capacitor } from "@capacitor/core";
 import App from "./App.jsx";
 import "./styles.css";
 import { syncAppRootHeight } from "./syncViewport.js";
+
+if (typeof document !== "undefined" && Capacitor.getPlatform() === "android") {
+  document.documentElement.classList.add("cap-android");
+}
 
 function setAppHeightVar() {
   syncAppRootHeight();

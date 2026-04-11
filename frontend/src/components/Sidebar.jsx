@@ -7,6 +7,7 @@ import ActivityBadge from "./ActivityBadge.jsx";
 import UserTagBadge from "./UserTagBadge.jsx";
 import { isPremiumActive } from "../premium.js";
 import { IconEllipsis } from "./Icons.jsx";
+import { XASMA_LOGO_SRC } from "../branding.js";
 
 const Sidebar = forwardRef(function Sidebar(
   {
@@ -653,6 +654,8 @@ const Sidebar = forwardRef(function Sidebar(
                         <img src={c.avatar} alt="" />
                       ) : !isRoom && other?.avatar ? (
                         <img src={other.avatar} alt="" />
+                      ) : isOfficial ? (
+                        <img src={XASMA_LOGO_SRC} alt="" className="xasmaBrandMark" decoding="async" />
                       ) : (
                         <span>{initials(isRoom || isOfficial ? label : other?.username || "")}</span>
                       )}
@@ -867,6 +870,8 @@ const Sidebar = forwardRef(function Sidebar(
                             <img src={c.avatar} alt="" />
                           ) : !isRoom && other?.avatar ? (
                             <img src={other.avatar} alt="" />
+                          ) : isOfficial ? (
+                            <img src={XASMA_LOGO_SRC} alt="" className="xasmaBrandMark" decoding="async" />
                           ) : (
                             <span>{initials(isRoom || isOfficial ? label : other?.username || "")}</span>
                           )}

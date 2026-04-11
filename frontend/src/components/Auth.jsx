@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { XASMA_LOGO_SRC } from "../branding.js";
 import { formatAuthError } from "../i18n.js";
 
 export default function Auth({ onLogin, onRegister, error, t }) {
@@ -29,7 +30,10 @@ export default function Auth({ onLogin, onRegister, error, t }) {
   return (
     <div className="authWrap">
       <div className="authCard">
-        <h1 className="authTitle">Xasma</h1>
+        <h1 className="authTitle authTitle--brand">
+          <img src={XASMA_LOGO_SRC} alt="" className="appLogo" width={36} height={36} decoding="async" />
+          <span className="authTitleWordmark">Xasma</span>
+        </h1>
 
         <div className="segmented">
           <button

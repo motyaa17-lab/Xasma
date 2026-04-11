@@ -68,7 +68,7 @@ The web client uses `VITE_API_URL` (preferred) or legacy `VITE_API_BASE` (see `s
 
 ## Icons and splash
 
-- Source logo: `frontend/assets/logo.svg` (same artwork as `public/xasma-icon.svg`).
+- Source logo: `frontend/assets/logo.svg` (vector for `@capacitor/assets`); app/PWA use `public/xasma-logo.png`.
 - Regenerate mipmaps: `npm run android:assets`, then `npm run android:sync`.
 
 ## Routing and auth

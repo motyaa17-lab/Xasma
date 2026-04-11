@@ -12,6 +12,7 @@ import { isPremiumActive } from "../premium.js";
 import { IconEllipsis, IconPhone } from "./Icons.jsx";
 import { localeForLang } from "../i18n.js";
 import { formatUserStatusLine } from "../userStatusLine.js";
+import { XASMA_LOGO_SRC } from "../branding.js";
 
 const MAX_VIDEO_NOTE_SEC = 60;
 const QUICK_REACTION_EMOJIS = ["❤️", "👍", "😂", "😮", "😢", "🔥"];
@@ -2198,7 +2199,7 @@ export default function Chat({
                 <div className="chatHeaderLeft">
                   <AvatarAura auraColor={chat?.other?.auraColor}>
                     <div className="avatarSm" aria-hidden>
-                      <span>{initials(chat?.title || t("appTitle"))}</span>
+                      <img src={XASMA_LOGO_SRC} alt="" className="xasmaBrandMark" decoding="async" />
                     </div>
                   </AvatarAura>
                   <div className="chatHeaderInfo">

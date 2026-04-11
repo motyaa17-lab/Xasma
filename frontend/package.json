@@ -15,6 +15,7 @@
     "android:assets": "npx @capacitor/assets generate --android --iconBackgroundColor \"#0b1220\" --iconBackgroundColorDark \"#0b1220\" --splashBackgroundColor \"#0b1220\" --splashBackgroundColorDark \"#0b1220\""
   },
   "dependencies": {
+    "@capacitor/core": "^6.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "socket.io-client": "^4.8.1"
@@ -23,7 +24,6 @@
     "@capacitor/android": "^6.2.0",
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^6.2.0",
-    "@capacitor/core": "^6.2.0",
     "@vitejs/plugin-react": "^4.3.1",
     "vite": "^5.4.2"
   }
