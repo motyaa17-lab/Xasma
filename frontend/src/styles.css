@@ -660,9 +660,9 @@ body.body--mobileConversationOpen {
 }
 
 .modalBackdrop--premiumProfile {
-  background: rgba(0, 0, 0, 0.62);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(0, 0, 0, 0.56);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
 .modalBackdrop--out {
@@ -724,15 +724,15 @@ body.body--mobileConversationOpen {
 
 .userProfileHero--premium .userProfileBg {
   transform: scale(1.08);
-  opacity: 0.94;
+  opacity: 0.98;
 }
 
 .userProfileHero--premium .userProfileBgOverlay {
   background:
-    radial-gradient(700px 260px at 50% 0%, rgba(122, 162, 255, 0.22), rgba(0, 0, 0, 0) 60%),
-    linear-gradient(180deg, rgba(0, 0, 0, 0.32) 0%, rgba(0, 0, 0, 0.72) 72%, rgba(11, 18, 32, 0.96) 100%);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+    radial-gradient(700px 260px at 50% 0%, rgba(122, 162, 255, 0.12), rgba(0, 0, 0, 0) 58%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.16) 0%, rgba(0, 0, 0, 0.38) 55%, rgba(11, 18, 32, 0.76) 100%);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
 }
 
 .userProfileHero--premium:not(.userProfileHero--hasBg) {
@@ -930,20 +930,20 @@ body.body--mobileConversationOpen {
   inset: 0;
   background-size: cover;
   background-position: center;
-  filter: saturate(1.05) contrast(1.02);
+  filter: saturate(1.04) contrast(1.03);
   transform: scale(1.06);
   transition: opacity 0.25s ease;
-  opacity: 0.92;
+  opacity: 0.98;
 }
 
 .userProfileBgOverlay {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(600px 220px at 50% 0%, rgba(37, 99, 235, 0.18), rgba(0, 0, 0, 0) 60%),
-    linear-gradient(180deg, rgba(11, 18, 32, 0.45) 0%, rgba(11, 18, 32, 0.82) 70%, rgba(11, 18, 32, 0.96) 100%);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+    radial-gradient(600px 220px at 50% 0%, rgba(37, 99, 235, 0.1), rgba(0, 0, 0, 0) 58%),
+    linear-gradient(180deg, rgba(11, 18, 32, 0.22) 0%, rgba(11, 18, 32, 0.48) 52%, rgba(11, 18, 32, 0.78) 100%);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
   pointer-events: none;
 }
 
