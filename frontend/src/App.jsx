@@ -101,6 +101,9 @@ export default function App() {
   const lastSocketResyncAtRef = useRef(0);
   const optimisticSendTimersRef = useRef(new Map()); // clientTempId -> timeoutId
   const messagesLoadSeqRef = useRef(0);
+  /** In-memory cache of last known messages per chat (instant re-open; background fetch still refreshes). */
+  const messagesCacheRef = useRef(new Map());
+  const messagesRef = useRef([]);
   const mobileInboxSidebarRef = useRef(null);
   const settingsRef = useRef(settings);
   const openChatFromNotificationRef = useRef(() => {});
@@ -784,6 +787,7 @@ export default function App() {
       setChats([]);
       setSelectedChatId(null);
       setMessages([]);
+      messagesCacheRef.current.clear();
       return;
     }
 
@@ -843,6 +847,25 @@ export default function App() {
     selectedChatIdRef.current = selectedChatId;
   }, [selectedChatId]);
 
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  function stashCurrentChatMessagesToCache(prevChatId) {
+    const cid = Number(prevChatId || 0);
+    if (!cid) return;
+    const snap = messagesRef.current;
+    if (!Array.isArray(snap) || snap.length === 0) return;
+    messagesCacheRef.current.set(cid, snap.slice());
+  }
+
+  function takeCachedMessagesSlice(chatId) {
+    const cid = Number(chatId || 0);
+    if (!cid) return [];
+    const got = messagesCacheRef.current.get(cid);
+    return got && got.length ? got.slice() : [];
+  }
+
   // Socket.io: connect once authenticated.
   useEffect(() => {
     if (!token) return;
@@ -882,7 +905,9 @@ export default function App() {
           setMessages((prev) => {
             if (Number(selectedChatIdRef.current || 0) !== Number(openChatId)) return prev;
             if (messagesLoadSeqRef.current !== loadSeq) return prev;
-            return mergeFetchedMessages(openChatId, list, prev);
+            const merged = mergeFetchedMessages(openChatId, list, prev);
+            messagesCacheRef.current.set(openChatId, merged.slice());
+            return merged;
           });
           const lastId = list.length ? Number(list[list.length - 1].id) : 0;
           if (lastId && socket.connected) {
@@ -1528,12 +1553,18 @@ export default function App() {
 
   async function refreshMessages(chatId) {
     const loadSeq = ++messagesLoadSeqRef.current;
-    const list = await getMessages(chatId, 50);
-    setMessages((prev) => {
-      if (Number(selectedChatIdRef.current || 0) !== Number(chatId)) return prev;
-      if (messagesLoadSeqRef.current !== loadSeq) return prev;
-      return mergeFetchedMessages(chatId, list, prev);
-    });
+    try {
+      const list = await getMessages(chatId, 50);
+      setMessages((prev) => {
+        if (Number(selectedChatIdRef.current || 0) !== Number(chatId)) return prev;
+        if (messagesLoadSeqRef.current !== loadSeq) return prev;
+        const merged = mergeFetchedMessages(chatId, list, prev);
+        messagesCacheRef.current.set(Number(chatId), merged.slice());
+        return merged;
+      });
+    } catch (e) {
+      debugLog("refreshMessages failed", e?.message || e);
+    }
   }
 
   async function handleSetChatPin(messageId) {
@@ -1560,20 +1591,57 @@ export default function App() {
   async function selectChat(chatId) {
     setSendRateLimitNotice("");
     const loadSeq = ++messagesLoadSeqRef.current;
+    const nextCid = Number(chatId);
+    const prevCid = Number(selectedChatIdRef.current || 0);
+
+    // Same chat: soft refresh only (sidebar may call select again).
+    if (prevCid === nextCid && nextCid) {
+      try {
+        const list = await getMessages(nextCid, 50);
+        setMessages((prev) => {
+          if (Number(selectedChatIdRef.current || 0) !== nextCid) return prev;
+          if (messagesLoadSeqRef.current !== loadSeq) return prev;
+          const merged = mergeFetchedMessages(nextCid, list, prev);
+          messagesCacheRef.current.set(nextCid, merged.slice());
+          return merged;
+        });
+        const lastId = list.length ? list[list.length - 1].id : 0;
+        if (lastId && socketRef.current && socketReady) {
+          socketRef.current.emit("chat:read", { chatId: nextCid, upToMessageId: lastId });
+        }
+      } catch (e) {
+        debugLog("selectChat same-chat refresh failed", e?.message || e);
+      }
+      return;
+    }
+
+    if (prevCid && prevCid !== nextCid) {
+      stashCurrentChatMessagesToCache(prevCid);
+    }
+
     setSelectedChatId(chatId);
     setChats((prev) =>
       prev.map((c) => (Number(c.id) === Number(chatId) ? { ...c, unreadCount: 0 } : c))
     );
-    setMessages([]);
-    const list = await getMessages(chatId, 50);
-    setMessages((prev) => {
-      if (Number(selectedChatIdRef.current || 0) !== Number(chatId)) return prev;
-      if (messagesLoadSeqRef.current !== loadSeq) return prev;
-      return mergeFetchedMessages(chatId, list, prev);
-    });
-    const lastId = list.length ? list[list.length - 1].id : 0;
-    if (lastId && socketRef.current && socketReady) {
-      socketRef.current.emit("chat:read", { chatId, upToMessageId: lastId });
+
+    const cached = takeCachedMessagesSlice(chatId);
+    setMessages(cached.length ? cached : []);
+
+    try {
+      const list = await getMessages(chatId, 50);
+      setMessages((prev) => {
+        if (Number(selectedChatIdRef.current || 0) !== Number(chatId)) return prev;
+        if (messagesLoadSeqRef.current !== loadSeq) return prev;
+        const merged = mergeFetchedMessages(chatId, list, prev);
+        messagesCacheRef.current.set(Number(chatId), merged.slice());
+        return merged;
+      });
+      const lastId = list.length ? list[list.length - 1].id : 0;
+      if (lastId && socketRef.current && socketReady) {
+        socketRef.current.emit("chat:read", { chatId, upToMessageId: lastId });
+      }
+    } catch (e) {
+      debugLog("selectChat getMessages failed", e?.message || e);
     }
   }
 
@@ -1618,6 +1686,7 @@ export default function App() {
 
   async function handleChatMembershipDelete(chatId) {
     await deleteChatMembership(chatId);
+    messagesCacheRef.current.delete(Number(chatId));
     setChats((prev) => prev.filter((c) => Number(c.id) !== Number(chatId)));
     if (Number(selectedChatId) === Number(chatId)) {
       setSelectedChatId(null);
@@ -1922,12 +1991,14 @@ export default function App() {
   }
 
   function goMobileTab(tab) {
+    stashCurrentChatMessagesToCache(selectedChatIdRef.current);
     setMobileTab(tab);
     setSelectedChatId(null);
     setMessages([]);
   }
 
   function handleMobileBackFromChat() {
+    stashCurrentChatMessagesToCache(selectedChatIdRef.current);
     setSelectedChatId(null);
     setMessages([]);
   }

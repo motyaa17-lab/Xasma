@@ -230,6 +230,76 @@ function computeMobileMessageMenuPlacement(anchorEl, menuEl, composerEl, headerE
   return { top, left, width: menuW, maxHeight, openUp };
 }
 
+/** Fixed-position menu for desktop: clamp to messages column + viewport, flip above/below and horizontally. */
+function computeDesktopMessageMenuPlacement(anchorEl, menuEl, messagesEl, composerEl) {
+  if (!anchorEl || !menuEl || !messagesEl) return null;
+
+  const margin = 8;
+  const gap = 6;
+  const ar = anchorEl.getBoundingClientRect();
+  const mr = messagesEl.getBoundingClientRect();
+  const cr = composerEl?.getBoundingClientRect();
+  const vv = typeof window !== "undefined" ? window.visualViewport : null;
+  const vw = Math.min(vv?.width ?? window.innerWidth, window.innerWidth);
+  const vh = Math.min(vv?.height ?? window.innerHeight, window.innerHeight);
+
+  const composerTop =
+    cr && Number.isFinite(cr.top) && cr.top > 0 && cr.top <= vh ? cr.top : vh - margin;
+
+  let boundTop = Math.max(margin, mr.top, 0);
+  let boundBottom = Math.min(composerTop - margin, mr.bottom, vh - margin);
+  let boundLeft = Math.max(margin, mr.left);
+  let boundRight = Math.min(vw - margin, mr.right);
+
+  let bandH = Math.max(80, boundBottom - boundTop);
+  if (bandH < 48) {
+    boundTop = margin;
+    boundBottom = Math.min(composerTop - margin, vh - margin);
+    boundLeft = margin;
+    boundRight = vw - margin;
+    bandH = Math.max(80, boundBottom - boundTop);
+  }
+  if (bandH < 48) return null;
+
+  const availW = Math.max(120, boundRight - boundLeft);
+  let menuW = Math.min(280, Math.max(menuEl.offsetWidth || 200, 168));
+  menuW = Math.min(menuW, availW);
+
+  const menuNaturalH = menuEl.offsetHeight || 120;
+  const spaceBelow = boundBottom - ar.bottom - gap;
+  const spaceAbove = ar.top - boundTop - gap;
+
+  let openUp = false;
+  let top;
+  let maxHeight = Math.min(menuNaturalH, bandH);
+
+  if (menuNaturalH <= spaceBelow) {
+    openUp = false;
+    top = ar.bottom + gap;
+  } else if (menuNaturalH <= spaceAbove) {
+    openUp = true;
+    top = ar.top - gap - menuNaturalH;
+  } else {
+    openUp = spaceAbove >= spaceBelow;
+    maxHeight = Math.max(100, Math.min(menuNaturalH, Math.max(spaceAbove, spaceBelow) - 2));
+    if (openUp) {
+      top = ar.top - gap - maxHeight;
+    } else {
+      top = ar.bottom + gap;
+    }
+  }
+
+  top = Math.max(boundTop, Math.min(top, boundBottom - maxHeight));
+
+  let left = ar.right - menuW;
+  if (left < boundLeft) {
+    left = ar.left;
+  }
+  left = Math.max(boundLeft, Math.min(left, boundRight - menuW));
+
+  return { top, left, width: menuW, maxHeight, openUp };
+}
+
 export default function Chat({
   chatId,
   chat,
@@ -415,9 +485,12 @@ export default function Chat({
   const swipeBackRef = useRef({ active: false, startX: 0, startY: 0, handled: false });
   const menuAnchorRef = useRef(null);
   const mobileFloatingMenuRef = useRef(null);
+  const desktopFloatingMenuRef = useRef(null);
+  const desktopMenuAnchorRef = useRef(null);
   const composerRef = useRef(null);
   const chatHeaderRef = useRef(null);
   const [mobileMenuPlacement, setMobileMenuPlacement] = useState(null);
+  const [desktopMenuPlacement, setDesktopMenuPlacement] = useState(null);
   const [longPressFlashMessageId, setLongPressFlashMessageId] = useState(null);
   const longPressFlashTimerRef = useRef(null);
   const longPressClickBlockUntilRef = useRef(0);
@@ -1095,6 +1168,10 @@ export default function Chat({
   useEffect(() => {
     function onKey(e) {
       if (e.key !== "Escape") return;
+      if (menuMessageId != null) {
+        setMenuMessageId(null);
+        return;
+      }
       if (voiceRecording || voiceArming) {
         e.preventDefault();
         cancelVoiceRecording();
@@ -1106,7 +1183,7 @@ export default function Chat({
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [voiceRecording, voiceArming, videoRecording, videoArming]);
+  }, [menuMessageId, voiceRecording, voiceArming, videoRecording, videoArming]);
 
   useEffect(() => {
     if (!editingMessageId) return;
@@ -1129,43 +1206,82 @@ export default function Chat({
   }, [menuMessageId]);
 
   useLayoutEffect(() => {
-    if (!isMobileChat || menuMessageId == null || !mobileMenuTarget || !mobileMenuFlags) {
+    if (menuMessageId == null || !mobileMenuTarget || !mobileMenuFlags) {
       setMobileMenuPlacement(null);
+      setDesktopMenuPlacement(null);
       return;
     }
 
-    const run = () => {
-      const place = computeMobileMessageMenuPlacement(
-        menuAnchorRef.current,
-        mobileFloatingMenuRef.current,
-        composerRef.current,
-        chatHeaderRef.current
+    if (isMobileChat) {
+      setDesktopMenuPlacement(null);
+      const run = () => {
+        const place = computeMobileMessageMenuPlacement(
+          menuAnchorRef.current,
+          mobileFloatingMenuRef.current,
+          composerRef.current,
+          chatHeaderRef.current
+        );
+        if (place) setMobileMenuPlacement(place);
+      };
+
+      run();
+      let raf1 = 0;
+      let raf2 = 0;
+      raf1 = requestAnimationFrame(() => {
+        run();
+        raf2 = requestAnimationFrame(run);
+      });
+
+      const vv = window.visualViewport;
+      const listEl = listRef.current;
+      vv?.addEventListener("resize", run);
+      vv?.addEventListener("scroll", run);
+      window.addEventListener("resize", run);
+      listEl?.addEventListener("scroll", run, { passive: true });
+
+      return () => {
+        cancelAnimationFrame(raf1);
+        cancelAnimationFrame(raf2);
+        vv?.removeEventListener("resize", run);
+        vv?.removeEventListener("scroll", run);
+        window.removeEventListener("resize", run);
+        listEl?.removeEventListener("scroll", run);
+      };
+    }
+
+    setMobileMenuPlacement(null);
+    const runDesktop = () => {
+      const place = computeDesktopMessageMenuPlacement(
+        desktopMenuAnchorRef.current,
+        desktopFloatingMenuRef.current,
+        listRef.current,
+        composerRef.current
       );
-      if (place) setMobileMenuPlacement(place);
+      if (place) setDesktopMenuPlacement(place);
     };
 
-    run();
-    let raf1 = 0;
-    let raf2 = 0;
-    raf1 = requestAnimationFrame(() => {
-      run();
-      raf2 = requestAnimationFrame(run);
+    runDesktop();
+    let rafD1 = 0;
+    let rafD2 = 0;
+    rafD1 = requestAnimationFrame(() => {
+      runDesktop();
+      rafD2 = requestAnimationFrame(runDesktop);
     });
 
     const vv = window.visualViewport;
     const listEl = listRef.current;
-    vv?.addEventListener("resize", run);
-    vv?.addEventListener("scroll", run);
-    window.addEventListener("resize", run);
-    listEl?.addEventListener("scroll", run, { passive: true });
+    vv?.addEventListener("resize", runDesktop);
+    vv?.addEventListener("scroll", runDesktop);
+    window.addEventListener("resize", runDesktop);
+    listEl?.addEventListener("scroll", runDesktop, { passive: true });
 
     return () => {
-      cancelAnimationFrame(raf1);
-      cancelAnimationFrame(raf2);
-      vv?.removeEventListener("resize", run);
-      vv?.removeEventListener("scroll", run);
-      window.removeEventListener("resize", run);
-      listEl?.removeEventListener("scroll", run);
+      cancelAnimationFrame(rafD1);
+      cancelAnimationFrame(rafD2);
+      vv?.removeEventListener("resize", runDesktop);
+      vv?.removeEventListener("scroll", runDesktop);
+      window.removeEventListener("resize", runDesktop);
+      listEl?.removeEventListener("scroll", runDesktop);
     };
   }, [isMobileChat, menuMessageId, mobileMenuTarget, mobileMenuFlags]);
 
@@ -2435,6 +2551,8 @@ export default function Chat({
                         ? " bubbleRow--enter bubbleRow--enterOwn"
                         : " bubbleRow--enter"
                       : ""
+                  }${
+                    !isMobileChat && showMenuButton && menuMessageId === m.id ? " bubbleRow--msgMenuOpen" : ""
                   }`}
                 >
                   <AvatarAura auraColor={msgAura}>
@@ -2544,11 +2662,15 @@ export default function Chat({
                       </span>
                     ) : null}
                     {showMenuButton ? (
-                      <div className="msgMenu">
+                      <div
+                        className="msgMenu"
+                        ref={menuMessageId === m.id ? desktopMenuAnchorRef : undefined}
+                      >
                         <button
                           type="button"
                           className="msgMenuBtn"
                           aria-label={t("menu")}
+                          aria-expanded={menuMessageId === m.id}
                           onMouseDown={(e) => e.stopPropagation()}
                           onTouchStart={(e) => e.stopPropagation()}
                           onClick={(e) => {
@@ -2558,36 +2680,6 @@ export default function Chat({
                         >
                           <IconEllipsis size={18} />
                         </button>
-                        {menuMessageId === m.id && !isMobileChat ? (
-                          <MessageActionMenuPanel
-                            t={t}
-                            canQuickReact={canQuickReact}
-                            hasSecondaryActions={hasSecondaryActions}
-                            canReply={canReply}
-                            canEditOwn={canEditOwn}
-                            canReport={canReport}
-                            canAdminDelete={canAdminDelete}
-                            canPin={canPinThisMessage}
-                            className="msgMenuDropdown"
-                            onToggleReaction={(emo) => onToggleReaction?.(m.id, emo)}
-                            onReply={() => {
-                              setReplyToMessage({
-                                id: m.id,
-                                senderUsername: m.sender?.username || getDisplayName(m, meId, meUsername, t),
-                                preview: getReplyPreviewForMessage(m),
-                              });
-                            }}
-                            onEdit={() => {
-                              setEditingMessageId(m.id);
-                              setText(String(m.text ?? ""));
-                              onTyping?.(false);
-                            }}
-                            onReport={() => setReportTargetMessage(m)}
-                            onAdminDelete={() => onAdminDeleteMessage?.(m.id)}
-                            onPin={() => onSetChatPin?.(m.id)}
-                            closeMenu={() => setMenuMessageId(null)}
-                          />
-                        ) : null}
                       </div>
                     ) : null}
                     {isRoom ? (
@@ -3079,14 +3171,13 @@ export default function Chat({
             {/* Telegram-style recording bar is shown above; keep this area clean. */}
           </div>
           )}
-            {isMobileChat &&
-            menuMessageId != null &&
+            {menuMessageId != null &&
             mobileMenuTarget &&
             mobileMenuFlags &&
             typeof document !== "undefined"
               ? createPortal(
                   <MessageActionMenuPanel
-                    ref={mobileFloatingMenuRef}
+                    ref={isMobileChat ? mobileFloatingMenuRef : desktopFloatingMenuRef}
                     t={t}
                     canQuickReact={mobileMenuFlags.canQuickReact}
                     hasSecondaryActions={mobileMenuFlags.hasSecondaryActions}
@@ -3095,17 +3186,17 @@ export default function Chat({
                     canReport={mobileMenuFlags.canReport}
                     canAdminDelete={mobileMenuFlags.canAdminDelete}
                     canPin={mobileMenuFlags.canPin}
-                    className={`msgMenuDropdown msgMenuDropdown--mobileFixed${
-                      mobileMenuPlacement?.openUp ? " msgMenuDropdown--openUp" : ""
-                    }`}
+                    className={`msgMenuDropdown${
+                      isMobileChat ? " msgMenuDropdown--mobileFixed" : " msgMenuDropdown--desktopFixed"
+                    }${(isMobileChat ? mobileMenuPlacement : desktopMenuPlacement)?.openUp ? " msgMenuDropdown--openUp" : ""}`}
                     style={
-                      mobileMenuPlacement
+                      (isMobileChat ? mobileMenuPlacement : desktopMenuPlacement)
                         ? {
                             position: "fixed",
-                            top: mobileMenuPlacement.top,
-                            left: mobileMenuPlacement.left,
-                            width: mobileMenuPlacement.width,
-                            maxHeight: mobileMenuPlacement.maxHeight,
+                            top: (isMobileChat ? mobileMenuPlacement : desktopMenuPlacement).top,
+                            left: (isMobileChat ? mobileMenuPlacement : desktopMenuPlacement).left,
+                            width: (isMobileChat ? mobileMenuPlacement : desktopMenuPlacement).width,
+                            maxHeight: (isMobileChat ? mobileMenuPlacement : desktopMenuPlacement).maxHeight,
                             zIndex: 200,
                           }
                         : {

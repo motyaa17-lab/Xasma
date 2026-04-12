@@ -1,4 +1,5 @@
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   adminBroadcastOfficial,
   adminListFlaggedMessages,
@@ -980,6 +981,7 @@ const UserMenu = forwardRef(function UserMenu(
             onClose={() => setPanel(null)}
             t={t}
             cardClassName={modalCardClass}
+            usePortal
           >
             {panel === "profile" ? (
               <div className="settingsModalList">
@@ -2415,9 +2417,13 @@ function readFileAsDataUrl(file) {
   });
 }
 
-function Modal({ title, children, onClose, t, cardClassName = "" }) {
-  return (
-    <div className="modalBackdrop modalBackdrop--app" role="dialog" aria-modal="true">
+function Modal({ title, children, onClose, t, cardClassName = "", usePortal = false }) {
+  const node = (
+    <div
+      className={`modalBackdrop modalBackdrop--app${usePortal ? " modalBackdrop--teleported" : ""}`.trim()}
+      role="dialog"
+      aria-modal="true"
+    >
       <div className={`modalCard ${cardClassName}`.trim()}>
         <div className="modalHeader">
           <div className="modalTitle">{title}</div>
@@ -2429,6 +2435,10 @@ function Modal({ title, children, onClose, t, cardClassName = "" }) {
       </div>
     </div>
   );
+  if (usePortal && typeof document !== "undefined") {
+    return createPortal(node, document.body);
+  }
+  return node;
 }
 
 function initials(name) {

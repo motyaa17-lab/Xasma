@@ -660,9 +660,14 @@ body.body--mobileConversationOpen {
 }
 
 .modalBackdrop--premiumProfile {
-  background: rgba(0, 0, 0, 0.56);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.58);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+/* Portaled from mobile settings: true viewport-fixed layer above shell + bottom nav */
+.modalBackdrop--teleported {
+  z-index: 100;
 }
 
 .modalBackdrop--out {
@@ -723,16 +728,19 @@ body.body--mobileConversationOpen {
 }
 
 .userProfileHero--premium .userProfileBg {
-  transform: scale(1.08);
-  opacity: 0.98;
+  transform: scale(1.045);
+  opacity: 0.99;
 }
 
 .userProfileHero--premium .userProfileBgOverlay {
   background:
-    radial-gradient(700px 260px at 50% 0%, rgba(122, 162, 255, 0.12), rgba(0, 0, 0, 0) 58%),
-    linear-gradient(180deg, rgba(0, 0, 0, 0.16) 0%, rgba(0, 0, 0, 0.38) 55%, rgba(11, 18, 32, 0.76) 100%);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
+    radial-gradient(ellipse 52% 115% at 0% 50%, rgba(6, 10, 20, 0.52) 0%, transparent 68%),
+    radial-gradient(ellipse 52% 115% at 100% 50%, rgba(6, 10, 20, 0.52) 0%, transparent 68%),
+    radial-gradient(ellipse 95% 78% at 50% 30%, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0) 36%, rgba(11, 18, 32, 0.22) 72%, rgba(11, 18, 32, 0.48) 100%),
+    radial-gradient(720px 270px at 50% 0%, rgba(122, 162, 255, 0.1), rgba(0, 0, 0, 0) 56%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.28) 45%, rgba(11, 18, 32, 0.82) 100%);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 
 .userProfileHero--premium:not(.userProfileHero--hasBg) {
@@ -930,20 +938,23 @@ body.body--mobileConversationOpen {
   inset: 0;
   background-size: cover;
   background-position: center;
-  filter: saturate(1.04) contrast(1.03);
-  transform: scale(1.06);
+  filter: saturate(1.03) contrast(1.02);
+  transform: scale(1.035);
   transition: opacity 0.25s ease;
-  opacity: 0.98;
+  opacity: 0.99;
 }
 
 .userProfileBgOverlay {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(600px 220px at 50% 0%, rgba(37, 99, 235, 0.1), rgba(0, 0, 0, 0) 58%),
-    linear-gradient(180deg, rgba(11, 18, 32, 0.22) 0%, rgba(11, 18, 32, 0.48) 52%, rgba(11, 18, 32, 0.78) 100%);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
+    radial-gradient(ellipse 52% 115% at 0% 50%, rgba(6, 10, 20, 0.48) 0%, transparent 68%),
+    radial-gradient(ellipse 52% 115% at 100% 50%, rgba(6, 10, 20, 0.48) 0%, transparent 68%),
+    radial-gradient(ellipse 95% 78% at 50% 30%, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0) 36%, rgba(11, 18, 32, 0.2) 72%, rgba(11, 18, 32, 0.46) 100%),
+    radial-gradient(640px 230px at 50% 0%, rgba(37, 99, 235, 0.08), rgba(0, 0, 0, 0) 56%),
+    linear-gradient(180deg, rgba(11, 18, 32, 0.1) 0%, rgba(11, 18, 32, 0.26) 46%, rgba(11, 18, 32, 0.84) 100%);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
   pointer-events: none;
 }
 
@@ -3665,6 +3676,7 @@ body.body--mobileConversationOpen {
   .systemMessageRow--enter,
   .msgMenuDropdown,
   .msgMenuDropdown--mobileFixed,
+  .msgMenuDropdown--desktopFixed,
   .appShell--mobile .mobilePane:not(.mobilePane--conversation),
   .appShell--mobile .mobileChatShell {
     animation: none !important;
@@ -4171,6 +4183,45 @@ body.body--mobileConversationOpen {
 .msgMenuDropdown--mobileFixed.msgMenuDropdown--openUp {
   transform-origin: bottom right;
   animation: msgMenuDropdownInUp var(--dur-menu) var(--ease-tg-out) both;
+}
+
+/* Desktop: portal + fixed — not clipped by .messages overflow; clamped in JS to thread + viewport */
+.msgMenuDropdown--desktopFixed {
+  position: fixed;
+  right: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  z-index: 200;
+  box-sizing: border-box;
+  transform-origin: top right;
+  animation: msgMenuDropdownIn var(--dur-menu) var(--ease-tg-out) both;
+}
+
+.msgMenuDropdown--desktopFixed.msgMenuDropdown--openUp {
+  transform-origin: bottom right;
+  animation: msgMenuDropdownInUp var(--dur-menu) var(--ease-tg-out) both;
+}
+
+/* Desktop / fine pointer: hide ⋯ until row hover, menu open, or keyboard focus */
+@media (hover: hover) and (pointer: fine) {
+  .bubbleRow .msgMenuBtn {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.16s ease;
+  }
+
+  .bubbleRow:hover .msgMenuBtn,
+  .bubbleRow:focus-within .msgMenuBtn,
+  .bubbleRow.bubbleRow--msgMenuOpen .msgMenuBtn {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .bubbleRow .msgMenuBtn:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 .msgMenuReactions {
@@ -6916,6 +6967,13 @@ body.body--mobileConversationOpen {
   background: rgba(11, 18, 32, 0.98);
   /* Flex child of .mobileStage: allow shrinking so .mobileSettingsScroll gets a bounded height */
   min-height: 0;
+  /*
+   * mobilePaneStackIn leaves `transform` on the pane (identity matrix). That creates a containing
+   * block so `position: fixed` modals inside the scroll subtree are anchored to the pane, not the
+   * viewport — focus + keyboard then fight with .mobileSettingsScroll and jump scroll to top.
+   */
+  animation: none !important;
+  transform: none !important;
 }
 
 /* Single vertical scroll for mobile Settings tab (header fixed; list scrolls) */
@@ -6928,7 +6986,8 @@ body.body--mobileConversationOpen {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   touch-action: pan-y;
-  padding: 12px 14px max(24px, env(safe-area-inset-bottom));
+  /* Extra bottom inset so list content clears the fixed bottom tab bar without “scroll into oblivion” */
+  padding: 12px 14px calc(72px + max(16px, env(safe-area-inset-bottom, 0px)));
 }
 
 .userMenu--mobilePage {
@@ -7374,6 +7433,31 @@ body.body--mobileConversationOpen {
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
+}
+
+/* Keep primary actions reachable while scrolling long forms (keyboard + small viewport) */
+.modalCard--mobileFriendly .modalBody .settingsFooter {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  margin-top: 10px;
+  padding: 12px 6px max(14px, calc(10px + env(safe-area-inset-bottom, 0px)));
+  background: rgba(11, 18, 32, 0.97);
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.modalCard--mobileFriendly .modalBody .settingsModalList > .premiumCtaBtn {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  margin-top: 12px;
+  padding: 14px 4px max(16px, calc(12px + env(safe-area-inset-bottom, 0px)));
+  background: rgba(11, 18, 32, 0.97);
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /*
