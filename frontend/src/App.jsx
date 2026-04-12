@@ -297,6 +297,35 @@ export default function App() {
     console.log("[Xasma]", ...args);
   }
 
+  /** Verbose WebRTC trace: DEV, or `localStorage.xasma_webrtc_debug = "1"`, or `VITE_WEBRTC_DEBUG=1` at build. */
+  function webrtcLog(tag, payload = {}) {
+    let on = Boolean(import.meta.env.DEV);
+    if (!on) {
+      try {
+        on = typeof localStorage !== "undefined" && localStorage.getItem("xasma_webrtc_debug") === "1";
+      } catch {
+        // ignore
+      }
+    }
+    if (!on && String(import.meta.env.VITE_WEBRTC_DEBUG || "") === "1") on = true;
+    if (!on) return;
+    const c = callRef.current;
+    // eslint-disable-next-line no-console
+    console.log("[Xasma][webrtc]", tag, {
+      callId: c?.callId ?? null,
+      dir: c?.direction ?? null,
+      phase: c?.phase ?? null,
+      ...payload,
+    });
+  }
+
+  function isActiveCallSession(expectedCallId) {
+    const c = callRef.current;
+    const id = expectedCallId ? String(expectedCallId) : "";
+    if (!id || !c.callId || String(c.callId) !== id) return false;
+    return c.phase === "connecting" || c.phase === "connected";
+  }
+
   const callConnectedTimerRef = useRef(null);
   const outgoingCancelBeforeCallIdRef = useRef(false);
 
@@ -462,6 +491,7 @@ export default function App() {
         pcRef.current.ontrack = null;
         pcRef.current.onconnectionstatechange = null;
         pcRef.current.oniceconnectionstatechange = null;
+        pcRef.current.onsignalingstatechange = null;
         try {
           pcRef.current.close();
         } catch {
@@ -509,9 +539,13 @@ export default function App() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       localStreamRef.current = stream;
+      webrtcLog("media:getUserMedia:ok", {
+        tracks: stream.getAudioTracks().map((tr) => ({ id: tr.id, state: tr.readyState, enabled: tr.enabled })),
+      });
       return stream;
     } catch (e) {
       debugLog("getUserMedia failed", e?.message || e);
+      webrtcLog("media:getUserMedia:error", { message: String(e?.message || e) });
       // End call on mic denial/failure.
       endOrCancelCall();
       return null;
@@ -531,14 +565,80 @@ export default function App() {
     }
   }
 
-  function markConnectedIfReady(pc) {
-    if (!pc) return;
-    const connected =
+  function hasRemoteAudioFromReceivers(pc) {
+    if (!pc) return false;
+    try {
+      for (const r of pc.getReceivers?.() || []) {
+        const tr = r.track;
+        if (!tr || tr.kind !== "audio" || tr.readyState === "ended") continue;
+        if (tr.readyState === "live") return true;
+        const ice = pc.iceConnectionState;
+        if (tr.readyState === "new" && (ice === "connected" || ice === "completed")) return true;
+      }
+    } catch {
+      // ignore
+    }
+    return false;
+  }
+
+  function transportLooksConnected(pc) {
+    if (!pc) return false;
+    return (
       pc.connectionState === "connected" ||
       pc.iceConnectionState === "connected" ||
-      pc.iceConnectionState === "completed";
-    if (!connected) return;
-    if (!remoteTrackSeenRef.current) return;
+      pc.iceConnectionState === "completed"
+    );
+  }
+
+  /** Some WebViews report ICE/connection "connected" before `ontrack`; wire `<audio>` from receivers when needed. */
+  function ensureRemoteAudioFromReceivers(pc) {
+    const el = remoteAudioRef.current;
+    if (!el || !pc) return;
+    try {
+      const cur = el.srcObject;
+      if (cur && typeof cur.getAudioTracks === "function") {
+        const tracks = cur.getAudioTracks();
+        if (tracks.some((x) => x.readyState !== "ended")) return;
+      }
+      if (!cur && remoteStreamRef.current) {
+        el.srcObject = remoteStreamRef.current;
+        el.muted = false;
+        el.volume = 1;
+        requestAnimationFrame(tryPlayRemoteAudio);
+        window.setTimeout(tryPlayRemoteAudio, 60);
+        return;
+      }
+      const stream = typeof MediaStream !== "undefined" ? new MediaStream() : null;
+      if (!stream) return;
+      for (const r of pc.getReceivers?.() || []) {
+        const tr = r.track;
+        if (tr && tr.kind === "audio" && tr.readyState !== "ended") {
+          try {
+            stream.addTrack(tr);
+          } catch {
+            // ignore
+          }
+        }
+      }
+      if (!stream.getTracks().length) return;
+      el.srcObject = stream;
+      remoteStreamRef.current = stream;
+      remoteTrackSeenRef.current = true;
+      el.muted = false;
+      el.volume = 1;
+      requestAnimationFrame(tryPlayRemoteAudio);
+      window.setTimeout(tryPlayRemoteAudio, 60);
+    } catch {
+      // ignore
+    }
+  }
+
+  function markConnectedIfReady(pc) {
+    if (!pc) return;
+    if (!transportLooksConnected(pc)) return;
+    const mediaOk = remoteTrackSeenRef.current || hasRemoteAudioFromReceivers(pc);
+    if (!mediaOk) return;
+    ensureRemoteAudioFromReceivers(pc);
     setCall((prev) =>
       prev.phase === "connecting"
         ? { ...prev, phase: "connected", connectedAtMs: prev.connectedAtMs || Date.now() }
@@ -556,15 +656,13 @@ export default function App() {
       iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
     });
 
-    // Helps some browsers/WebViews reliably negotiate audio receive.
-    try {
-      pc.addTransceiver?.("audio", { direction: "sendrecv" });
-    } catch {
-      // ignore
-    }
+    webrtcLog("pc:create", { callId: id });
 
     pc.onicecandidate = (ev) => {
-      if (!ev.candidate) return;
+      if (!ev.candidate) {
+        webrtcLog("ice:local-gathering-done", {});
+        return;
+      }
       socket.emit("webrtc:ice-candidate", { callId: id, candidate: ev.candidate.toJSON() });
     };
 
@@ -584,6 +682,11 @@ export default function App() {
       }
       remoteStreamRef.current = stream;
       remoteTrackSeenRef.current = true;
+      webrtcLog("remote:ontrack", {
+        streams: ev.streams?.length ?? 0,
+        trackId: ev.track?.id,
+        trackState: ev.track?.readyState,
+      });
       const el = remoteAudioRef.current;
       if (el) {
         try {
@@ -602,21 +705,30 @@ export default function App() {
       markConnectedIfReady(pc);
     };
 
+    pc.onsignalingstatechange = () => {
+      webrtcLog("pc:signalingState", { state: pc.signalingState });
+      markConnectedIfReady(pc);
+    };
+
     pc.onconnectionstatechange = () => {
       const st = pc.connectionState;
+      webrtcLog("pc:connectionState", { state: st });
       if (st === "connected") markConnectedIfReady(pc);
       // "disconnected" is often transient (ICE restart / network blip); only "failed" is a hard stop.
       if (st === "failed") {
         debugLog("webrtc connectionState", st);
+        webrtcLog("pc:connectionState:failed", {});
         endOrCancelCall();
       }
     };
 
     pc.oniceconnectionstatechange = () => {
       const st = pc.iceConnectionState;
+      webrtcLog("pc:iceConnectionState", { state: st });
       if (st === "connected" || st === "completed") markConnectedIfReady(pc);
       if (st === "failed") {
         debugLog("webrtc iceConnectionState", st);
+        webrtcLog("pc:iceConnectionState:failed", {});
         endOrCancelCall();
       }
     };
@@ -629,13 +741,15 @@ export default function App() {
     const list = pendingIceRef.current;
     if (!list.length) return;
     pendingIceRef.current = [];
+    webrtcLog("ice:flush", { n: list.length });
     for (const c of list) {
       try {
-        await pc.addIceCandidate(c);
+        if (c) await pc.addIceCandidate(new RTCIceCandidate(c));
       } catch {
         // ignore
       }
     }
+    markConnectedIfReady(pc);
   }
 
   useEffect(() => {
@@ -686,12 +800,15 @@ export default function App() {
       // Caller creates and sends offer.
       if (call.direction === "outgoing") {
         try {
+          webrtcLog("signal:createOffer:start", {});
           const offer = await pc.createOffer();
           if (cancelled) return;
           await pc.setLocalDescription(offer);
+          webrtcLog("signal:setLocal(offer):ok", { signaling: pc.signalingState });
           socketRef.current?.emit("webrtc:offer", { callId: String(call.callId), sdp: pc.localDescription });
         } catch (e) {
           debugLog("createOffer/setLocalDescription failed", e?.message || e);
+          webrtcLog("signal:createOffer:error", { message: String(e?.message || e) });
           endOrCancelCall();
         }
       }
@@ -868,7 +985,7 @@ export default function App() {
 
   // Socket.io: connect once authenticated.
   useEffect(() => {
-    if (!token) return;
+    if (!token || !socketEndpoint) return;
 
     const socket = io(socketEndpoint, {
       auth: { token },
@@ -1143,14 +1260,17 @@ export default function App() {
     // ========================
 
     socket.on("webrtc:offer", async ({ callId, sdp } = {}) => {
-      const c = callRef.current;
-      if (!c.callId || String(callId || "") !== String(c.callId)) return;
-      if (c.phase !== "connecting" && c.phase !== "connected") return;
+      const id = callId ? String(callId) : "";
+      if (!id || !sdp) return;
+      if (!isActiveCallSession(id)) return;
+
+      webrtcLog("signal:offer:recv", { sdpType: sdp.type });
 
       const stream = await ensureLocalAudioOrFail();
-      if (!stream) return;
-      const pc = ensurePeerConnection(String(callId));
-      if (!pc) return;
+      if (!isActiveCallSession(id) || !stream) return;
+
+      const pc = ensurePeerConnection(id);
+      if (!pc || !isActiveCallSession(id)) return;
 
       // Attach local tracks once.
       const already = new Set(pc.getSenders().map((s) => s.track).filter(Boolean));
@@ -1165,45 +1285,62 @@ export default function App() {
 
       try {
         await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+        webrtcLog("signal:setRemote(offer):ok", { signaling: pc.signalingState });
         await flushPendingIce(pc);
+        if (!isActiveCallSession(id)) return;
+        webrtcLog("signal:createAnswer:start", {});
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-        socket.emit("webrtc:answer", { callId: String(callId), sdp: pc.localDescription });
+        webrtcLog("signal:setLocal(answer):ok", { signaling: pc.signalingState });
+        socket.emit("webrtc:answer", { callId: id, sdp: pc.localDescription });
+        markConnectedIfReady(pc);
       } catch (e) {
         debugLog("handle offer failed", e?.message || e);
+        webrtcLog("signal:offer:error", { message: String(e?.message || e) });
         endOrCancelCall();
       }
     });
 
     socket.on("webrtc:answer", async ({ callId, sdp } = {}) => {
-      const c = callRef.current;
-      if (!c.callId || String(callId || "") !== String(c.callId)) return;
-      if (c.phase !== "connecting" && c.phase !== "connected") return;
+      const id = callId ? String(callId) : "";
+      if (!id || !sdp) return;
+      if (!isActiveCallSession(id)) return;
+
       const pc = pcRef.current;
       if (!pc) return;
+
+      webrtcLog("signal:answer:recv", { sdpType: sdp.type });
+
       try {
         await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+        webrtcLog("signal:setRemote(answer):ok", { signaling: pc.signalingState });
         await flushPendingIce(pc);
+        if (!isActiveCallSession(id)) return;
+        markConnectedIfReady(pc);
       } catch (e) {
         debugLog("handle answer failed", e?.message || e);
+        webrtcLog("signal:answer:error", { message: String(e?.message || e) });
         endOrCancelCall();
       }
     });
 
     socket.on("webrtc:ice-candidate", async ({ callId, candidate } = {}) => {
-      const c = callRef.current;
-      if (!c.callId || String(callId || "") !== String(c.callId)) return;
-      if (c.phase !== "connecting" && c.phase !== "connected") return;
+      const id = callId ? String(callId) : "";
+      if (!id || !candidate) return;
+      if (!isActiveCallSession(id)) return;
       const pc = pcRef.current;
-      if (!pc || !candidate) return;
+      if (!pc) return;
       try {
         if (!pc.remoteDescription) {
           pendingIceRef.current.push(candidate);
+          webrtcLog("ice:queued", { pending: pendingIceRef.current.length });
           return;
         }
-        await pc.addIceCandidate(candidate);
-      } catch {
-        // ignore
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        webrtcLog("ice:applied", {});
+        markConnectedIfReady(pc);
+      } catch (e) {
+        webrtcLog("ice:apply-error", { message: String(e?.message || e) });
       }
     });
 

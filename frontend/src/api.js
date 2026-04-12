@@ -52,12 +52,25 @@ function computeApiBase() {
   const envBase = fixMisconfiguredApiPort(apiUrlFromEnv());
   if (envBase) return envBase;
 
-  // Local development fallbacks only.
-  if (isCapacitorAndroid() || isCordovaAndroid()) return "http://10.0.2.2:4000";
-  return "http://localhost:4000";
+  // Local development fallbacks only (never use these in a production bundle / APK).
+  if (import.meta.env.DEV) {
+    if (isCapacitorAndroid() || isCordovaAndroid()) return "http://10.0.2.2:4000";
+    return "http://localhost:4000";
+  }
+
+  // eslint-disable-next-line no-console
+  console.error(
+    "[Xasma] Production build has no VITE_API_URL / VITE_API_BASE. Check .env.production. Note: .env.production.local overrides .env.production for vite build."
+  );
+  return "";
 }
 
 const API_BASE = computeApiBase();
+
+// eslint-disable-next-line no-console
+console.log("API URL:", import.meta.env.VITE_API_URL);
+// eslint-disable-next-line no-console
+console.log("[Xasma] API_BASE:", API_BASE || "(missing)");
 
 if (import.meta.env.DEV) {
   // eslint-disable-next-line no-console
@@ -81,11 +94,18 @@ export class ApiError extends Error {
   }
 }
 
+function ensureApiBase() {
+  if (!API_BASE) {
+    throw new ApiError("Server address not configured for this build", 0);
+  }
+}
+
 function getToken() {
   return localStorage.getItem("token");
 }
 
 async function apiFetch(path, { method = "GET", body, token } = {}) {
+  ensureApiBase();
   const headers = { "Content-Type": "application/json" };
   const t = token || getToken();
   if (t) headers.Authorization = `Bearer ${t}`;
@@ -295,6 +315,7 @@ export async function postChatMessage(chatId, text, imageUrl, audioUrl, videoUrl
 }
 
 export async function uploadChatImage(file) {
+  ensureApiBase();
   const fd = new FormData();
   fd.append("image", file);
   const token = getToken();
@@ -315,6 +336,7 @@ export async function uploadChatImage(file) {
 }
 
 export async function uploadChatAudio(file) {
+  ensureApiBase();
   const fd = new FormData();
   fd.append("audio", file);
   const token = getToken();
@@ -345,6 +367,7 @@ export async function uploadChatVideo(file) {
       isBlob: typeof Blob !== "undefined" ? file instanceof Blob : false,
     });
   }
+  ensureApiBase();
   const fd = new FormData();
   fd.append("video", file);
   const token = getToken();

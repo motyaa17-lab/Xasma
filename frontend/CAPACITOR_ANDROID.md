@@ -52,8 +52,8 @@ Install on a device: copy the APK or use **Run** with a device/emulator.
 
 The web client uses `VITE_API_URL` (preferred) or legacy `VITE_API_BASE` (see `src/api.js`). For a real device you must build with your backend URL:
 
-1. Copy `frontend/.env.production.example` to `frontend/.env.production` (or use `.env.production.local`).
-2. Set `VITE_API_URL=https://your-api-host` (HTTPS recommended).
+1. Set `VITE_API_URL=https://your-api-host` in `frontend/.env.production` (HTTPS recommended).
+2. **Vite precedence:** if `frontend/.env.production.local` exists, it **overrides** `.env.production` for `npm run build`. A LAN IP there is fine for same-Wi‑Fi testing but will break an APK on cellular or another network.
 3. Run `npm run android:sync` so the bundled JS includes that URL.
 
 **HTTP / LAN:** Android blocks cleartext HTTP by default. For `http://` APIs you must add a network security config or `android:usesCleartextTraffic="true"` (dev only).
