@@ -4,6 +4,7 @@ import { formatAuthError } from "../i18n.js";
 
 export default function Auth({ onLogin, onRegister, error, t }) {
   const [mode, setMode] = useState("login"); // "login" | "register"
+  const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [avatar, setAvatar] = useState("");
@@ -18,9 +19,9 @@ export default function Auth({ onLogin, onRegister, error, t }) {
     setErr("");
     try {
       if (mode === "login") {
-        await onLogin({ username, password });
+        await onLogin({ email, password });
       } else {
-        await onRegister({ username, password, avatar });
+        await onRegister({ username, email, password, avatar });
       }
     } catch (e2) {
       setErr(formatAuthError(e2, t));
@@ -60,12 +61,27 @@ export default function Auth({ onLogin, onRegister, error, t }) {
 
         <form onSubmit={submit} className="authForm">
           <label className="field">
-            <span>{t("authDisplayNameLabel")}</span>
-            <input value={username} onChange={(e) => setUsername(e.target.value)} required />
+            <span>{t("authEmailLabel")}</span>
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              inputMode="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+            />
             <span className="muted small authFieldHint">
-              {mode === "login" ? t("authLoginDisplayOrHandleHint") : t("authRegisterHandleAutoHint")}
+              {mode === "login" ? t("authLoginEmailHint") : t("authRegisterEmailHint")}
             </span>
           </label>
+
+          {mode === "register" ? (
+            <label className="field">
+              <span>{t("authDisplayNameLabel")}</span>
+              <input value={username} onChange={(e) => setUsername(e.target.value)} required />
+              <span className="muted small authFieldHint">{t("authRegisterHandleAutoHint")}</span>
+            </label>
+          ) : null}
 
           <label className="field">
             <span>{t("password")}</span>

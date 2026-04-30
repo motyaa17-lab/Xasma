@@ -29,6 +29,7 @@ import {
   updateMessage,
   updateMyAvatar,
   updateMyProfile,
+  updateMyEmail,
 } from "./api.js";
 import { getSocketEndpoint } from "./api.js";
 import {
@@ -2127,6 +2128,20 @@ export default function App() {
     setMe(updated);
   }
 
+  async function changeMyEmail(nextEmail) {
+    const email = String(nextEmail || "").trim();
+    if (!email) return;
+    const prevEmail = me?.email || "";
+    setMe((prev) => (prev ? { ...prev, email } : prev));
+    try {
+      const saved = await updateMyEmail(email);
+      setMe((prev) => (prev ? { ...prev, email: saved } : prev));
+    } catch (e) {
+      setMe((prev) => (prev ? { ...prev, email: prevEmail } : prev));
+      throw e;
+    }
+  }
+
   function goMobileTab(tab) {
     stashCurrentChatMessagesToCache(selectedChatIdRef.current);
     setMobileTab(tab);
@@ -2163,6 +2178,7 @@ export default function App() {
     onLogout: logout,
     onChangeAvatar: changeMyAvatar,
     onChangeProfile: changeMyProfile,
+    onChangeEmail: changeMyEmail,
     settings,
     onChangeSettings: (next) => setSettings((prev) => ({ ...prev, ...next })),
     t,

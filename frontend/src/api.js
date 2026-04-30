@@ -129,18 +129,18 @@ async function apiFetch(path, { method = "GET", body, token } = {}) {
   return data;
 }
 
-export async function register({ username, password, avatar, inviteCode }) {
+export async function register({ username, email, password, avatar, inviteCode }) {
   return apiFetch("/api/register", {
     method: "POST",
-    body: { username, password, avatar, inviteCode: inviteCode || "" },
+    body: { username, email, password, avatar, inviteCode: inviteCode || "" },
     token: null,
   });
 }
 
-export async function login({ username, password }) {
+export async function login({ email, password }) {
   return apiFetch("/api/login", {
     method: "POST",
-    body: { username, password },
+    body: { email, password },
     token: null,
   });
 }
@@ -156,6 +156,14 @@ export async function updateMyAvatar(avatar) {
     body: { avatar: avatar || "" },
   });
   return data.user;
+}
+
+export async function updateMyEmail(email) {
+  const data = await apiFetch("/api/me/email", {
+    method: "PUT",
+    body: { email: String(email || "").trim() },
+  });
+  return data.email || "";
 }
 
 export async function updateMyProfile({

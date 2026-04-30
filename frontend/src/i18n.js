@@ -71,8 +71,9 @@ export const translations = {
     authGenericError: "Something went wrong. Please try again.",
     authBanned: "Your account has been banned by an administrator.",
     authDisplayNameLabel: "Display name",
-    authLoginDisplayOrHandleHint:
-      "Sign in with your display name or @username (without @ is fine; matching ignores case).",
+    authEmailLabel: "Email",
+    authLoginEmailHint: "Sign in with your email address.",
+    authRegisterEmailHint: "Use a real email address — you will sign in with it.",
     authRegisterHandleAutoHint: "A unique @username is assigned to your account automatically.",
 
     chats: "Chats",
@@ -502,8 +503,9 @@ export const translations = {
     authGenericError: "Что-то пошло не так. Попробуйте ещё раз.",
     authBanned: "Ваш аккаунт заблокирован администратором.",
     authDisplayNameLabel: "Отображаемое имя",
-    authLoginDisplayOrHandleHint:
-      "Вход по отображаемому имени или @username (символ @ можно не вводить; без учёта регистра).",
+    authEmailLabel: "Email",
+    authLoginEmailHint: "Вход по адресу электронной почты.",
+    authRegisterEmailHint: "Укажите реальный email — по нему будет вход.",
     authRegisterHandleAutoHint: "Уникальный @username создаётся для аккаунта автоматически.",
 
     chats: "Чаты",
@@ -935,8 +937,9 @@ export const translations = {
     authGenericError: "Щось пішло не так. Спробуйте ще раз.",
     authBanned: "Ваш обліковий запис заблоковано адміністратором.",
     authDisplayNameLabel: "Відображуване ім’я",
-    authLoginDisplayOrHandleHint:
-      "Вхід за відображуваним ім’ям або @username (символ @ можна не вводити; без урахування регістру).",
+    authEmailLabel: "Email",
+    authLoginEmailHint: "Вхід за адресою електронної пошти.",
+    authRegisterEmailHint: "Вкажіть реальний email — за ним буде вхід.",
     authRegisterHandleAutoHint: "Унікальний @username призначається обліковому запису автоматично.",
 
     chats: "Чати",

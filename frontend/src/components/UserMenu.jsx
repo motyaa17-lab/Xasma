@@ -502,6 +502,7 @@ const UserMenu = forwardRef(function UserMenu(
     onLogout,
     onChangeAvatar,
     onChangeProfile,
+    onChangeEmail,
     settings,
     onChangeSettings,
     t,
@@ -540,6 +541,9 @@ const UserMenu = forwardRef(function UserMenu(
   const [profileStatusText, setProfileStatusText] = useState("");
   const [profileAbout, setProfileAbout] = useState("");
   const [profileAuraColor, setProfileAuraColor] = useState(DEFAULT_AURA_COLOR);
+  const [profileEmail, setProfileEmail] = useState("");
+  const [profileEmailSaving, setProfileEmailSaving] = useState(false);
+  const [profileEmailError, setProfileEmailError] = useState("");
   const [profileUserTag, setProfileUserTag] = useState("");
   const [profileTagColor, setProfileTagColor] = useState("#64748b");
   const [profileTagStyle, setProfileTagStyle] = useState("solid");
@@ -603,6 +607,8 @@ const UserMenu = forwardRef(function UserMenu(
     setProfileStatusText(String(me?.statusText || ""));
     setProfileAbout(String(me?.about || ""));
     setProfileAuraColor(String(me?.auraColor || "").trim() || DEFAULT_AURA_COLOR);
+    setProfileEmail(String(me?.email || ""));
+    setProfileEmailError("");
     setProfileUserTag(me?.tag ? String(me.tag) : "");
     setProfileTagColor(String(me?.tagColor || "#64748b"));
     setProfileTagStyle(me?.tagStyle === "gradient" ? "gradient" : "solid");
@@ -616,6 +622,7 @@ const UserMenu = forwardRef(function UserMenu(
     me?.statusText,
     me?.about,
     me?.auraColor,
+    me?.email,
     me?.profileBackground,
     me?.tag,
     me?.tagColor,
@@ -623,6 +630,21 @@ const UserMenu = forwardRef(function UserMenu(
     me?.usernameStyle,
     me?.avatarRing,
   ]);
+
+  async function saveEmail() {
+    if (!onChangeEmail) return;
+    const email = String(profileEmail || "").trim();
+    if (!email) return;
+    setProfileEmailSaving(true);
+    setProfileEmailError("");
+    try {
+      await onChangeEmail(email);
+    } catch (e) {
+      setProfileEmailError(e.message || t("errorGeneric"));
+    } finally {
+      setProfileEmailSaving(false);
+    }
+  }
 
   async function saveProfile() {
     if (!onChangeProfile) return;
@@ -986,6 +1008,7 @@ const UserMenu = forwardRef(function UserMenu(
             {panel === "profile" ? (
               <div className="settingsModalList">
                 {avatarError ? <div className="authError">{avatarError}</div> : null}
+                {profileEmailError ? <div className="authError">{profileEmailError}</div> : null}
                 <div className="settingsProfileHeader">
                   <AvatarAura auraColor={profileAuraColor}>
                     {(() => {
@@ -1024,6 +1047,28 @@ const UserMenu = forwardRef(function UserMenu(
                       <div className="settingsProfileAt muted small">{formatAtUserHandle(me.userHandle)}</div>
                     ) : null}
                     <div className="settingsProfileStatus muted small">{statusLine}</div>
+                  </div>
+                </div>
+
+                <div className="settingsSection settingsSection--padded">
+                  <div className="settingsTitle">{t("authEmailLabel")}</div>
+                  <input
+                    value={profileEmail}
+                    onChange={(e) => setProfileEmail(e.target.value)}
+                    inputMode="email"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    placeholder="name@example.com"
+                  />
+                  <div className="profileActions" style={{ marginTop: 10 }}>
+                    <button
+                      type="button"
+                      className="primaryBtn"
+                      onClick={saveEmail}
+                      disabled={profileEmailSaving || !String(profileEmail || "").trim()}
+                    >
+                      {profileEmailSaving ? t("saving") : t("save")}
+                    </button>
                   </div>
                 </div>
 
@@ -1701,6 +1746,7 @@ const UserMenu = forwardRef(function UserMenu(
           {panel === "profile" ? (
             <div>
               {avatarError ? <div className="authError">{avatarError}</div> : null}
+              {profileEmailError ? <div className="authError">{profileEmailError}</div> : null}
               <div className="profilePanel">
                 <AvatarAura auraColor={profileAuraColor}>
                   {(() => {
@@ -1746,6 +1792,28 @@ const UserMenu = forwardRef(function UserMenu(
                   <div className="profileHint muted small">
                     {me?.isOnline ? t("online") : me?.lastSeenAt ? t("lastSeenAt").replace("{time}", formatLastSeen(me.lastSeenAt, settings?.lang)) : t("lastSeen")}
                   </div>
+                </div>
+              </div>
+
+              <div className="settingsSection settingsSection--padded">
+                <div className="settingsTitle">{t("authEmailLabel")}</div>
+                <input
+                  value={profileEmail}
+                  onChange={(e) => setProfileEmail(e.target.value)}
+                  inputMode="email"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  placeholder="name@example.com"
+                />
+                <div className="profileActions" style={{ marginTop: 10 }}>
+                  <button
+                    type="button"
+                    className="primaryBtn"
+                    onClick={saveEmail}
+                    disabled={profileEmailSaving || !String(profileEmail || "").trim()}
+                  >
+                    {profileEmailSaving ? t("saving") : t("save")}
+                  </button>
                 </div>
               </div>
 

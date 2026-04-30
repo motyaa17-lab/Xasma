@@ -1010,18 +1010,30 @@ async function insertChatMessageAndBroadcast(
 }
 
 app.post("/api/register", async (req, res) => {
-  const { username, password, avatar, inviteCode } = req.body || {};
-  if (!username || !password) return res.status(400).json({ error: "username and password are required" });
+  const { username, email, password, avatar, inviteCode } = req.body || {};
+  if (!username || !email || !password) {
+    return res.status(400).json({ error: "username, email and password are required" });
+  }
 
   const uname = username.trim();
   if (uname.toLowerCase() === OFFICIAL_SYSTEM_USERNAME) {
     return res.status(400).json({ error: "This username is reserved" });
   }
 
+  const emailRaw = String(email || "").trim();
+  const emailNorm = emailRaw.toLowerCase();
+  // Keep validation intentionally simple; server-side uniqueness is enforced by DB index.
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNorm)) {
+    return res.status(400).json({ error: "Invalid email" });
+  }
+
   const avatar_url = typeof avatar === "string" && avatar.trim() ? avatar.trim() : null;
 
   const existing = await query(`SELECT id FROM users WHERE username = $1`, [uname]);
   if (existing.rows[0]) return res.status(409).json({ error: "Username already exists" });
+
+  const existingEmail = await query(`SELECT id FROM users WHERE LOWER(email) = LOWER($1)`, [emailNorm]);
+  if (existingEmail.rows[0]) return res.status(409).json({ error: "Email already exists" });
 
   function base62(bytes) {
     const alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -1061,13 +1073,13 @@ app.post("/api/register", async (req, res) => {
       const user_handle = await allocateUniqueUserHandle(client);
       try {
         const inserted = await client.query(
-          `INSERT INTO users (username, password_hash, avatar_url, referral_code, invited_by, user_handle)
-           VALUES ($1, $2, $3, $4, $5, $6)
+          `INSERT INTO users (username, email, password_hash, avatar_url, referral_code, invited_by, user_handle)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
            RETURNING id, username, avatar_url, role, banned, aura_color, created_at,
                      referral_code, invited_by, referrals_count,
                      has_custom_bg, has_badge, has_reactions, has_premium_lite,
                      premium_type, premium_expires_at, premium_granted_at, profile_bg_url, user_handle`,
-          [uname, password_hash, avatar_url, c, inviterId, user_handle]
+          [uname, emailNorm, password_hash, avatar_url, c, inviterId, user_handle]
         );
         user = inserted.rows[0];
         myCode = c;
@@ -1133,6 +1145,10 @@ app.post("/api/register", async (req, res) => {
     await client.query("COMMIT");
   } catch (e) {
     await client.query("ROLLBACK").catch(() => {});
+    const msg = String(e?.message || "").toLowerCase();
+    if (msg.includes("users_email_lower_uidx") || (msg.includes("email") && (msg.includes("duplicate") || msg.includes("unique")))) {
+      return res.status(409).json({ error: "Email already exists" });
+    }
     throw e;
   } finally {
     client.release();
@@ -1174,11 +1190,11 @@ app.post("/api/register", async (req, res) => {
 });
 
 app.post("/api/login", async (req, res) => {
-  const { username, password } = req.body || {};
-  if (!username || !password) return res.status(400).json({ error: "username and password are required" });
+  const { email, password, username } = req.body || {};
+  const loginEmail = String(email || username || "").trim();
+  if (!loginEmail || !password) return res.status(400).json({ error: "email and password are required" });
 
-  const rawLogin = String(username).trim();
-  const handleGuess = loginHandleNormalized(username);
+  const emailNorm = loginEmail.toLowerCase();
 
   const r = await query(
     `SELECT id, username, password_hash, avatar_url, role, banned, aura_color, messages_sent_count,
@@ -1187,8 +1203,8 @@ app.post("/api/login", async (req, res) => {
             has_custom_bg, has_badge, has_reactions, has_premium_lite,
             is_premium, premium_activated_at, profile_bg_url,
             premium_type, premium_expires_at, premium_granted_at
-     FROM users WHERE username = $1 OR user_handle = $2`,
-    [rawLogin, handleGuess]
+     FROM users WHERE LOWER(email) = LOWER($1)`,
+    [emailNorm]
   );
   const user = r.rows[0];
   if (!user) return res.status(401).json({ error: "Invalid credentials" });
@@ -1240,7 +1256,7 @@ app.post("/api/login", async (req, res) => {
 app.get("/api/me", authRequired, (req, res) => {
   const uid = Number(req.user.id);
   return query(
-    `SELECT id, username, user_handle, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about, aura_color, messages_sent_count,
+    `SELECT id, username, email, user_handle, avatar_url, role, banned, is_online, last_seen_at, status_kind, status_text, about, aura_color, messages_sent_count,
             user_tag, tag_color, tag_style, username_style, avatar_ring, created_at,
             referral_code, invited_by, referrals_count,
             has_custom_bg, has_badge, has_reactions, has_premium_lite,
@@ -1257,6 +1273,7 @@ app.get("/api/me", authRequired, (req, res) => {
       user: {
         id: Number(user.id),
         username: user.username,
+        email: user.email || "",
         userHandle: userHandleApi(user),
         avatar: user.avatar_url,
         role: user.role,
@@ -1287,6 +1304,30 @@ app.get("/api/me", authRequired, (req, res) => {
       },
     });
   });
+});
+
+app.put("/api/me/email", authRequired, async (req, res) => {
+  const uid = Number(req.user.id);
+  const emailRaw = typeof req.body?.email === "string" ? req.body.email.trim() : "";
+  const emailNorm = emailRaw.toLowerCase();
+  if (!emailNorm) return res.status(400).json({ error: "Email is required" });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNorm)) return res.status(400).json({ error: "Invalid email" });
+
+  // Fast path: ensure unique (case-insensitive).
+  const existing = await query(`SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND id != $2`, [emailNorm, uid]);
+  if (existing.rows[0]) return res.status(409).json({ error: "Email already exists" });
+
+  try {
+    const up = await query(`UPDATE users SET email = $1 WHERE id = $2 RETURNING email`, [emailNorm, uid]);
+    if (!up.rows[0]) return res.status(404).json({ error: "User not found" });
+    return res.json({ email: up.rows[0].email || "" });
+  } catch (e) {
+    const msg = String(e?.message || "").toLowerCase();
+    if (msg.includes("users_email_lower_uidx") || (msg.includes("email") && (msg.includes("duplicate") || msg.includes("unique")))) {
+      return res.status(409).json({ error: "Email already exists" });
+    }
+    throw e;
+  }
 });
 
 app.put("/api/me/profile", authRequired, (req, res) => {

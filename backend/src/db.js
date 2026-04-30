@@ -23,6 +23,7 @@ async function initDb() {
     CREATE TABLE IF NOT EXISTS users (
       id BIGSERIAL PRIMARY KEY,
       username TEXT NOT NULL UNIQUE,
+      email TEXT,
       password_hash TEXT NOT NULL,
       avatar_url TEXT,
       status_kind TEXT,
@@ -78,6 +79,7 @@ async function initDb() {
   `);
 
   // Migrations for existing DBs (safe/idempotent).
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT`);
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user'`);
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS banned BOOLEAN NOT NULL DEFAULT FALSE`);
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status_kind TEXT`);
@@ -303,6 +305,13 @@ async function initDb() {
   }
 
   await query(`CREATE UNIQUE INDEX IF NOT EXISTS users_user_handle_uidx ON users (user_handle)`);
+
+  // Email login: enforce uniqueness case-insensitively (NULL allowed for legacy users).
+  await query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower_uidx
+    ON users (LOWER(email))
+    WHERE email IS NOT NULL AND TRIM(email) <> ''
+  `);
 
   // Ensure initial admin (safe if user doesn't exist).
   await query(`UPDATE users SET role = 'admin' WHERE username = 'Xasma'`);
