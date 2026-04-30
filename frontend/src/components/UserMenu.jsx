@@ -807,7 +807,7 @@ const UserMenu = forwardRef(function UserMenu(
       return t("lastSeen");
     })();
 
-    function SettingsRow({ label, right, danger, onClick, disabled }) {
+    function SettingsRow({ label, right, icon, danger, onClick, disabled }) {
       return (
         <button
           type="button"
@@ -815,7 +815,10 @@ const UserMenu = forwardRef(function UserMenu(
           onClick={onClick}
           disabled={disabled}
         >
-          <span className="settingsRowLeft">{label}</span>
+          <span className="settingsRowLeft">
+            {icon ? <span className="tgSettingsIconWrap">{icon}</span> : null}
+            <span className="settingsRowLabel">{label}</span>
+          </span>
           <span className="settingsRowRight">
             {right ? <span className="settingsRowValue">{right}</span> : null}
             <span className="settingsRowChevron" aria-hidden>
@@ -829,7 +832,9 @@ const UserMenu = forwardRef(function UserMenu(
     function SettingsChoiceRow({ label, selected, onClick }) {
       return (
         <button type="button" className="settingsRow" onClick={onClick}>
-          <span className="settingsRowLeft">{label}</span>
+          <span className="settingsRowLeft">
+            <span className="settingsRowLabel">{label}</span>
+          </span>
           <span className="settingsRowRight">
             {selected ? <span className="settingsRowCheck" aria-hidden>✓</span> : <span className="settingsRowSpacer" />}
           </span>
@@ -863,7 +868,11 @@ const UserMenu = forwardRef(function UserMenu(
         <div className="settingsList">
           <div className="settingsSectionHeader">{t("profile")}</div>
           <div className="settingsSection">
-            <SettingsRow label={t("myProfile")} onClick={() => setPanel("profile")} />
+            <SettingsRow
+              label={t("myProfile")}
+              icon={<span className="tgSettingsIcon tgSettingsIcon--red" aria-hidden>👤</span>}
+              onClick={() => setPanel("profile")}
+            />
           </div>
 
           <div className="settingsSectionHeader">{t("language")}</div>
@@ -871,13 +880,18 @@ const UserMenu = forwardRef(function UserMenu(
             <SettingsRow
               label={t("language")}
               right={currentLanguageLabel(settings?.lang, t)}
+              icon={<span className="tgSettingsIcon tgSettingsIcon--purple" aria-hidden>🌐</span>}
               onClick={() => setPanel("language")}
             />
           </div>
 
           <div className="settingsSectionHeader">{t("notifySettingsTitle")}</div>
           <div className="settingsSection">
-            <SettingsRow label={t("notifyEnableLabel")} onClick={() => setPanel("notifications")} />
+            <SettingsRow
+              label={t("notifyEnableLabel")}
+              icon={<span className="tgSettingsIcon tgSettingsIcon--red" aria-hidden>🔔</span>}
+              onClick={() => setPanel("notifications")}
+            />
           </div>
 
           <div className="settingsSectionHeader">{t("chatBackground")}</div>
@@ -885,6 +899,7 @@ const UserMenu = forwardRef(function UserMenu(
             <SettingsRow
               label={t("settingsCurrentBackground")}
               right={chatBackgroundDisplayLabel(t, settings)}
+              icon={<span className="tgSettingsIcon tgSettingsIcon--blue" aria-hidden>🎨</span>}
               onClick={() => setPanel("chatBackground")}
             />
           </div>

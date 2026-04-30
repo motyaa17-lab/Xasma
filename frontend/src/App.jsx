@@ -7,7 +7,7 @@ import Sidebar from "./components/Sidebar.jsx";
 import Chat from "./components/Chat.jsx";
 import UserMenu from "./components/UserMenu.jsx";
 import InstallDownloadPanel from "./components/InstallDownloadPanel.jsx";
-import { IconChats, IconPhone, IconSettings, IconDownload } from "./components/Icons.jsx";
+import { IconChats, IconCompose, IconContacts, IconPhone, IconSearch, IconSettings, IconDownload } from "./components/Icons.jsx";
 import CallOverlay from "./components/CallOverlay.jsx";
 import CallsScreen from "./components/CallsScreen.jsx";
 import { useIsMobile } from "./hooks/useIsMobile.js";
@@ -2193,6 +2193,14 @@ export default function App() {
     setMessages([]);
   }
 
+  function formatNavBadgeCount(n) {
+    const v = Math.max(0, Number(n) || 0);
+    if (!v) return "";
+    if (v < 1000) return String(v);
+    const k = Math.round((v / 1000) * 10) / 10;
+    return `${String(k).replace(/\.0$/, "")}K`;
+  }
+
   function handleMobileBackFromChat() {
     stashCurrentChatMessagesToCache(selectedChatIdRef.current);
     setSelectedChatId(null);
@@ -2384,55 +2392,24 @@ export default function App() {
         {mobileTab === "chats" && !selectedChatId ? (
           <div className="mobilePane mobilePane--inbox">
             <header className="mobileMainHeader">
-              <div className="mobileMainHeaderText">
-                <div className="mobileBrandRow">
-                  <span className="appLogoShell" aria-hidden>
-                    <span className="appLogoCrop">
-                      <img src={XASMA_LOGO_SRC} alt="" className="appLogo" decoding="async" />
-                    </span>
+              <button type="button" className="tgTopTextBtn" onClick={() => {}}>
+                {t("editShort") || t("edit")}
+              </button>
+              <div className="tgTopTitle">{t("navChats")}</div>
+              <div className="tgTopActions">
+                <button type="button" className="tgTopIconBtn" aria-label={t("select") ?? "Select"} onClick={() => {}}>
+                  <span className="tgTopCheck" aria-hidden>
+                    ✓
                   </span>
-                  <span className="mobileBrandTitle">{t("appTitle")}</span>
-                  <span className="appBetaBadge">BETA</span>
-                </div>
-                <div className={`mobileSocketPill${socketReady ? " mobileSocketPill--on" : ""}`}>
-                  {socketReady ? t("realtimeOn") : t("realtimeReconnecting")}
-                </div>
-              </div>
-              <div className="mobileMainHeaderActions">
+                </button>
                 <button
                   type="button"
-                  className="mobileDownloadBtn"
-                  onClick={() => setInstallDownloadOpen(true)}
+                  className="tgTopIconBtn"
+                  aria-label={t("newMessage") ?? "New message"}
+                  onClick={() => mobileInboxSidebarRef.current?.openCreateGroup?.()}
                 >
-                  {t("downloadButton")}
+                  <IconCompose size={20} />
                 </button>
-                {sidebarProps.onCreateGroup ? (
-                  <button
-                    type="button"
-                    className="mobileHeaderIconBtn"
-                    onClick={() => mobileInboxSidebarRef.current?.openCreateGroup?.()}
-                    aria-label={t("createGroup")}
-                    title={t("createGroup")}
-                  >
-                    <span className="mobileHeaderIconPlus" aria-hidden>
-                      +
-                    </span>
-                  </button>
-                ) : null}
-                {sidebarProps.onCreateChannel ? (
-                  <button
-                    type="button"
-                    className="mobileHeaderIconBtn"
-                    onClick={() => mobileInboxSidebarRef.current?.openCreateChannel?.()}
-                    aria-label={t("createChannel")}
-                    title={t("createChannel")}
-                  >
-                    <span className="mobileHeaderIconChannel" aria-hidden>
-                      #
-                    </span>
-                  </button>
-                ) : null}
-                <UserMenu {...userMenuProps} variant="dropdown" />
               </div>
             </header>
             <Sidebar ref={mobileInboxSidebarRef} {...sidebarProps} mobileLayout />
@@ -2469,10 +2446,39 @@ export default function App() {
           </div>
         ) : null}
 
+        {mobileTab === "contacts" ? (
+          <div className="mobilePane mobilePane--placeholder">
+            <header className="mobileSubHeader">
+              <h1 className="mobileSubHeaderTitle">{t("navContacts")}</h1>
+            </header>
+            <div className="mobilePlaceholderBody muted">{t("comingSoon")}</div>
+          </div>
+        ) : null}
+
+        {mobileTab === "search" ? (
+          <div className="mobilePane mobilePane--placeholder">
+            <header className="mobileSubHeader">
+              <h1 className="mobileSubHeaderTitle">{t("navSearch")}</h1>
+            </header>
+            <div className="mobilePlaceholderBody muted">{t("comingSoon")}</div>
+          </div>
+        ) : null}
+
         {mobileTab === "settings" ? (
           <div className="mobilePane mobilePane--settings">
-            <header className="mobileSubHeader">
-              <h1 className="mobileSubHeaderTitle">{t("navSettings")}</h1>
+            <header className="tgSettingsTopBar">
+              <button type="button" className="tgTopIconBtn" aria-label={t("qr") ?? "QR"} onClick={() => {}}>
+                <span aria-hidden>⌁</span>
+              </button>
+              <div className="tgTopTitle">
+                {(me?.displayName || me?.username || t("navSettings")) + " "}
+                <span className="tgSettingsChevron" aria-hidden>
+                  ˅
+                </span>
+              </div>
+              <button type="button" className="tgTopTextBtn" onClick={() => {}}>
+                {t("editShort") || t("edit")}
+              </button>
             </header>
             <div className="mobileSettingsScroll">
               <UserMenu {...userMenuProps} variant="mobilePage" />
@@ -2483,13 +2489,35 @@ export default function App() {
 
       {mobileTab === "chats" && selectedChatId ? null : (
         <nav className="mobileBottomNav" aria-label={t("mobileNavLabel")}>
+          {(() => {
+            const totalUnread = chats.reduce((acc, c) => acc + Math.max(0, Number(c?.unreadCount) || 0), 0);
+            const callsUnread = callLogs.reduce((acc, r) => acc + (r?.missed ? 1 : 0), 0);
+            const chatsBadge = formatNavBadgeCount(totalUnread);
+            const callsBadge = formatNavBadgeCount(callsUnread);
+            return (
+              <>
+          <button
+            type="button"
+            className={`mobileNavItem${mobileTab === "contacts" ? " mobileNavItem--active" : ""}`}
+            onClick={() => goMobileTab("contacts")}
+          >
+            <span className="mobileNavIconWrap" aria-hidden>
+              <span className="mobileNavIcon">
+                <IconContacts size={20} />
+              </span>
+            </span>
+            <span className="mobileNavLabel">{t("navContacts")}</span>
+          </button>
           <button
             type="button"
             className={`mobileNavItem${mobileTab === "chats" ? " mobileNavItem--active" : ""}`}
             onClick={() => goMobileTab("chats")}
           >
-            <span className="mobileNavIcon" aria-hidden>
-              <IconChats size={20} />
+            <span className="mobileNavIconWrap" aria-hidden>
+              <span className="mobileNavIcon">
+                <IconChats size={20} />
+              </span>
+              {chatsBadge ? <span className="mobileNavBadge">{chatsBadge}</span> : null}
             </span>
             <span className="mobileNavLabel">{t("navChats")}</span>
           </button>
@@ -2498,8 +2526,11 @@ export default function App() {
             className={`mobileNavItem${mobileTab === "calls" ? " mobileNavItem--active" : ""}`}
             onClick={() => goMobileTab("calls")}
           >
-            <span className="mobileNavIcon" aria-hidden>
-              <IconPhone size={20} />
+            <span className="mobileNavIconWrap" aria-hidden>
+              <span className="mobileNavIcon">
+                <IconPhone size={20} />
+              </span>
+              {callsBadge ? <span className="mobileNavBadge mobileNavBadge--red">{callsBadge}</span> : null}
             </span>
             <span className="mobileNavLabel">{t("navCalls")}</span>
           </button>
@@ -2508,11 +2539,28 @@ export default function App() {
             className={`mobileNavItem${mobileTab === "settings" ? " mobileNavItem--active" : ""}`}
             onClick={() => goMobileTab("settings")}
           >
-            <span className="mobileNavIcon" aria-hidden>
-              <IconSettings size={20} />
+            <span className="mobileNavIconWrap" aria-hidden>
+              <span className="mobileNavIcon">
+                <IconSettings size={20} />
+              </span>
             </span>
             <span className="mobileNavLabel">{t("navSettings")}</span>
           </button>
+          <button
+            type="button"
+            className={`mobileNavItem${mobileTab === "search" ? " mobileNavItem--active" : ""}`}
+            onClick={() => goMobileTab("search")}
+          >
+            <span className="mobileNavIconWrap" aria-hidden>
+              <span className="mobileNavIcon">
+                <IconSearch size={20} />
+              </span>
+            </span>
+            <span className="mobileNavLabel">{t("navSearch")}</span>
+          </button>
+              </>
+            );
+          })()}
         </nav>
       )}
     </div>

@@ -8,7 +8,7 @@ import UserTagBadge from "./UserTagBadge.jsx";
 import { isPremiumActive } from "../premium.js";
 import { avatarRingWrapClass, usernameDisplayClass } from "../userPersonalization.js";
 import { formatAtUserHandle } from "../userHandleDisplay.js";
-import { IconEllipsis } from "./Icons.jsx";
+import { IconEllipsis, IconSearch } from "./Icons.jsx";
 import { XASMA_LOGO_SRC } from "../branding.js";
 import { readMessageDraft } from "../messageDrafts.js";
 
@@ -597,37 +597,96 @@ const Sidebar = forwardRef(function Sidebar(
 
   if (mobileLayout) {
     const mobileChatsToShow = query.trim() ? mobileFilteredChats : chats;
+    const storyChats = chats.slice(0, 10);
 
     return (
       <>
-        <div className="mobileChatSearchWrap">
-          <input
-            type="search"
-            className="mobileChatSearch"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t("searchUnifiedPlaceholder")}
-            enterKeyHint="search"
-            autoComplete="off"
-            aria-label={t("searchUnifiedPlaceholder")}
-          />
+        <div className="tgStoriesStrip" aria-label={t("stories") ?? "Stories"}>
+          <div className="tgStoriesScroll">
+            <button type="button" className="tgStoryItem tgStoryItem--me" aria-label={t("myStory") ?? "My story"}>
+              <span className="tgStoryAvatar">
+                <span className="tgStoryPlus" aria-hidden>
+                  +
+                </span>
+              </span>
+              <span className="tgStoryLabel">{t("myStory") ?? "Моя история"}</span>
+            </button>
+            {storyChats.map((c) => {
+              const isGroup = c.type === "group";
+              const isChannel = c.type === "channel";
+              const isRoom = isGroup || isChannel;
+              const isOfficial = c.type === "official";
+              const other = c.other;
+              const label = isChannel
+                ? c.title || t("channelInfoTitle")
+                : isGroup
+                  ? c.title || t("groupChat")
+                  : isOfficial
+                    ? c.title || t("appTitle")
+                    : other?.username || "";
+              const avatarUrl = isRoom ? c.avatar : other?.avatar;
+
+              return (
+                <button
+                  key={`story-${c.id}`}
+                  type="button"
+                  className="tgStoryItem"
+                  onClick={() => onSelectChat?.(c.id)}
+                  aria-label={label}
+                >
+                  <span className="tgStoryAvatar">
+                    {avatarUrl ? <img src={avatarUrl} alt="" /> : <span className="tgStoryInitials">{initials(label)}</span>}
+                  </span>
+                  <span className="tgStoryLabel">{label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
-        <button
-          type="button"
-          className="mobileArchivedRow"
-          onClick={() => {
-            // UX parity with iOS-style inbox; actual archived chats are not implemented yet.
-            // Keep this as a non-breaking affordance for now.
-          }}
-        >
-          <span className="mobileArchivedIcon" aria-hidden>
-            ⌄
+
+        <div className="tgSearchWrap">
+          <div className="tgSearchField">
+            <span className="tgSearchIcon" aria-hidden>
+              <IconSearch size={18} />
+            </span>
+            <input
+              type="search"
+              className="tgSearchInput"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t("searchUnifiedPlaceholder")}
+              enterKeyHint="search"
+              autoComplete="off"
+              aria-label={t("searchUnifiedPlaceholder")}
+            />
+          </div>
+        </div>
+
+        <div className="tgSegmented" role="tablist" aria-label={t("chatFolders") ?? "Folders"}>
+          <button type="button" className="tgSegBtn tgSegBtn--active" role="tab" aria-selected="true">
+            {t("all") ?? "Все"}
+          </button>
+          <button type="button" className="tgSegBtn" role="tab" aria-selected="false">
+            Telegram
+          </button>
+          <button type="button" className="tgSegBtn" role="tab" aria-selected="false">
+            A
+          </button>
+        </div>
+
+        <button type="button" className="tgListRow tgArchiveRow" onClick={() => {}} aria-label={t("archive") ?? "Архив"}>
+          <span className="tgRowAvatar tgRowAvatar--archive" aria-hidden />
+          <span className="tgRowMain">
+            <span className="tgRowTitle">{t("archive") ?? "Архив"}</span>
+            <span className="tgRowSubtitle muted">{t("archivedChats")}</span>
           </span>
-          <span className="mobileArchivedLabel">{t("archivedChats")}</span>
-          <span className="mobileArchivedCount muted small" aria-hidden>
-            0
+          <span className="tgRowRight">
+            <span className="tgRowBadge" aria-label={t("unreadBadgeAria").replace("{count}", "1")}>
+              1
+            </span>
           </span>
         </button>
+
         <div className="mobileChatListScroll" onScroll={MOBILE_CHAT_SWIPE_ENABLED ? onMobileChatListScroll : undefined}>
           {canSearch && searching ? (
             <div className="mobileSearchStatus muted" role="status">
@@ -671,101 +730,54 @@ const Sidebar = forwardRef(function Sidebar(
             const unreadLabel = unreadN > 0 ? (unreadN > 99 ? "99+" : String(unreadN)) : null;
             const statusSubtitle =
               !isRoom && !isOfficial && other ? formatUserStatusLine(other, t, lang) : "";
-            const rowClass = isOfficial ? "mobileChatRow mobileChatRow--official" : "mobileChatRow";
+            const rowClass = isOfficial ? "tgListRow tgChatRow tgChatRow--official" : "tgListRow tgChatRow";
             const rowBody = (
               <>
-                <div className="mobileChatRowAvatarWrap">
-                  <AvatarAura skip={isRoom || isOfficial} auraColor={other?.auraColor}>
-                    {(() => {
-                      const ringC =
-                        !isRoom && !isOfficial
-                          ? avatarRingWrapClass(otherIsPremium ? other?.avatarRing : "")
-                          : "";
-                      const inner = (
-                        <div
-                          className={
-                            (online ? "mobileChatRowAvatar presence online" : "mobileChatRowAvatar presence") +
-                            (otherIsPremium ? " avatarPremium" : "")
-                          }
-                        >
-                          {isRoom && c.avatar ? (
-                            <img src={c.avatar} alt="" />
-                          ) : !isRoom && other?.avatar ? (
-                            <img src={other.avatar} alt="" />
-                          ) : isOfficial ? (
-                            <img src={XASMA_LOGO_SRC} alt="" className="xasmaBrandMark" decoding="async" />
-                          ) : (
-                            <span>{initials(isRoom || isOfficial ? label : other?.username || "")}</span>
-                          )}
-                        </div>
-                      );
-                      return ringC ? <span className={ringC}>{inner}</span> : inner;
-                    })()}
-                  </AvatarAura>
-                  {!isRoom && !isOfficial ? (
-                    <span
-                      className={online ? "avatarPresenceDot avatarPresenceDot--on" : "avatarPresenceDot"}
-                      aria-hidden
-                    />
-                  ) : null}
-                </div>
-                <div className="mobileChatRowMain">
-                  <div className="mobileChatRowTop">
-                    <div className="mobileChatRowTitleBlock">
-                      <span className="mobileChatRowName">
-                        <span className={!isRoom && !isOfficial ? usernameDisplayClass(other) || undefined : undefined}>
-                          {label}
-                          {otherIsPremium ? <span className="premiumBadge">💎</span> : null}
-                        </span>
-                        {isOfficial ? (
-                          <span className="officialChatListBadge">{t("officialChatBadge")}</span>
-                        ) : null}
-                        {isChannel ? <span className="channelChatListBadge">{t("channelBadge")}</span> : null}
-                        {!isRoom && !isOfficial ? (
-                          <UserTagBadge
-                            tag={other?.tag}
-                            tagColor={other?.tagColor}
-                            tagStyle={other?.tagStyle}
-                          />
-                        ) : null}
-                        {!isRoom && !isOfficial ? (
-                          <ActivityBadge messageCount={other?.messageCount} t={t} />
-                        ) : null}
+                <span className="tgRowAvatar">
+                  {isRoom && c.avatar ? (
+                    <img src={c.avatar} alt="" />
+                  ) : !isRoom && other?.avatar ? (
+                    <img src={other.avatar} alt="" />
+                  ) : isOfficial ? (
+                    <img src={XASMA_LOGO_SRC} alt="" className="xasmaBrandMark" decoding="async" />
+                  ) : (
+                    <span className="tgRowInitials">{initials(isRoom || isOfficial ? label : other?.username || "")}</span>
+                  )}
+                </span>
+                <span className="tgRowMain">
+                  <span className="tgRowTopLine">
+                    <span className="tgRowTitle">
+                      <span className={!isRoom && !isOfficial ? usernameDisplayClass(other) || undefined : undefined}>
+                        {label}
+                        {otherIsPremium ? <span className="premiumBadge">💎</span> : null}
                       </span>
-                      {!isRoom && !isOfficial && other?.userHandle ? (
-                        <div className="mobileChatRowAt muted small">{formatAtUserHandle(other.userHandle)}</div>
-                      ) : null}
-                      {!isRoom && !isOfficial && statusSubtitle ? (
-                        <span className="mobileChatRowStatus muted" title={statusSubtitle}>
-                          {statusSubtitle}
-                        </span>
-                      ) : null}
-                    </div>
-                    <div className="mobileChatRowRight" aria-label={unreadLabel ? t("unreadBadgeAria").replace("{count}", unreadLabel) : undefined}>
+                    </span>
+                    <span className="tgRowMeta">
                       {c.last?.createdAt ? (
-                        <time className="mobileChatRowTime" dateTime={c.last.createdAt}>
+                        <time className="tgRowTime" dateTime={c.last.createdAt}>
                           {formatListTime(c.last.createdAt, lang)}
                         </time>
+                      ) : null}
+                    </span>
+                  </span>
+                  <span className="tgRowBottomLine">
+                    <span className="tgRowSubtitle muted" title={draftText.trim() ? draftText : preview}>
+                      {draftText.trim() ? (
+                        <>
+                          <span className="chatDraftLabel">{t("draftLabel")}:</span>{" "}
+                          {String(draftText).replace(/\s+/g, " ").trim()}
+                        </>
                       ) : (
-                        <span className="mobileChatRowTime" aria-hidden />
+                        preview
                       )}
-                      {unreadLabel ? <span className="chatUnreadBadge">{unreadLabel}</span> : null}
-                    </div>
-                  </div>
-                  <div className="mobileChatRowBottom">
-                    {draftText.trim() ? (
-                      <span className="mobileChatRowPreview muted" title={draftText}>
-                        <span className="chatDraftLabel">{t("draftLabel")}:</span>{" "}
-                        {String(draftText).replace(/\s+/g, " ").trim()}
-                      </span>
-                    ) : (
-                      <span className="mobileChatRowPreview muted">{preview}</span>
-                    )}
-                    {showActivity && !unreadLabel ? (
-                      <span className="mobileChatRowUnread" title={t("newActivity")} />
-                    ) : null}
-                  </div>
-                </div>
+                    </span>
+                    <span className="tgRowRight">
+                      {unreadLabel ? <span className="tgRowBadge">{unreadLabel}</span> : null}
+                      {showActivity && !unreadLabel ? <span className="tgRowDot" aria-hidden /> : null}
+                      {c.listPinned ? <span className="tgRowPin" aria-hidden>📌</span> : null}
+                    </span>
+                  </span>
+                </span>
               </>
             );
 

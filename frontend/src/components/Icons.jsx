@@ -112,3 +112,52 @@ export function IconSearch(props) {
   );
 }
 
+export function IconContacts(props) {
+  return (
+    <svg {...baseProps(props)} fill="none">
+      <path
+        d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+      <path
+        d="M20 21v-2a3.5 3.5 0 0 0-2.5-3.36"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M17.5 3.64A4 4 0 0 1 18 11"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export function IconCompose(props) {
+  return (
+    <svg {...baseProps(props)} fill="none">
+      <path
+        d="M12 20h9"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+

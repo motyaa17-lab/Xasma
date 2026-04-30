@@ -6067,15 +6067,21 @@ body.body--mobileConversationOpen {
   overflow: hidden;
 }
 
+.mobilePane--placeholder {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.92), rgba(8, 12, 20, 0.98));
+}
+
+.mobilePlaceholderBody {
+  padding: 20px 14px;
+  font-size: 14px;
+}
+
 .appShell--mobile .mobilePane:not(.mobilePane--conversation) {
   animation: mobilePaneStackIn calc(var(--dur-chat-shell) * 0.9) var(--ease-ui) both;
 }
 
 .mobilePane--inbox {
-  background:
-    radial-gradient(120% 80% at 20% 0%, rgba(37, 99, 235, 0.10) 0%, rgba(11, 18, 32, 0) 55%),
-    radial-gradient(120% 80% at 80% 0%, rgba(16, 185, 129, 0.06) 0%, rgba(11, 18, 32, 0) 60%),
-    linear-gradient(180deg, rgba(17, 27, 46, 0.98), rgba(11, 18, 32, 0.99));
+  background: #000;
 }
 
 .mobileMainHeader {
@@ -6086,9 +6092,63 @@ body.body--mobileConversationOpen {
   gap: 12px;
   padding: 12px 14px 10px;
   padding-top: max(9px, env(safe-area-inset-top));
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(15, 23, 42, 0.86);
-  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.tgTopTextBtn {
+  border: none;
+  background: transparent;
+  color: rgba(147, 197, 253, 0.98);
+  font-size: 16px;
+  font-weight: 700;
+  padding: 6px 2px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tgTopTextBtn:active {
+  opacity: 0.7;
+}
+
+.tgTopTitle {
+  flex: 1 1 auto;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: rgba(226, 232, 240, 0.98);
+}
+
+.tgTopActions {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.tgTopIconBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(147, 197, 253, 0.98);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tgTopIconBtn:active {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.tgTopCheck {
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
 }
 
 .mobileMainHeaderText {
@@ -6187,6 +6247,152 @@ body.body--mobileConversationOpen {
   color: rgba(52, 211, 153, 0.95);
 }
 
+.tgStoriesStrip {
+  flex-shrink: 0;
+  padding: 6px 0 2px;
+}
+
+.tgStoriesScroll {
+  display: flex;
+  gap: 12px;
+  padding: 0 14px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.tgStoriesScroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.tgStoryItem {
+  width: 70px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tgStoryAvatar {
+  width: 62px;
+  height: 62px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 2px solid rgba(16, 185, 129, 0.65);
+  overflow: hidden;
+  margin: 0 auto;
+}
+
+.tgStoryItem--me .tgStoryAvatar {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.tgStoryAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tgStoryInitials {
+  font-weight: 800;
+  font-size: 18px;
+  color: rgba(226, 232, 240, 0.95);
+}
+
+.tgStoryPlus {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(59, 130, 246, 0.95);
+  color: white;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.tgStoryLabel {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.1;
+  text-align: center;
+  color: rgba(226, 232, 240, 0.88);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tgSearchWrap {
+  flex-shrink: 0;
+  padding: 6px 14px 8px;
+}
+
+.tgSearchField {
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(28, 28, 30, 0.92);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+}
+
+.tgSearchIcon {
+  color: rgba(148, 163, 184, 0.9);
+  display: flex;
+  align-items: center;
+}
+
+.tgSearchInput {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: rgba(226, 232, 240, 0.96);
+  font-size: 16px;
+}
+
+.tgSearchInput::placeholder {
+  color: rgba(148, 163, 184, 0.9);
+}
+
+.tgSegmented {
+  flex-shrink: 0;
+  margin: 0 14px 10px;
+  height: 32px;
+  border-radius: 10px;
+  background: rgba(28, 28, 30, 0.92);
+  padding: 2px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 40px;
+  gap: 2px;
+}
+
+.tgSegBtn {
+  border: none;
+  background: transparent;
+  color: rgba(226, 232, 240, 0.85);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tgSegBtn--active {
+  background: rgba(44, 44, 46, 0.95);
+  color: rgba(226, 232, 240, 0.98);
+}
+
 .mobileChatSearchWrap {
   flex-shrink: 0;
   padding: 10px 12px 6px;
@@ -6266,7 +6472,7 @@ body.body--mobileConversationOpen {
   min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 0 10px max(10px, env(safe-area-inset-bottom));
+  padding: 0 0 max(10px, env(safe-area-inset-bottom));
 }
 
 .mobileChatListEmpty {
@@ -6443,6 +6649,154 @@ body.body--mobileConversationOpen {
   text-align: left;
   cursor: pointer;
   min-height: 72px;
+}
+
+/* Telegram iOS-like list rows (mobile inbox) */
+.tgListRow {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: rgba(226, 232, 240, 0.98);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tgListRow:active {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tgChatRow {
+  position: relative;
+}
+
+.tgChatRow::after {
+  content: "";
+  position: absolute;
+  left: 14px;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  transform: scaleY(0.5);
+  transform-origin: bottom;
+}
+
+.tgChatRow::after {
+  left: 86px; /* aligns with iOS list: separator starts after avatar */
+}
+
+.tgRowAvatar {
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+  display: grid;
+  place-items: center;
+}
+
+.tgRowAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tgRowAvatar--archive {
+  background: radial-gradient(circle at 30% 30%, rgba(147, 197, 253, 0.95), rgba(59, 130, 246, 0.92));
+  border-radius: 14px;
+}
+
+.tgRowInitials {
+  font-weight: 900;
+  font-size: 18px;
+  color: rgba(226, 232, 240, 0.95);
+}
+
+.tgRowMain {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tgRowTopLine,
+.tgRowBottomLine {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.tgRowTitle {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tgRowSubtitle {
+  font-size: 14px;
+  line-height: 1.2;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: rgba(148, 163, 184, 0.95);
+}
+
+.tgRowMeta {
+  flex: 0 0 auto;
+  color: rgba(148, 163, 184, 0.9);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tgRowTime {
+  font-variant-numeric: tabular-nums;
+}
+
+.tgRowRight {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tgRowBadge {
+  min-width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.28);
+  color: rgba(226, 232, 240, 0.98);
+  font-weight: 900;
+  font-size: 12px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tgRowDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.95);
+}
+
+.tgRowPin {
+  opacity: 0.65;
+  font-size: 13px;
+  line-height: 1;
 }
 
 .mobileChatRow:active {
@@ -7008,17 +7362,19 @@ body.body--mobileConversationOpen {
   display: flex;
   align-items: stretch;
   justify-content: space-around;
-  gap: 4px;
-  margin: 10px 14px 14px;
-  padding: 8px 10px;
-  padding-bottom: max(8px, env(safe-area-inset-bottom));
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 22px;
-  background: rgba(2, 6, 23, 0.62);
-  backdrop-filter: blur(12px);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    0 18px 40px rgba(0, 0, 0, 0.35);
+  gap: 2px;
+  margin: 0;
+  padding: 6px 10px;
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(255, 255, 255, 0.10);
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  border-radius: 0;
+  background: rgba(28, 28, 30, 0.66);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: none;
 }
 
 .mobileNavItem {
@@ -7033,7 +7389,7 @@ body.body--mobileConversationOpen {
   border: none;
   border-radius: 12px;
   background: transparent;
-  color: rgba(148, 163, 184, 0.95);
+  color: rgba(174, 174, 178, 0.95);
   font-size: 11px;
   font-weight: 700;
   cursor: pointer;
@@ -7046,15 +7402,44 @@ body.body--mobileConversationOpen {
 }
 
 .mobileNavItem--active {
-  color: #bfdbfe;
-  background: rgba(37, 99, 235, 0.18);
-  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2), 0 0 12px rgba(0, 120, 255, 0.08);
+  color: rgba(147, 197, 253, 0.98);
+  background: transparent;
+  box-shadow: none;
 }
 
 .mobileNavIcon {
   font-size: 20px;
   line-height: 1;
   opacity: 0.92;
+}
+
+.mobileNavIconWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobileNavBadge {
+  position: absolute;
+  right: -10px;
+  top: -6px;
+  min-width: 22px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.96);
+  color: white;
+  font-size: 10px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+
+.mobileNavBadge--red {
+  background: rgba(255, 59, 48, 0.96);
 }
 
 .mobileNavIcon svg {
@@ -7077,6 +7462,25 @@ body.body--mobileConversationOpen {
   margin: 0;
   font-size: 20px;
   font-weight: 800;
+}
+
+.tgSettingsTopBar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px 10px;
+  padding-top: max(12px, env(safe-area-inset-top));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.tgSettingsChevron {
+  opacity: 0.6;
+  font-weight: 900;
 }
 
 .mobilePlaceholderBody {
@@ -7130,9 +7534,9 @@ body.body--mobileConversationOpen {
   align-items: center;
   gap: 12px;
   padding: 14px 10px;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(15, 23, 42, 0.28);
+  border-radius: 14px;
+  border: none;
+  background: rgba(28, 28, 30, 0.92);
   color: var(--text);
   cursor: pointer;
 }
@@ -7213,9 +7617,9 @@ body.body--mobileConversationOpen {
 }
 
 .settingsSection {
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(15, 23, 42, 0.22);
+  border-radius: 14px;
+  border: none;
+  background: rgba(28, 28, 30, 0.92);
   overflow: hidden;
 }
 
@@ -7337,6 +7741,50 @@ body.body--mobileConversationOpen {
   color: var(--text);
   cursor: pointer;
   text-align: left;
+}
+
+.settingsRowLeft {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.settingsRowLabel {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tgSettingsIconWrap {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+}
+
+.tgSettingsIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  color: white;
+}
+
+.tgSettingsIcon--blue {
+  background: #0a84ff;
+}
+
+.tgSettingsIcon--red {
+  background: #ff3b30;
+}
+
+.tgSettingsIcon--purple {
+  background: #af52de;
 }
 
 .settingsRow + .settingsRow {
