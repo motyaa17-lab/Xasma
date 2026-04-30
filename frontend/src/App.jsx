@@ -134,6 +134,8 @@ export default function App() {
   const socketEndpoint = useMemo(() => getSocketEndpoint(), []);
   const isMobile = useIsMobile(900);
   const [mobileTab, setMobileTab] = useState("chats");
+  const [mobileStoriesExpanded, setMobileStoriesExpanded] = useState(false);
+  const [mobileTopNotice, setMobileTopNotice] = useState("");
   const [installDownloadOpen, setInstallDownloadOpen] = useState(false);
   const [desktopCallsOpen, setDesktopCallsOpen] = useState(false);
   const desktopUserMenuRef = useRef(null);
@@ -2191,6 +2193,7 @@ export default function App() {
     setMobileTab(tab);
     setSelectedChatId(null);
     setMessages([]);
+    setMobileStoriesExpanded(false);
   }
 
   function formatNavBadgeCount(n) {
@@ -2392,12 +2395,48 @@ export default function App() {
         {mobileTab === "chats" && !selectedChatId ? (
           <div className="mobilePane mobilePane--inbox">
             <header className="mobileMainHeader">
-              <button type="button" className="tgTopTextBtn" onClick={() => {}}>
+              <button
+                type="button"
+                className="tgTopTextBtn"
+                onClick={() => setMobileTopNotice(t("comingSoon"))}
+              >
                 {t("editShort") || t("edit")}
               </button>
               <div className="tgTopTitle">{t("navChats")}</div>
+              <button
+                type="button"
+                className="tgTopStoriesMini"
+                aria-label={t("stories") ?? "Stories"}
+                onClick={() => setMobileStoriesExpanded((v) => !v)}
+                title={t("stories") ?? "Stories"}
+              >
+                {chats.slice(0, 3).map((c) => {
+                  const label =
+                    c.type === "group" || c.type === "channel"
+                      ? c.title || t("groupChat")
+                      : c.type === "official"
+                        ? c.title || t("appTitle")
+                        : c.other?.username || "";
+                  const url =
+                    c.type === "group" || c.type === "channel"
+                      ? c.avatar
+                      : c.type === "official"
+                        ? ""
+                        : c.other?.avatar;
+                  return (
+                    <span key={`mini-story-${c.id}`} className="tgTopStoriesMiniAvatar" aria-hidden>
+                      {url ? <img src={url} alt="" /> : <span>{String(label || "?").slice(0, 1).toUpperCase()}</span>}
+                    </span>
+                  );
+                })}
+              </button>
               <div className="tgTopActions">
-                <button type="button" className="tgTopIconBtn" aria-label={t("select") ?? "Select"} onClick={() => {}}>
+                <button
+                  type="button"
+                  className="tgTopIconBtn"
+                  aria-label={t("select") ?? "Select"}
+                  onClick={() => setMobileTopNotice(t("comingSoon"))}
+                >
                   <span className="tgTopCheck" aria-hidden>
                     ✓
                   </span>
@@ -2412,7 +2451,13 @@ export default function App() {
                 </button>
               </div>
             </header>
-            <Sidebar ref={mobileInboxSidebarRef} {...sidebarProps} mobileLayout />
+            <Sidebar
+              ref={mobileInboxSidebarRef}
+              {...sidebarProps}
+              mobileLayout
+              mobileStoriesExpanded={mobileStoriesExpanded}
+              onMobileStoriesExpandedChange={setMobileStoriesExpanded}
+            />
           </div>
         ) : null}
 
@@ -2586,6 +2631,21 @@ export default function App() {
           desktopShell
         )}
       </div>
+      {mobileTopNotice ? (
+        <div className="modalBackdrop modalBackdrop--app" role="dialog" aria-modal="true">
+          <div className="modalCard modalCard--mobileFriendly" style={{ maxWidth: 420, width: "min(420px, calc(100vw - 24px))" }}>
+            <div className="modalHeader">
+              <div className="modalTitle">{t("info") ?? "Info"}</div>
+              <button type="button" className="iconCloseBtn" onClick={() => setMobileTopNotice("")} aria-label={t("close")}>
+                ×
+              </button>
+            </div>
+            <div className="modalBody">
+              <div className="muted">{mobileTopNotice}</div>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {callOverlay}
       {desktopCallsOpen && !isMobile ? (
         <div className="modalBackdrop modalBackdrop--app" role="dialog" aria-modal="true">

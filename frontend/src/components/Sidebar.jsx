@@ -12,6 +12,49 @@ import { IconEllipsis, IconSearch } from "./Icons.jsx";
 import { XASMA_LOGO_SRC } from "../branding.js";
 import { readMessageDraft } from "../messageDrafts.js";
 
+function MobileChatListScroll({ className, onScroll, onDoublePullDown, children }) {
+  const rootRef = useRef(null);
+  const pullRef = useRef({ y0: 0, t0: 0, lastPullAt: 0, pullCount: 0, armed: false });
+
+  const onTouchStart = useCallback((e) => {
+    const el = rootRef.current;
+    if (!el) return;
+    if (el.scrollTop > 0) return;
+    const t = e.touches?.[0];
+    if (!t) return;
+    pullRef.current = { y0: t.clientY, t0: Date.now(), lastPullAt: pullRef.current.lastPullAt, pullCount: pullRef.current.pullCount, armed: true };
+  }, []);
+
+  const onTouchEnd = useCallback(
+    (e) => {
+      const el = rootRef.current;
+      const st = el ? el.scrollTop : 0;
+      const t = e.changedTouches?.[0];
+      const cur = pullRef.current;
+      if (!cur.armed || !t) return;
+      cur.armed = false;
+      if (st > 0) return;
+      const dy = t.clientY - cur.y0;
+      if (dy < 54) return;
+      const now = Date.now();
+      if (now - cur.lastPullAt < 900) cur.pullCount += 1;
+      else cur.pullCount = 1;
+      cur.lastPullAt = now;
+      if (cur.pullCount >= 2) {
+        cur.pullCount = 0;
+        onDoublePullDown?.();
+      }
+    },
+    [onDoublePullDown]
+  );
+
+  return (
+    <div ref={rootRef} className={className} onScroll={onScroll} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+      {children}
+    </div>
+  );
+}
+
 const Sidebar = forwardRef(function Sidebar(
   {
     chats,
@@ -25,6 +68,8 @@ const Sidebar = forwardRef(function Sidebar(
     t,
     lang,
     mobileLayout = false,
+    mobileStoriesExpanded = false,
+    onMobileStoriesExpandedChange,
   },
   ref
 ) {
@@ -58,6 +103,80 @@ const Sidebar = forwardRef(function Sidebar(
   const [swipeOpenId, setSwipeOpenId] = useState(null);
   const [swipeScrollNonce, setSwipeScrollNonce] = useState(0);
   const chatListScrollCloseRaf = useRef(null);
+
+  const [mobileFolderSelected, setMobileFolderSelected] = useState("all"); // "all" | "archive" | folderId
+  const [mobileFolders, setMobileFolders] = useState([]);
+  const [folderCreateOpen, setFolderCreateOpen] = useState(false);
+  const [folderCreateName, setFolderCreateName] = useState("");
+  const [chatActionId, setChatActionId] = useState(null);
+  const [chatMoveFolderId, setChatMoveFolderId] = useState("");
+  const [storyViewerOpen, setStoryViewerOpen] = useState(false);
+  const [storyViewerLabel, setStoryViewerLabel] = useState("");
+
+  const storyChats = chats.slice(0, 12);
+
+  const foldersStorageKey = "xasma.chatFolders.v1";
+  const chatFolderKey = (chatId) => `xasma.chatFolder.v1.${Number(chatId)}`;
+  const chatArchiveKey = (chatId) => `xasma.chatArchive.v1.${Number(chatId)}`;
+
+  function loadFolders() {
+    try {
+      const raw = localStorage.getItem(foldersStorageKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(parsed)) return parsed.filter((x) => x && typeof x.id === "string" && typeof x.name === "string");
+      return [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveFolders(next) {
+    setMobileFolders(next);
+    try {
+      localStorage.setItem(foldersStorageKey, JSON.stringify(next));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function getChatFolderId(chatId) {
+    try {
+      return localStorage.getItem(chatFolderKey(chatId)) || "";
+    } catch {
+      return "";
+    }
+  }
+
+  function setChatFolderId(chatId, folderId) {
+    try {
+      if (!folderId) localStorage.removeItem(chatFolderKey(chatId));
+      else localStorage.setItem(chatFolderKey(chatId), String(folderId));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function isChatArchived(chatId) {
+    try {
+      return localStorage.getItem(chatArchiveKey(chatId)) === "1";
+    } catch {
+      return false;
+    }
+  }
+
+  function setChatArchived(chatId, archived) {
+    try {
+      if (archived) localStorage.setItem(chatArchiveKey(chatId), "1");
+      else localStorage.removeItem(chatArchiveKey(chatId));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  useEffect(() => {
+    if (!mobileLayout) return;
+    setMobileFolders(loadFolders());
+  }, [mobileLayout]);
 
   const handleSwipePhase = useCallback((id, phase) => {
     if (phase === "lock") setSwipeOpenId(id);
@@ -596,53 +715,81 @@ const Sidebar = forwardRef(function Sidebar(
     ) : null;
 
   if (mobileLayout) {
-    const mobileChatsToShow = query.trim() ? mobileFilteredChats : chats;
-    const storyChats = chats.slice(0, 10);
+    const baseChats = query.trim() ? mobileFilteredChats : chats;
+    const mobileChatsToShow = baseChats.filter((c) => {
+      const archived = isChatArchived(c.id);
+      const folderId = getChatFolderId(c.id);
+      if (mobileFolderSelected === "archive") return archived;
+      if (archived) return false;
+      if (mobileFolderSelected === "all") return true;
+      return folderId === mobileFolderSelected;
+    });
+
+    const mobileFolderTabs = [
+      { id: "all", label: t("all") ?? "Все" },
+      { id: "archive", label: t("archive") ?? "Архив" },
+      ...mobileFolders.map((f) => ({ id: f.id, label: f.name })),
+    ];
+
+    const storyStrip = mobileStoriesExpanded ? (
+      <div className="tgStoriesStrip tgStoriesStrip--expanded" aria-label={t("stories") ?? "Stories"}>
+        <div className="tgStoriesScroll">
+          <button
+            type="button"
+            className="tgStoryItem tgStoryItem--me"
+            aria-label={t("myStory") ?? "My story"}
+            onClick={() => {
+              setStoryViewerLabel(t("myStory") ?? "Моя история");
+              setStoryViewerOpen(true);
+            }}
+          >
+            <span className="tgStoryAvatar">
+              <span className="tgStoryPlus" aria-hidden>
+                +
+              </span>
+            </span>
+            <span className="tgStoryLabel">{t("myStory") ?? "Моя история"}</span>
+          </button>
+          {storyChats.map((c) => {
+            const isGroup = c.type === "group";
+            const isChannel = c.type === "channel";
+            const isRoom = isGroup || isChannel;
+            const isOfficial = c.type === "official";
+            const other = c.other;
+            const label = isChannel
+              ? c.title || t("channelInfoTitle")
+              : isGroup
+                ? c.title || t("groupChat")
+                : isOfficial
+                  ? c.title || t("appTitle")
+                  : other?.username || "";
+            const avatarUrl = isRoom ? c.avatar : other?.avatar;
+
+            return (
+              <button
+                key={`story-${c.id}`}
+                type="button"
+                className="tgStoryItem"
+                onClick={() => {
+                  setStoryViewerLabel(label);
+                  setStoryViewerOpen(true);
+                }}
+                aria-label={label}
+              >
+                <span className="tgStoryAvatar">
+                  {avatarUrl ? <img src={avatarUrl} alt="" /> : <span className="tgStoryInitials">{initials(label)}</span>}
+                </span>
+                <span className="tgStoryLabel">{label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    ) : null;
 
     return (
       <>
-        <div className="tgStoriesStrip" aria-label={t("stories") ?? "Stories"}>
-          <div className="tgStoriesScroll">
-            <button type="button" className="tgStoryItem tgStoryItem--me" aria-label={t("myStory") ?? "My story"}>
-              <span className="tgStoryAvatar">
-                <span className="tgStoryPlus" aria-hidden>
-                  +
-                </span>
-              </span>
-              <span className="tgStoryLabel">{t("myStory") ?? "Моя история"}</span>
-            </button>
-            {storyChats.map((c) => {
-              const isGroup = c.type === "group";
-              const isChannel = c.type === "channel";
-              const isRoom = isGroup || isChannel;
-              const isOfficial = c.type === "official";
-              const other = c.other;
-              const label = isChannel
-                ? c.title || t("channelInfoTitle")
-                : isGroup
-                  ? c.title || t("groupChat")
-                  : isOfficial
-                    ? c.title || t("appTitle")
-                    : other?.username || "";
-              const avatarUrl = isRoom ? c.avatar : other?.avatar;
-
-              return (
-                <button
-                  key={`story-${c.id}`}
-                  type="button"
-                  className="tgStoryItem"
-                  onClick={() => onSelectChat?.(c.id)}
-                  aria-label={label}
-                >
-                  <span className="tgStoryAvatar">
-                    {avatarUrl ? <img src={avatarUrl} alt="" /> : <span className="tgStoryInitials">{initials(label)}</span>}
-                  </span>
-                  <span className="tgStoryLabel">{label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        {storyStrip}
 
         <div className="tgSearchWrap">
           <div className="tgSearchField">
@@ -662,32 +809,39 @@ const Sidebar = forwardRef(function Sidebar(
           </div>
         </div>
 
-        <div className="tgSegmented" role="tablist" aria-label={t("chatFolders") ?? "Folders"}>
-          <button type="button" className="tgSegBtn tgSegBtn--active" role="tab" aria-selected="true">
-            {t("all") ?? "Все"}
-          </button>
-          <button type="button" className="tgSegBtn" role="tab" aria-selected="false">
-            Telegram
-          </button>
-          <button type="button" className="tgSegBtn" role="tab" aria-selected="false">
-            A
-          </button>
+        <div className="tgFolderBar" role="tablist" aria-label={t("chatFolders") ?? "Folders"}>
+          <div className="tgFolderScroll">
+            {mobileFolderTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                className={tab.id === mobileFolderSelected ? "tgFolderPill tgFolderPill--active" : "tgFolderPill"}
+                role="tab"
+                aria-selected={tab.id === mobileFolderSelected}
+                onClick={() => setMobileFolderSelected(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="tgFolderAddBtn"
+              aria-label={t("addFolder") ?? "Add folder"}
+              onClick={() => {
+                setFolderCreateName("");
+                setFolderCreateOpen(true);
+              }}
+            >
+              +
+            </button>
+          </div>
         </div>
 
-        <button type="button" className="tgListRow tgArchiveRow" onClick={() => {}} aria-label={t("archive") ?? "Архив"}>
-          <span className="tgRowAvatar tgRowAvatar--archive" aria-hidden />
-          <span className="tgRowMain">
-            <span className="tgRowTitle">{t("archive") ?? "Архив"}</span>
-            <span className="tgRowSubtitle muted">{t("archivedChats")}</span>
-          </span>
-          <span className="tgRowRight">
-            <span className="tgRowBadge" aria-label={t("unreadBadgeAria").replace("{count}", "1")}>
-              1
-            </span>
-          </span>
-        </button>
-
-        <div className="mobileChatListScroll" onScroll={MOBILE_CHAT_SWIPE_ENABLED ? onMobileChatListScroll : undefined}>
+        <MobileChatListScroll
+          className="mobileChatListScroll"
+          onScroll={MOBILE_CHAT_SWIPE_ENABLED ? onMobileChatListScroll : undefined}
+          onDoublePullDown={() => onMobileStoriesExpandedChange?.(!mobileStoriesExpanded)}
+        >
           {canSearch && searching ? (
             <div className="mobileSearchStatus muted" role="status">
               {t("searching")}
@@ -797,13 +951,34 @@ const Sidebar = forwardRef(function Sidebar(
                   onSwipeActiveChange={handleSwipePhase}
                   t={t}
                 >
-                  {rowBody}
+                  <button
+                    type="button"
+                    className={rowClass}
+                    onClick={() => onSelectChat(c.id)}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setChatActionId(c.id);
+                      setChatMoveFolderId(getChatFolderId(c.id));
+                    }}
+                  >
+                    {rowBody}
+                  </button>
                 </MobileChatRowSwipe>
               );
             }
 
             return (
-              <button key={c.id} type="button" className={rowClass} onClick={() => onSelectChat(c.id)}>
+              <button
+                key={c.id}
+                type="button"
+                className={rowClass}
+                onClick={() => onSelectChat(c.id)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setChatActionId(c.id);
+                  setChatMoveFolderId(getChatFolderId(c.id));
+                }}
+              >
                 {rowBody}
               </button>
             );
@@ -838,10 +1013,137 @@ const Sidebar = forwardRef(function Sidebar(
           {canSearch && !searching && mobileFilteredChats.length === 0 && results.length === 0 ? (
             <div className="mobileChatListEmpty muted">{t("searchNoResults")}</div>
           ) : null}
-        </div>
+        </MobileChatListScroll>
         {groupModal}
         {channelModal}
         {deleteConfirmModal}
+        {folderCreateOpen ? (
+          <div className="modalBackdrop modalBackdrop--app" role="dialog" aria-modal="true">
+            <div className="modalCard modalCard--mobileFriendly" style={{ maxWidth: 420, width: "min(420px, calc(100vw - 24px))" }}>
+              <div className="modalHeader">
+                <div className="modalTitle">{t("addFolder") ?? "Add folder"}</div>
+                <button type="button" className="iconCloseBtn" onClick={() => setFolderCreateOpen(false)} aria-label={t("close")}>
+                  ×
+                </button>
+              </div>
+              <div className="modalBody">
+                <input
+                  className="searchInput"
+                  value={folderCreateName}
+                  onChange={(e) => setFolderCreateName(e.target.value)}
+                  placeholder={t("folderName") ?? "Folder name"}
+                  aria-label={t("folderName") ?? "Folder name"}
+                />
+                <div className="groupModalActions">
+                  <button type="button" className="ghostBtn" onClick={() => setFolderCreateOpen(false)}>
+                    {t("cancel") ?? t("close")}
+                  </button>
+                  <button
+                    type="button"
+                    className="primaryBtn"
+                    onClick={() => {
+                      const name = folderCreateName.trim();
+                      if (!name) return;
+                      const id = `f_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+                      saveFolders([...mobileFolders, { id, name }]);
+                      setMobileFolderSelected(id);
+                      setFolderCreateOpen(false);
+                    }}
+                  >
+                    {t("create") ?? "Create"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {chatActionId != null ? (
+          <div className="modalBackdrop modalBackdrop--app" role="dialog" aria-modal="true">
+            <div className="modalCard modalCard--mobileFriendly" style={{ maxWidth: 420, width: "min(420px, calc(100vw - 24px))" }}>
+              <div className="modalHeader">
+                <div className="modalTitle">{t("chatActions") ?? "Chat actions"}</div>
+                <button type="button" className="iconCloseBtn" onClick={() => setChatActionId(null)} aria-label={t("close")}>
+                  ×
+                </button>
+              </div>
+              <div className="modalBody">
+                <button
+                  type="button"
+                  className="settingsRow"
+                  onClick={() => {
+                    const cid = chatActionId;
+                    const next = !isChatArchived(cid);
+                    setChatArchived(cid, next);
+                    if (next) setMobileFolderSelected("archive");
+                    setChatActionId(null);
+                  }}
+                >
+                  <span className="settingsRowLeft">
+                    <span className="settingsRowLabel">{isChatArchived(chatActionId) ? (t("unarchive") ?? "Unarchive") : (t("archive") ?? "Archive")}</span>
+                  </span>
+                </button>
+
+                <div className="settingsSectionHeader">{t("moveToFolder") ?? "Move to folder"}</div>
+                <div className="settingsSection">
+                  <button
+                    type="button"
+                    className={chatMoveFolderId ? "settingsRow" : "settingsRow settingsRow--activeChoice"}
+                    onClick={() => setChatMoveFolderId("")}
+                  >
+                    <span className="settingsRowLeft">
+                      <span className="settingsRowLabel">{t("all") ?? "Все"}</span>
+                    </span>
+                  </button>
+                  {mobileFolders.map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      className={chatMoveFolderId === f.id ? "settingsRow settingsRow--activeChoice" : "settingsRow"}
+                      onClick={() => setChatMoveFolderId(f.id)}
+                    >
+                      <span className="settingsRowLeft">
+                        <span className="settingsRowLabel">{f.name}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <div className="groupModalActions">
+                  <button type="button" className="ghostBtn" onClick={() => setChatActionId(null)}>
+                    {t("cancel") ?? t("close")}
+                  </button>
+                  <button
+                    type="button"
+                    className="primaryBtn"
+                    onClick={() => {
+                      const cid = chatActionId;
+                      setChatFolderId(cid, chatMoveFolderId);
+                      setChatActionId(null);
+                    }}
+                  >
+                    {t("save") ?? "Save"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {storyViewerOpen ? (
+          <div className="modalBackdrop modalBackdrop--app" role="dialog" aria-modal="true">
+            <div className="modalCard modalCard--mobileFriendly" style={{ maxWidth: 520, width: "min(520px, calc(100vw - 24px))" }}>
+              <div className="modalHeader">
+                <div className="modalTitle">{storyViewerLabel}</div>
+                <button type="button" className="iconCloseBtn" onClick={() => setStoryViewerOpen(false)} aria-label={t("close")}>
+                  ×
+                </button>
+              </div>
+              <div className="modalBody">
+                <div className="muted">{t("storiesComingSoon") ?? t("comingSoon")}</div>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </>
     );
   }
