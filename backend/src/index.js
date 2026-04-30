@@ -1191,21 +1191,30 @@ app.post("/api/register", async (req, res) => {
 
 app.post("/api/login", async (req, res) => {
   const { email, password, username } = req.body || {};
-  const loginEmail = String(email || username || "").trim();
-  if (!loginEmail || !password) return res.status(400).json({ error: "email and password are required" });
+  const loginInput = String(email || username || "").trim();
+  if (!loginInput || !password) return res.status(400).json({ error: "email and password are required" });
 
-  const emailNorm = loginEmail.toLowerCase();
+  const looksLikeEmail = loginInput.includes("@");
+  const handleGuess = loginHandleNormalized(loginInput);
 
-  const r = await query(
-    `SELECT id, username, password_hash, avatar_url, role, banned, aura_color, messages_sent_count,
-            user_tag, tag_color, tag_style, username_style, avatar_ring, user_handle, created_at,
-            referral_code, invited_by, referrals_count,
-            has_custom_bg, has_badge, has_reactions, has_premium_lite,
-            is_premium, premium_activated_at, profile_bg_url,
-            premium_type, premium_expires_at, premium_granted_at
-     FROM users WHERE LOWER(email) = LOWER($1)`,
-    [emailNorm]
-  );
+  const sql = looksLikeEmail
+    ? `SELECT id, username, password_hash, avatar_url, role, banned, aura_color, messages_sent_count,
+              user_tag, tag_color, tag_style, username_style, avatar_ring, user_handle, created_at,
+              referral_code, invited_by, referrals_count,
+              has_custom_bg, has_badge, has_reactions, has_premium_lite,
+              is_premium, premium_activated_at, profile_bg_url,
+              premium_type, premium_expires_at, premium_granted_at
+       FROM users WHERE LOWER(email) = LOWER($1)`
+    : `SELECT id, username, password_hash, avatar_url, role, banned, aura_color, messages_sent_count,
+              user_tag, tag_color, tag_style, username_style, avatar_ring, user_handle, created_at,
+              referral_code, invited_by, referrals_count,
+              has_custom_bg, has_badge, has_reactions, has_premium_lite,
+              is_premium, premium_activated_at, profile_bg_url,
+              premium_type, premium_expires_at, premium_granted_at
+       FROM users WHERE username = $1 OR user_handle = $2`;
+
+  const params = looksLikeEmail ? [loginInput.toLowerCase()] : [loginInput, handleGuess];
+  const r = await query(sql, params);
   const user = r.rows[0];
   if (!user) return res.status(401).json({ error: "Invalid credentials" });
   if (user.banned) return res.status(403).json({ error: "Banned" });
