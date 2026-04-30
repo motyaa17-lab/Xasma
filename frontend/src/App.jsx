@@ -30,6 +30,8 @@ import {
   updateMyAvatar,
   updateMyProfile,
   updateMyEmail,
+  forwardMessage,
+  deleteMessage,
 } from "./api.js";
 import { getSocketEndpoint } from "./api.js";
 import {
@@ -1467,6 +1469,29 @@ export default function App() {
       );
     });
 
+    socket.on("message:deletedForAll", ({ chatId, messageId, deletedAt }) => {
+      const cid = Number(chatId);
+      const mid = Number(messageId);
+      if (!cid || !mid) return;
+      const openChatId = selectedChatIdRef.current;
+      if (openChatId && cid === openChatId) {
+        setMessages((prev) =>
+          prev.map((m) => (Number(m?.id) === mid ? { ...m, deletedForAll: true, deletedAt: deletedAt || null, text: "", imageUrl: null, audioUrl: null, videoUrl: null, replyTo: null, forwardFrom: null, editedAt: null } : m))
+        );
+      }
+      setChats((prev) =>
+        prev.map((c) => {
+          if (Number(c.id) !== cid) return c;
+          if (c.last && Number(c.last.id) === mid) {
+            const last = { ...c.last, text: t("messageDeleted"), id: mid };
+            return { ...c, last };
+          }
+          // If pinned message was deleted, keep pin but update preview on next refresh; safe no-op here.
+          return c;
+        })
+      );
+    });
+
     socket.on("chat:pinnedUpdated", ({ chatId, pinnedMessageId, pinnedPreview } = {}) => {
       const cid = Number(chatId);
       if (!cid) return;
@@ -2031,6 +2056,15 @@ export default function App() {
     );
   }
 
+  async function handleForwardMessage(messageId, toChatId) {
+    if (me?.banned) return;
+    const res = await forwardMessage(messageId, toChatId);
+    // Navigate to the destination chat (Telegram-like).
+    if (isMobile) setMobileTab("chats");
+    await selectChat(Number(toChatId));
+    return res;
+  }
+
   async function handleToggleReaction(messageId, emoji) {
     if (me?.banned) return;
     const mid = Number(messageId);
@@ -2044,6 +2078,16 @@ export default function App() {
     const mid = Number(messageId);
     await adminDeleteMessage(mid);
     setMessages((prev) => prev.filter((m) => Number(m.id) !== mid));
+  }
+
+  async function handleDeleteMessage(messageId, scope) {
+    if (me?.banned) return;
+    const s = scope === "both" ? "both" : "self";
+    await deleteMessage(messageId, { scope: s });
+    if (s === "self") {
+      // Hide locally; server will also hide on next fetch.
+      setMessages((prev) => prev.filter((m) => Number(m?.id) !== Number(messageId)));
+    }
   }
 
   async function handleLogin(data) {
@@ -2200,6 +2244,7 @@ export default function App() {
   const chatPropsBase = {
     chatId: selectedChatId,
     chat: chats.find((c) => c.id === selectedChatId) || null,
+    chats,
     otherTyping: Boolean(selectedChatId && typingUntil[selectedChatId] > Date.now()),
     messages,
     meId: me.id,
@@ -2210,6 +2255,8 @@ export default function App() {
     onSend: handleSend,
     onRetrySend: handleRetrySend,
     onEditMessage: handleEditMessage,
+    onForwardMessage: handleForwardMessage,
+    onDeleteMessage: handleDeleteMessage,
     onToggleReaction: handleToggleReaction,
     isAdmin: me.role === "admin",
     onAdminDeleteMessage: handleAdminDeleteMessage,

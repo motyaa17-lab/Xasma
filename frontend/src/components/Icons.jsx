@@ -94,3 +94,21 @@ export function IconEllipsis(props) {
   );
 }
 
+export function IconSearch(props) {
+  return (
+    <svg {...baseProps(props)} fill="none">
+      <path
+        d="M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16z"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+      <path
+        d="M21 21l-4.4-4.4"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+

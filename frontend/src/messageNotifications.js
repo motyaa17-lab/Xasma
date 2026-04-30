@@ -4,6 +4,7 @@
  */
 
 import { canDeliverMessageNotifications } from "./notifyPermissions.js";
+import { isChatMuted } from "./chatMute.js";
 
 export function notificationsSupported() {
   return typeof window !== "undefined" && typeof Notification !== "undefined";
@@ -53,6 +54,7 @@ export async function tryShowIncomingMessageNotification(msg, { meId, openChatId
     const body = buildMessageNotificationBody(msg, t);
     const chatId = Number(msg.chatId);
     if (!chatId) return;
+    if (isChatMuted(chatId)) return;
 
     const n = new Notification(title, {
       body,

@@ -2323,6 +2323,12 @@ body.body--mobileConversationOpen {
   background: rgba(255, 255, 255, 0.1);
 }
 
+.chatHeaderCallBtn--active {
+  border-color: rgba(59, 130, 246, 0.45);
+  background: rgba(37, 99, 235, 0.18);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.18), 0 0 12px rgba(0, 120, 255, 0.08);
+}
+
 .chatHeaderCallBtn:active {
   transform: scale(0.92);
 }
@@ -3069,6 +3075,15 @@ body.body--mobileConversationOpen {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 200px;
+}
+
+.chatDraftLabel {
+  color: rgba(96, 165, 250, 0.95);
+  font-weight: 900;
+}
+
+.chatLast--draft {
+  color: rgba(203, 213, 225, 0.92);
 }
 
 .avatarAuraOuter {
@@ -3947,6 +3962,10 @@ body.body--mobileConversationOpen {
   background: rgba(11, 18, 32, 0.5);
 }
 
+.replyComposerBar--edit {
+  border-left: 3px solid rgba(34, 197, 94, 0.75);
+}
+
 .replyComposerMain {
   min-width: 0;
   flex: 1;
@@ -4017,6 +4036,28 @@ body.body--mobileConversationOpen {
 }
 
 .replyBlockPreview {
+  margin-top: 2px;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.forwardBlock {
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border-left: 3px solid rgba(96, 165, 250, 0.7);
+  background: rgba(11, 18, 32, 0.22);
+}
+
+.forwardBlockTitle {
+  font-size: 12px;
+  font-weight: 900;
+  color: rgba(226, 232, 240, 0.94);
+}
+
+.forwardBlockPreview {
   margin-top: 2px;
   font-size: 12px;
   overflow: hidden;
@@ -4384,6 +4425,15 @@ body.body--mobileConversationOpen {
   font-weight: 900;
   letter-spacing: 0.5px;
   color: rgba(229, 231, 235, 0.85);
+}
+
+.bubbleChecks--delivered {
+  color: rgba(229, 231, 235, 0.82);
+}
+
+.bubbleChecks--read {
+  color: rgba(147, 197, 253, 0.95);
+  text-shadow: 0 0 10px rgba(59, 130, 246, 0.18);
 }
 
 .bubbleChecks--sending {
@@ -6156,6 +6206,53 @@ body.body--mobileConversationOpen {
   box-shadow: var(--glow-focus);
 }
 
+.mobileArchivedRow {
+  flex-shrink: 0;
+  margin: 2px 10px 8px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(11, 18, 32, 0.45);
+  color: rgba(226, 232, 240, 0.95);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobileArchivedRow:active {
+  background: rgba(24, 32, 52, 0.55);
+  border-color: rgba(148, 163, 184, 0.14);
+}
+
+.mobileArchivedIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(148, 163, 184, 0.95);
+  font-size: 14px;
+  flex: 0 0 auto;
+}
+
+.mobileArchivedLabel {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.mobileArchivedCount {
+  flex: 0 0 auto;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
 .mobileChatListScroll {
   flex: 1;
   min-height: 0;
@@ -6888,10 +6985,12 @@ body.body--mobileConversationOpen {
   align-items: stretch;
   justify-content: space-around;
   gap: 4px;
+  margin: 6px 10px 10px;
   padding: 6px 8px;
   padding-bottom: max(8px, env(safe-area-inset-bottom));
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(15, 23, 42, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.90);
   backdrop-filter: blur(12px);
 }
 

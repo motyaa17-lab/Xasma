@@ -854,25 +854,31 @@ function messageRowToApi(mr, reactions = []) {
       };
   const replyFromOfficial =
     botId && mr.reply_to_sender_id != null && Number(mr.reply_to_sender_id) === botId;
+  const forwardFromOfficial =
+    botId && mr.forward_from_sender_id != null && Number(mr.forward_from_sender_id) === botId;
+  const deletedForAll = Boolean(mr.deleted_for_all);
   return {
     id: Number(mr.id),
     chatId: Number(mr.chat_id),
     senderId: sid,
-    text: mr.text,
+    text: deletedForAll ? "" : mr.text,
     replyToMessageId: mr.reply_to_message_id != null ? Number(mr.reply_to_message_id) : null,
+    forwardFromMessageId: mr.forward_from_message_id != null ? Number(mr.forward_from_message_id) : null,
+    deletedForAll,
+    deletedAt: mr.deleted_at || null,
     deliveredAt: mr.delivered_at,
     readAt: mr.read_at,
-    editedAt: mr.edited_at,
+    editedAt: deletedForAll ? null : mr.edited_at,
     createdAt: mr.created_at,
     sender,
     type: msgType,
     systemKind: mr.system_kind || null,
     systemPayload: payload && typeof payload === "object" ? payload : null,
-    imageUrl: mr.image_url || null,
-    audioUrl: mr.audio_url || null,
-    videoUrl: mr.video_url || null,
+    imageUrl: deletedForAll ? null : mr.image_url || null,
+    audioUrl: deletedForAll ? null : mr.audio_url || null,
+    videoUrl: deletedForAll ? null : mr.video_url || null,
     replyTo:
-      mr.reply_to_message_id != null
+      !deletedForAll && mr.reply_to_message_id != null
         ? {
             id: Number(mr.reply_to_message_id),
             senderId: mr.reply_to_sender_id != null ? Number(mr.reply_to_sender_id) : null,
@@ -883,6 +889,18 @@ function messageRowToApi(mr, reactions = []) {
             videoUrl: mr.reply_to_video_url || null,
           }
         : null,
+    forwardFrom:
+      !deletedForAll && mr.forward_from_message_id != null
+        ? {
+            id: Number(mr.forward_from_message_id),
+            senderId: mr.forward_from_sender_id != null ? Number(mr.forward_from_sender_id) : null,
+            senderUsername: forwardFromOfficial ? "Xasma" : mr.forward_from_sender_username || "",
+            text: mr.forward_from_text || "",
+            imageUrl: mr.forward_from_image_url || null,
+            audioUrl: mr.forward_from_audio_url || null,
+            videoUrl: mr.forward_from_video_url || null,
+          }
+        : null,
     reactions,
   };
 }
@@ -890,7 +908,8 @@ function messageRowToApi(mr, reactions = []) {
 async function fetchMessageById(messageId) {
   const messageRow = await query(
     `
-      SELECT m.id, m.chat_id, m.sender_id, m.text, m.reply_to_message_id, m.delivered_at, m.read_at, m.edited_at, m.created_at,
+      SELECT m.id, m.chat_id, m.sender_id, m.text, m.reply_to_message_id, m.forward_from_message_id, m.deleted_for_all, m.deleted_at,
+             m.delivered_at, m.read_at, m.edited_at, m.created_at,
              m.message_type, m.system_kind, m.system_payload, m.image_url, m.audio_url, m.video_url,
              u.username, u.avatar_url, u.aura_color, u.messages_sent_count,
              u.user_tag, u.tag_color, u.tag_style,
@@ -902,11 +921,19 @@ async function fetchMessageById(messageId) {
              rm.text AS reply_to_text,
              rm.image_url AS reply_to_image_url,
              rm.audio_url AS reply_to_audio_url,
-             rm.video_url AS reply_to_video_url
+             rm.video_url AS reply_to_video_url,
+             fm.sender_id AS forward_from_sender_id,
+             fu.username AS forward_from_sender_username,
+             fm.text AS forward_from_text,
+             fm.image_url AS forward_from_image_url,
+             fm.audio_url AS forward_from_audio_url,
+             fm.video_url AS forward_from_video_url
       FROM messages m
       JOIN users u ON u.id = m.sender_id
       LEFT JOIN messages rm ON rm.id = m.reply_to_message_id
       LEFT JOIN users ru ON ru.id = rm.sender_id
+      LEFT JOIN messages fm ON fm.id = m.forward_from_message_id
+      LEFT JOIN users fu ON fu.id = fm.sender_id
       WHERE m.id = $1
     `,
     [messageId]
@@ -966,10 +993,10 @@ async function insertChatMessageAndBroadcast(
   const safety = scanOutgoingMessageText(text);
   const inserted = await query(
     `INSERT INTO messages (
-       chat_id, sender_id, text, message_type, image_url, audio_url, video_url, reply_to_message_id,
+       chat_id, sender_id, text, message_type, image_url, audio_url, video_url, reply_to_message_id, forward_from_message_id,
        flagged, risk_level, flagged_reason, flagged_at
      )
-     VALUES ($1, $2, $3, 'text', $4, $5, $6, $7, $8, $9, $10, CASE WHEN $8 THEN now() ELSE NULL END)
+     VALUES ($1, $2, $3, 'text', $4, $5, $6, $7, NULL, $8, $9, $10, CASE WHEN $8 THEN now() ELSE NULL END)
      RETURNING id`,
     [
       chatId,
@@ -1006,6 +1033,68 @@ async function insertChatMessageAndBroadcast(
     const payload = { chatId, updates: [{ id: message.id, deliveredAt, readAt: null }] };
     await emitToChatMemberSockets(chatId, "chat:message:status", payload);
   }
+  return message;
+}
+
+async function insertForwardedMessageAndBroadcast(toChatId, senderId, fromMessageId, clientTempId) {
+  const toChat = await getChatById(toChatId);
+  if (!toChat) return null;
+  if (toChat?.type === "official") {
+    const bot = getOfficialAnnounceUserId();
+    if (!bot || Number(senderId) !== Number(bot)) return null;
+  }
+  if (toChat?.type === "channel" && !(await canSenderPostToChannel(toChat, senderId))) {
+    return null;
+  }
+
+  const src = await query(
+    `
+    SELECT id, chat_id, sender_id, text, image_url, audio_url, video_url, message_type
+    FROM messages
+    WHERE id = $1
+  `,
+    [fromMessageId]
+  );
+  const srcRow = src.rows[0];
+  if (!srcRow) return null;
+  if ((srcRow.message_type || "text") !== "text") return null;
+
+  // Ensure the user has access to the source message and can post to destination.
+  if (!(await isUserChatMember(Number(srcRow.chat_id), Number(senderId)))) return null;
+  if (!(await isUserChatMember(Number(toChatId), Number(senderId)))) return null;
+
+  const text = String(srcRow.text || "").trim();
+  const img = srcRow.image_url || null;
+  const aud = srcRow.audio_url || null;
+  const vid = srcRow.video_url || null;
+  if (!text && !img && !aud && !vid) return null;
+
+  const safety = scanOutgoingMessageText(text);
+  const inserted = await query(
+    `INSERT INTO messages (
+       chat_id, sender_id, text, message_type, image_url, audio_url, video_url, reply_to_message_id, forward_from_message_id,
+       flagged, risk_level, flagged_reason, flagged_at
+     )
+     VALUES ($1, $2, $3, 'text', $4, $5, $6, NULL, $7, $8, $9, $10, CASE WHEN $8 THEN now() ELSE NULL END)
+     RETURNING id`,
+    [
+      toChatId,
+      senderId,
+      text,
+      img,
+      aud,
+      vid,
+      Number(fromMessageId),
+      Boolean(safety),
+      safety ? safety.riskLevel : null,
+      safety ? safety.flaggedReason : null,
+    ]
+  );
+  const insertedId = Number(inserted.rows[0].id);
+
+  const message = await fetchMessageById(insertedId);
+  if (clientTempId) message.clientTempId = String(clientTempId);
+  await emitToChatMemberSockets(toChatId, "chat:message", message);
   return message;
 }
 
@@ -2420,6 +2509,9 @@ app.get("/api/chats/:chatId/messages", authRequired, (req, res) => {
       m.sender_id,
       m.text,
       m.reply_to_message_id,
+      m.forward_from_message_id,
+      m.deleted_for_all,
+      m.deleted_at,
       m.delivered_at,
       m.read_at,
       m.edited_at,
@@ -2448,16 +2540,26 @@ app.get("/api/chats/:chatId/messages", authRequired, (req, res) => {
       rm.text AS reply_to_text,
       rm.image_url AS reply_to_image_url,
       rm.audio_url AS reply_to_audio_url,
-      rm.video_url AS reply_to_video_url
+      rm.video_url AS reply_to_video_url,
+      fm.sender_id AS forward_from_sender_id,
+      fu.username AS forward_from_sender_username,
+      fm.text AS forward_from_text,
+      fm.image_url AS forward_from_image_url,
+      fm.audio_url AS forward_from_audio_url,
+      fm.video_url AS forward_from_video_url
     FROM messages m
     JOIN users u ON u.id = m.sender_id
     LEFT JOIN messages rm ON rm.id = m.reply_to_message_id
     LEFT JOIN users ru ON ru.id = rm.sender_id
+    LEFT JOIN messages fm ON fm.id = m.forward_from_message_id
+    LEFT JOIN users fu ON fu.id = fm.sender_id
+    LEFT JOIN message_hidden mh ON mh.message_id = m.id AND mh.user_id = $3
     WHERE m.chat_id = $1
+      AND mh.message_id IS NULL
     ORDER BY m.created_at DESC, m.id DESC
     LIMIT $2
   `,
-    [chatId, limit]
+    [chatId, limit, uid]
   );
 
   // We fetch newest-first for performance; return oldest-first for rendering.
@@ -2473,6 +2575,77 @@ app.get("/api/chats/:chatId/messages", authRequired, (req, res) => {
       messageRowToApi(m, reactionsByMessageId.get(Number(m.id)) || [])
     ),
   });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
+app.get("/api/chats/:chatId/messages/search", authRequired, (req, res) => {
+  const chatId = Number(req.params.chatId);
+  const q = typeof req.query?.q === "string" ? String(req.query.q).trim() : "";
+  const limit = Math.min(parseInt(String(req.query.limit || "30"), 10), 100);
+  if (!chatId) return res.status(400).json({ error: "Invalid chat id" });
+  if (!q) return res.status(400).json({ error: "q is required" });
+
+  (async () => {
+    const uid = Number(req.user.id);
+    const chat = await getChatById(chatId);
+    if (!chat) return res.status(404).json({ error: "Chat not found" });
+    if (!(await isUserChatMember(chatId, uid))) return res.status(403).json({ error: "Not a member of this chat" });
+
+    const r = await query(
+      `
+      SELECT m.id, m.text, m.created_at, m.deleted_for_all, u.username
+      FROM messages m
+      JOIN users u ON u.id = m.sender_id
+      LEFT JOIN message_hidden mh ON mh.message_id = m.id AND mh.user_id = $4
+      WHERE m.chat_id = $1
+        AND mh.message_id IS NULL
+        AND COALESCE(m.message_type, 'text') = 'text'
+        AND m.deleted_for_all = FALSE
+        AND m.text ILIKE $2 ESCAPE '\\'
+      ORDER BY m.created_at DESC, m.id DESC
+      LIMIT $3
+    `,
+      [chatId, `%${q.replace(/[%_\\]/g, "\\$&")}%`, limit, uid]
+    );
+
+    return res.json({
+      results: r.rows.map((row) => ({
+        id: Number(row.id),
+        text: row.text || "",
+        createdAt: row.created_at,
+        senderUsername: row.username || "",
+      })),
+    });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
+app.post("/api/messages/:messageId/forward", authRequired, (req, res) => {
+  const fromMessageId = Number(req.params.messageId);
+  const toChatId = Number(req.body?.toChatId);
+  if (!fromMessageId || !toChatId) return res.status(400).json({ error: "Invalid request" });
+
+  (async () => {
+    const uid = Number(req.user.id);
+    const chat = await getChatById(toChatId);
+    if (!chat) return res.status(404).json({ error: "Chat not found" });
+    if (!(await isUserChatMember(toChatId, uid))) return res.status(403).json({ error: "Not a member of this chat" });
+    if (chat.type === "channel" && !(await canSenderPostToChannel(chat, uid))) {
+      return res.status(403).json({ error: "Only the channel owner or an admin can post messages" });
+    }
+
+    const rate = checkSendRateLimit(uid);
+    if (!rate.allowed) {
+      const ra = Math.max(1, Math.ceil(rate.retryAfterMs / 1000));
+      res.setHeader("Retry-After", String(ra));
+      return res.status(429).json({
+        error: "Too many messages. Try again in a few seconds.",
+        retryAfterMs: Math.ceil(rate.retryAfterMs),
+      });
+    }
+
+    const message = await insertForwardedMessageAndBroadcast(toChatId, uid, fromMessageId);
+    if (!message) return res.status(400).json({ error: "Invalid message" });
+    return res.json({ message });
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });
 
@@ -2625,7 +2798,7 @@ app.put("/api/messages/:messageId", authRequired, (req, res) => {
 
     const messageRow = await query(
       `
-      SELECT m.id, m.chat_id, m.sender_id, m.text, m.delivered_at, m.read_at, m.edited_at, m.created_at,
+      SELECT m.id, m.chat_id, m.sender_id, m.text, m.deleted_for_all, m.deleted_at, m.delivered_at, m.read_at, m.edited_at, m.created_at,
              m.message_type, m.system_kind, m.system_payload, m.image_url, m.audio_url, m.video_url,
              u.username, u.avatar_url, u.aura_color, u.messages_sent_count,
              u.user_tag, u.tag_color, u.tag_style,
@@ -2646,6 +2819,71 @@ app.put("/api/messages/:messageId", authRequired, (req, res) => {
     await emitToChatMemberSockets(cid, "message:edited", { chatId: cid, message });
 
     return res.json({ message });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
+app.delete("/api/messages/:messageId", authRequired, (req, res) => {
+  const messageId = Number(req.params.messageId);
+  const scopeRaw = String(req.query?.scope || req.body?.scope || "").trim().toLowerCase();
+  const scope = scopeRaw === "both" || scopeRaw === "self" ? scopeRaw : "";
+  if (!messageId) return res.status(400).json({ error: "Invalid message id" });
+  if (!scope) return res.status(400).json({ error: "scope is required (self|both)" });
+
+  (async () => {
+    const uid = Number(req.user.id);
+    const msgR = await query(
+      `SELECT id, chat_id, sender_id, message_type, deleted_for_all FROM messages WHERE id = $1`,
+      [messageId]
+    );
+    const msg = msgR.rows[0];
+    if (!msg) return res.status(404).json({ error: "Message not found" });
+    if ((msg.message_type || "text") === "system") return res.status(403).json({ error: "Not allowed" });
+
+    const cid = Number(msg.chat_id);
+    const chat = await getChatById(cid);
+    if (!chat) return res.status(404).json({ error: "Chat not found" });
+    if (!(await isUserChatMember(cid, uid))) return res.status(403).json({ error: "Not a member of this chat" });
+
+    if (scope === "self") {
+      // Hide only for the current user (Telegram-like "Delete for me").
+      await query(
+        `INSERT INTO message_hidden (user_id, message_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+        [uid, messageId]
+      );
+      return res.json({ ok: true });
+    }
+
+    // scope=both: only author (or admin), only in 1:1 chats.
+    const isAdmin = String(req.user?.role || "") === "admin";
+    if (!isAdmin && Number(msg.sender_id) !== uid) return res.status(403).json({ error: "Not allowed" });
+    if (chat.type !== "direct") return res.status(403).json({ error: "Delete for both is only available in 1:1 chats" });
+    if (msg.deleted_for_all) return res.json({ ok: true });
+
+    await query(
+      `
+      UPDATE messages
+      SET deleted_for_all = TRUE,
+          deleted_at = now(),
+          text = '',
+          image_url = NULL,
+          audio_url = NULL,
+          video_url = NULL,
+          reply_to_message_id = NULL,
+          forward_from_message_id = NULL,
+          edited_at = NULL
+      WHERE id = $1
+    `,
+      [messageId]
+    );
+    await query(`DELETE FROM message_reactions WHERE message_id = $1`, [messageId]);
+
+    await emitToChatMemberSockets(cid, "message:deletedForAll", {
+      chatId: cid,
+      messageId,
+      deletedAt: new Date().toISOString(),
+    });
+
+    return res.json({ ok: true });
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });
 

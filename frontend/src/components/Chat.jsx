@@ -1,6 +1,13 @@
 import React, { forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { uploadChatImage, uploadChatAudio, uploadChatVideo, getApiBase, reportMessage } from "../api.js";
+import {
+  uploadChatImage,
+  uploadChatAudio,
+  uploadChatVideo,
+  getApiBase,
+  reportMessage,
+  searchChatMessages,
+} from "../api.js";
 import AvatarAura from "./AvatarAura.jsx";
 import GroupInfoModal from "./GroupInfoModal.jsx";
 import VoiceMessagePlayer from "./VoiceMessagePlayer.jsx";
@@ -9,13 +16,14 @@ import UserProfileModal from "./UserProfileModal.jsx";
 import ActivityBadge from "./ActivityBadge.jsx";
 import UserTagBadge from "./UserTagBadge.jsx";
 import { isPremiumActive } from "../premium.js";
-import { IconEllipsis, IconPhone } from "./Icons.jsx";
+import { IconEllipsis, IconPhone, IconSearch } from "./Icons.jsx";
 import { localeForLang } from "../i18n.js";
 import { formatUserStatusLine } from "../userStatusLine.js";
 import { XASMA_LOGO_SRC } from "../branding.js";
 import { readMessageDraft, writeMessageDraft, clearMessageDraft } from "../messageDrafts.js";
 import { avatarRingWrapClass, usernameDisplayClass } from "../userPersonalization.js";
 import { formatAtUserHandle } from "../userHandleDisplay.js";
+import { isChatMuted, setChatMuted } from "../chatMute.js";
 
 const MAX_VIDEO_NOTE_SEC = 60;
 const QUICK_REACTION_EMOJIS = ["❤️", "👍", "😂", "😮", "😢", "🔥"];
@@ -43,6 +51,9 @@ const MessageActionMenuPanel = forwardRef(function MessageActionMenuPanel(
     canQuickReact,
     hasSecondaryActions,
     canEditOwn,
+    canForward,
+    canDeleteOwn,
+    canDeleteForAll,
     canReport,
     canAdminDelete,
     canPin,
@@ -51,6 +62,9 @@ const MessageActionMenuPanel = forwardRef(function MessageActionMenuPanel(
     style,
     onToggleReaction,
     onEdit,
+    onForward,
+    onDeleteSelf,
+    onDeleteForAll,
     onReport,
     onAdminDelete,
     onPin,
@@ -106,6 +120,54 @@ const MessageActionMenuPanel = forwardRef(function MessageActionMenuPanel(
           }}
         >
           {t("replyToMessage")}
+        </button>
+      ) : null}
+      {canForward ? (
+        <button
+          type="button"
+          className="msgMenuItem"
+          role="menuitem"
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            closeMenu();
+            onForward?.();
+          }}
+        >
+          {t("forward")}
+        </button>
+      ) : null}
+      {canDeleteForAll ? (
+        <button
+          type="button"
+          className="msgMenuItem msgMenuItem--danger"
+          role="menuitem"
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            closeMenu();
+            onDeleteForAll?.();
+          }}
+        >
+          {t("deleteForBoth")}
+        </button>
+      ) : null}
+      {canDeleteOwn ? (
+        <button
+          type="button"
+          className="msgMenuItem msgMenuItem--danger"
+          role="menuitem"
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            closeMenu();
+            onDeleteSelf?.();
+          }}
+        >
+          {t("delete")}
         </button>
       ) : null}
       {canEditOwn ? (
@@ -303,6 +365,7 @@ function computeDesktopMessageMenuPlacement(anchorEl, menuEl, messagesEl, compos
 export default function Chat({
   chatId,
   chat,
+  chats = [],
   otherTyping,
   messages,
   meId,
@@ -315,6 +378,8 @@ export default function Chat({
   onStartCall,
   callUiBlocked = false,
   onEditMessage,
+  onForwardMessage,
+  onDeleteMessage,
   onToggleReaction,
   isAdmin,
   onAdminDeleteMessage,
@@ -419,6 +484,20 @@ export default function Chat({
   const [menuMessageId, setMenuMessageId] = useState(null);
   const [reportTargetMessage, setReportTargetMessage] = useState(null);
   const [reportBusy, setReportBusy] = useState(false);
+  const [forwardTargetMessage, setForwardTargetMessage] = useState(null);
+  const [forwardBusy, setForwardBusy] = useState(false);
+  const [forwardError, setForwardError] = useState("");
+  const [forwardQuery, setForwardQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQ, setSearchQ] = useState("");
+  const [searchBusy, setSearchBusy] = useState(false);
+  const [searchError, setSearchError] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [chatMuted, setChatMutedUi] = useState(false);
+
+  useEffect(() => {
+    setChatMutedUi(isChatMuted(chatId));
+  }, [chatId]);
   const [reportFeedback, setReportFeedback] = useState("");
   const [enteringMessageIds, setEnteringMessageIds] = useState(() => new Set());
   const [chatOpening, setChatOpening] = useState(false);
@@ -674,22 +753,33 @@ export default function Chat({
       (m.senderId === meId && (!isBanned || isAdmin)) ||
       (m.senderId !== meId && (isAdmin || !isBanned));
     if (!showMessageMenu) return null;
-    const canEditOwn = m.senderId === meId && !isBanned;
+    const canEditOwn = m.senderId === meId && !isBanned && !m.deletedForAll;
+    const canDeleteOwn = m.senderId === meId && (!isBanned || isAdmin) && !m.deletedForAll;
+    const canDeleteForAll =
+      m.senderId === meId &&
+      (!isBanned || isAdmin) &&
+      !m.deletedForAll &&
+      chat?.type === "direct";
     const canAdminDelete = Boolean(isAdmin);
     const canReport =
       !isOfficial && !isBanned && m.senderId !== meId && (m.type || "text") !== "system";
-    const canPin = canPinForUser && (m.type || "text") !== "system";
-    const canReply = showMessageMenu && (m.type || "text") !== "system";
+    const canPin = canPinForUser && (m.type || "text") !== "system" && !m.deletedForAll;
+    const canReply = showMessageMenu && (m.type || "text") !== "system" && !m.deletedForAll;
+    const canForward = showMessageMenu && (m.type || "text") !== "system" && !m.deletedForAll;
     return {
       canQuickReact: !isBanned,
       canEditOwn,
+      canForward,
+      canDeleteOwn,
+      canDeleteForAll,
       canReport,
       canAdminDelete,
       canPin,
       canReply,
-      hasSecondaryActions: canReply || canEditOwn || canReport || canAdminDelete || canPin,
+      hasSecondaryActions:
+        canReply || canEditOwn || canForward || canDeleteOwn || canDeleteForAll || canReport || canAdminDelete || canPin,
     };
-  }, [mobileMenuTarget, meId, isBanned, isAdmin, isOfficial, canPinForUser]);
+  }, [mobileMenuTarget, meId, isBanned, isAdmin, isOfficial, canPinForUser, chat?.type]);
 
   const clearBubbleLongPress = useCallback(() => {
     if (longPressTimerRef.current != null) {
@@ -2170,6 +2260,35 @@ export default function Chat({
     }, 1200);
   }
 
+  useEffect(() => {
+    if (!searchOpen) return;
+    const cid = Number(chatId || 0);
+    if (!cid) return;
+    const q = String(searchQ || "").trim();
+    if (!q) {
+      setSearchResults([]);
+      setSearchError("");
+      return;
+    }
+    let cancelled = false;
+    setSearchBusy(true);
+    setSearchError("");
+    const tmo = window.setTimeout(async () => {
+      try {
+        const res = await searchChatMessages(cid, q, 30);
+        if (!cancelled) setSearchResults(res);
+      } catch (e) {
+        if (!cancelled) setSearchError(e.message || t("errorGeneric"));
+      } finally {
+        if (!cancelled) setSearchBusy(false);
+      }
+    }, 220);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(tmo);
+    };
+  }, [searchOpen, searchQ, chatId, t]);
+
   const trimmedComposerText = String(text ?? "").trim();
   const composerHasText = trimmedComposerText.length > 0;
   const composerHasMedia = Boolean(pendingImageUrl) && !editingMessageId;
@@ -2426,6 +2545,41 @@ export default function Chat({
                 </span>
               </button>
             ) : null}
+            {chatId ? (
+              <button
+                type="button"
+                className="chatHeaderCallBtn"
+                onClick={() => {
+                  setSearchError("");
+                  setSearchQ("");
+                  setSearchResults([]);
+                  setSearchOpen(true);
+                }}
+                aria-label={t("searchInChat")}
+                title={t("searchInChat")}
+              >
+                <span className="chatHeaderCallIcon" aria-hidden>
+                  <IconSearch size={18} />
+                </span>
+              </button>
+            ) : null}
+            {chatId && !isOfficial ? (
+              <button
+                type="button"
+                className={chatMuted ? "chatHeaderCallBtn chatHeaderCallBtn--active" : "chatHeaderCallBtn"}
+                onClick={() => {
+                  const next = !chatMuted;
+                  setChatMuted(chatId, next);
+                  setChatMutedUi(next);
+                }}
+                aria-label={chatMuted ? t("unmuteChat") : t("muteChat")}
+                title={chatMuted ? t("unmuteChat") : t("muteChat")}
+              >
+                <span className="chatHeaderCallIcon" aria-hidden>
+                  {chatMuted ? "🔇" : "🔔"}
+                </span>
+              </button>
+            ) : null}
             {isRoom ? (
               <button
                 type="button"
@@ -2438,6 +2592,79 @@ export default function Chat({
               </button>
             ) : null}
           </div>
+
+          {searchOpen && typeof document !== "undefined"
+            ? createPortal(
+                <div
+                  className="reportModalOverlay"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="searchModalTitle"
+                  onMouseDown={(e) => {
+                    if (e.target === e.currentTarget && !searchBusy) setSearchOpen(false);
+                  }}
+                  onTouchStart={(e) => {
+                    if (e.target === e.currentTarget && !searchBusy) setSearchOpen(false);
+                  }}
+                >
+                  <div
+                    className="reportModal"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div id="searchModalTitle" className="reportModalTitle">
+                      {t("searchInChat")}
+                    </div>
+                    {searchError ? <div className="authError">{searchError}</div> : null}
+                    <input
+                      className="searchInput"
+                      value={searchQ}
+                      onChange={(e) => setSearchQ(e.target.value)}
+                      placeholder={t("searchUnifiedPlaceholder")}
+                      autoFocus
+                    />
+                    {searchBusy ? <div className="muted small" style={{ marginTop: 10 }}>{t("searching")}</div> : null}
+                    <div className="searchResults" style={{ marginTop: 10, maxHeight: "50vh", overflow: "auto" }}>
+                      {searchResults.map((r) => (
+                        <button
+                          key={r.id}
+                          type="button"
+                          className="searchResult"
+                          onClick={() => {
+                            setSearchOpen(false);
+                            scrollToMessageById(Number(r.id));
+                          }}
+                        >
+                          <div className="searchResultMain">
+                            <div className="searchResultTextCol">
+                              <div className="searchUser">{r.senderUsername || t("notifyUnknownSender")}</div>
+                              <div className="muted small">
+                                {String(r.text || "").replace(/\s+/g, " ").trim()}
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                      {!searchBusy && !searchError && String(searchQ || "").trim() && searchResults.length === 0 ? (
+                        <div className="muted small" style={{ padding: "8px 4px" }}>
+                          {t("searchNoResults")}
+                        </div>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      className="ghostBtn"
+                      disabled={searchBusy}
+                      onClick={() => setSearchOpen(false)}
+                      style={{ width: "100%", marginTop: 10 }}
+                    >
+                      {t("close")}
+                    </button>
+                  </div>
+                </div>,
+                document.body
+              )
+            : null}
 
           {chat?.pinnedMessageId ? (
             <div className="chatPinnedBar">
@@ -2736,6 +2963,22 @@ export default function Chat({
                         soundOnLabel={t("videoSoundOn")}
                       />
                     ) : null}
+                    {m.forwardFrom ? (
+                      <div className="forwardBlock">
+                        <div className="forwardBlockTitle">
+                          {t("forwardedFrom").replace("{name}", m.forwardFrom.senderUsername || t("notifyUnknownSender"))}
+                        </div>
+                        <div className="forwardBlockPreview muted">
+                          {m.forwardFrom.imageUrl
+                            ? t("notifyPreviewPhoto")
+                            : m.forwardFrom.audioUrl
+                              ? t("notifyPreviewVoice")
+                              : m.forwardFrom.videoUrl
+                                ? t("notifyPreviewVideo")
+                                : String(m.forwardFrom.text || "").replace(/\s+/g, " ").trim() || t("notifyBodyFallback")}
+                        </div>
+                      </div>
+                    ) : null}
                     {m.audioUrl ? (
                       <VoiceMessagePlayer
                         src={messageMediaAbsUrl(m.audioUrl)}
@@ -2754,6 +2997,10 @@ export default function Chat({
                           <span className="bubbleEdited"> {t("edited")}</span>
                         ) : null}
                       </div>
+                    ) : m.deletedForAll ? (
+                      <div className="bubbleText bubbleTextMetaOnly">
+                        <span className="bubbleEdited">{t("messageDeleted")}</span>
+                      </div>
                     ) : m.editedAt ? (
                       <div className="bubbleText bubbleTextMetaOnly">
                         <span className="bubbleEdited">{t("edited")}</span>
@@ -2768,7 +3015,11 @@ export default function Chat({
                               ? "bubbleChecks bubbleChecks--failed"
                               : m.localStatus === "sending"
                                 ? "bubbleChecks bubbleChecks--sending"
-                                : "bubbleChecks"
+                                : m.readAt
+                                  ? "bubbleChecks bubbleChecks--read"
+                                  : m.deliveredAt
+                                    ? "bubbleChecks bubbleChecks--delivered"
+                                    : "bubbleChecks"
                           }
                           title={checksTitle(m, t)}
                         >
@@ -2859,6 +3110,34 @@ export default function Chat({
             {imageUploading ? <div className="uploadProgressHint">{t("uploadImageProgress")}</div> : null}
             {voiceUploading ? <div className="uploadProgressHint">{t("voiceSending")}</div> : null}
             {videoNoteUploading ? <div className="uploadProgressHint">{t("videoNoteUploading")}</div> : null}
+            {editingMessageId ? (
+              <div className="replyComposerBar replyComposerBar--edit" role="group" aria-label={t("editingLabel")}>
+                <div className="replyComposerMain">
+                  <div className="replyComposerLabel">{t("editingLabel")}</div>
+                  <div className="replyComposerLine">
+                    <span className="replyComposerSender">{t("editingMessage")}</span>
+                    <span className="replyComposerPreview muted">
+                      {(() => {
+                        const m = safeMessages.find((x) => Number(x?.id) === Number(editingMessageId));
+                        if (!m) return "";
+                        return getReplyPreviewForMessage(m);
+                      })()}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="replyComposerClose"
+                  aria-label={t("cancelEdit")}
+                  onClick={() => {
+                    setEditingMessageId(null);
+                    setText(readMessageDraft(chatId) || "");
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            ) : null}
             {replyToMessage ? (
               <div className="replyComposerBar" role="group" aria-label={t("replyTo")}>
                 <div className="replyComposerMain">
@@ -3182,7 +3461,10 @@ export default function Chat({
                     canQuickReact={mobileMenuFlags.canQuickReact}
                     hasSecondaryActions={mobileMenuFlags.hasSecondaryActions}
                     canReply={mobileMenuFlags.canReply}
+                    canForward={mobileMenuFlags.canForward}
                     canEditOwn={mobileMenuFlags.canEditOwn}
+                    canDeleteOwn={mobileMenuFlags.canDeleteOwn}
+                    canDeleteForAll={mobileMenuFlags.canDeleteForAll}
                     canReport={mobileMenuFlags.canReport}
                     canAdminDelete={mobileMenuFlags.canAdminDelete}
                     canPin={mobileMenuFlags.canPin}
@@ -3224,11 +3506,109 @@ export default function Chat({
                       setText(String(mobileMenuTarget.text ?? ""));
                       onTyping?.(false);
                     }}
+                    onForward={() => {
+                      setForwardError("");
+                      setForwardQuery("");
+                      setForwardTargetMessage(mobileMenuTarget);
+                    }}
+                    onDeleteSelf={() => onDeleteMessage?.(mobileMenuTarget.id, "self")}
+                    onDeleteForAll={() => onDeleteMessage?.(mobileMenuTarget.id, "both")}
                     onReport={() => setReportTargetMessage(mobileMenuTarget)}
                     onAdminDelete={() => onAdminDeleteMessage?.(mobileMenuTarget.id)}
                     onPin={() => onSetChatPin?.(mobileMenuTarget.id)}
                     closeMenu={() => setMenuMessageId(null)}
                   />,
+                  document.body
+                )
+              : null}
+            {forwardTargetMessage && typeof document !== "undefined"
+              ? createPortal(
+                  <div
+                    className="reportModalOverlay"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="forwardModalTitle"
+                    onMouseDown={(e) => {
+                      if (e.target === e.currentTarget && !forwardBusy) setForwardTargetMessage(null);
+                    }}
+                    onTouchStart={(e) => {
+                      if (e.target === e.currentTarget && !forwardBusy) setForwardTargetMessage(null);
+                    }}
+                  >
+                    <div
+                      className="reportModal"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div id="forwardModalTitle" className="reportModalTitle">
+                        {t("forwardTo")}
+                      </div>
+                      {forwardError ? <div className="authError">{forwardError}</div> : null}
+                      <input
+                        className="searchInput"
+                        value={forwardQuery}
+                        onChange={(e) => setForwardQuery(e.target.value)}
+                        placeholder={t("searchChatsPlaceholder")}
+                        disabled={forwardBusy}
+                      />
+                      <div className="reportModalReasons" style={{ marginTop: 10 }}>
+                        {(() => {
+                          const q = String(forwardQuery || "").trim().toLowerCase();
+                          const list = Array.isArray(chats) ? chats : [];
+                          const filtered = q
+                            ? list.filter((c) => {
+                                const label =
+                                  c.type === "group" || c.type === "channel"
+                                    ? String(c.title || "")
+                                    : c.type === "official"
+                                      ? String(c.title || c.other?.username || "")
+                                      : String(c.other?.username || "");
+                                return label.toLowerCase().includes(q);
+                              })
+                            : list;
+                          return filtered.slice(0, 50).map((c) => {
+                            const label =
+                              c.type === "group" || c.type === "channel"
+                                ? String(c.title || "")
+                                : c.type === "official"
+                                  ? String(c.title || c.other?.username || "")
+                                  : String(c.other?.username || "");
+                            return (
+                              <button
+                                key={c.id}
+                                type="button"
+                                className="reportModalReasonBtn"
+                                disabled={forwardBusy}
+                                onClick={async () => {
+                                  try {
+                                    setForwardBusy(true);
+                                    setForwardError("");
+                                    await onForwardMessage?.(forwardTargetMessage.id, Number(c.id));
+                                    setForwardTargetMessage(null);
+                                  } catch (e) {
+                                    setForwardError(e.message || t("errorGeneric"));
+                                  } finally {
+                                    setForwardBusy(false);
+                                  }
+                                }}
+                              >
+                                {label || t("chats")}
+                              </button>
+                            );
+                          });
+                        })()}
+                      </div>
+                      <button
+                        type="button"
+                        className="ghostBtn"
+                        disabled={forwardBusy}
+                        onClick={() => setForwardTargetMessage(null)}
+                        style={{ width: "100%", marginTop: 10 }}
+                      >
+                        {t("cancel")}
+                      </button>
+                    </div>
+                  </div>,
                   document.body
                 )
               : null}

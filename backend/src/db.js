@@ -58,10 +58,20 @@ async function initDb() {
       sender_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       text TEXT NOT NULL,
       reply_to_message_id BIGINT,
+      forward_from_message_id BIGINT,
+      deleted_for_all BOOLEAN NOT NULL DEFAULT FALSE,
+      deleted_at TIMESTAMPTZ,
       delivered_at TIMESTAMPTZ,
       read_at TIMESTAMPTZ,
       edited_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS message_hidden (
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      message_id BIGINT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, message_id)
     );
 
     CREATE TABLE IF NOT EXISTS message_reactions (
@@ -87,7 +97,22 @@ async function initDb() {
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS about TEXT`);
 
   await query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to_message_id BIGINT`);
+  await query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS forward_from_message_id BIGINT`);
+  await query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS deleted_for_all BOOLEAN NOT NULL DEFAULT FALSE`);
+  await query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`);
   await query(`CREATE INDEX IF NOT EXISTS idx_messages_reply_to ON messages(reply_to_message_id)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_messages_forward_from ON messages(forward_from_message_id)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_messages_deleted_for_all ON messages(deleted_for_all, deleted_at DESC)`);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS message_hidden (
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      message_id BIGINT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, message_id)
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_message_hidden_user ON message_hidden(user_id, created_at DESC)`);
 
   // Group chats: type, title, creator; direct chats keep ordered user1_id/user2_id.
   await query(`ALTER TABLE chats ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'direct'`);

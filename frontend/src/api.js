@@ -400,10 +400,42 @@ export async function getMessages(chatId, limit = 50) {
   return data.messages;
 }
 
+export async function searchChatMessages(chatId, q, limit = 30) {
+  const cid = Number(chatId);
+  const qq = String(q || "").trim();
+  const lim = Math.min(Math.max(1, Number(limit) || 30), 100);
+  if (!cid) throw new ApiError("Invalid chat id", 400);
+  if (!qq) return [];
+  const data = await apiFetch(
+    `/api/chats/${cid}/messages/search?q=${encodeURIComponent(qq)}&limit=${encodeURIComponent(String(lim))}`
+  );
+  return Array.isArray(data.results) ? data.results : [];
+}
+
 export async function updateMessage(messageId, text) {
   return apiFetch(`/api/messages/${messageId}`, {
     method: "PUT",
     body: { text },
+  });
+}
+
+export async function forwardMessage(messageId, toChatId) {
+  const mid = Number(messageId);
+  const cid = Number(toChatId);
+  if (!mid || !cid) throw new ApiError("Invalid request", 400);
+  return apiFetch(`/api/messages/${mid}/forward`, {
+    method: "POST",
+    body: { toChatId: cid },
+  });
+}
+
+export async function deleteMessage(messageId, { scope } = {}) {
+  const mid = Number(messageId);
+  const s = scope === "both" || scope === "self" ? scope : "";
+  if (!mid || !s) throw new ApiError("Invalid request", 400);
+  return apiFetch(`/api/messages/${mid}?scope=${encodeURIComponent(s)}`, {
+    method: "DELETE",
+    body: {},
   });
 }
 

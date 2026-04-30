@@ -10,6 +10,7 @@ import { avatarRingWrapClass, usernameDisplayClass } from "../userPersonalizatio
 import { formatAtUserHandle } from "../userHandleDisplay.js";
 import { IconEllipsis } from "./Icons.jsx";
 import { XASMA_LOGO_SRC } from "../branding.js";
+import { readMessageDraft } from "../messageDrafts.js";
 
 const Sidebar = forwardRef(function Sidebar(
   {
@@ -611,6 +612,22 @@ const Sidebar = forwardRef(function Sidebar(
             aria-label={t("searchUnifiedPlaceholder")}
           />
         </div>
+        <button
+          type="button"
+          className="mobileArchivedRow"
+          onClick={() => {
+            // UX parity with iOS-style inbox; actual archived chats are not implemented yet.
+            // Keep this as a non-breaking affordance for now.
+          }}
+        >
+          <span className="mobileArchivedIcon" aria-hidden>
+            ⌄
+          </span>
+          <span className="mobileArchivedLabel">{t("archivedChats")}</span>
+          <span className="mobileArchivedCount muted small" aria-hidden>
+            0
+          </span>
+        </button>
         <div className="mobileChatListScroll" onScroll={MOBILE_CHAT_SWIPE_ENABLED ? onMobileChatListScroll : undefined}>
           {canSearch && searching ? (
             <div className="mobileSearchStatus muted" role="status">
@@ -642,9 +659,12 @@ const Sidebar = forwardRef(function Sidebar(
                   ? c.title || t("appTitle")
                   : other?.username || "";
             const online = !isRoom && !isOfficial && Boolean(other?.isOnline);
-            const preview = c.last?.text
-              ? String(c.last.text).replace(/\s+/g, " ").trim()
-              : t("noMessages");
+            const draftText = readMessageDraft(c.id);
+            const preview = draftText.trim()
+              ? `${t("draftLabel")}: ${String(draftText).replace(/\s+/g, " ").trim()}`
+              : c.last?.text
+                ? String(c.last.text).replace(/\s+/g, " ").trim()
+                : t("noMessages");
             const showActivity =
               Boolean(c.last?.senderId && me?.id && Number(c.last.senderId) !== Number(me.id));
             const unreadN = Math.max(0, Number(c.unreadCount) || 0);
@@ -733,7 +753,14 @@ const Sidebar = forwardRef(function Sidebar(
                     </div>
                   </div>
                   <div className="mobileChatRowBottom">
-                    <span className="mobileChatRowPreview muted">{preview}</span>
+                    {draftText.trim() ? (
+                      <span className="mobileChatRowPreview muted" title={draftText}>
+                        <span className="chatDraftLabel">{t("draftLabel")}:</span>{" "}
+                        {String(draftText).replace(/\s+/g, " ").trim()}
+                      </span>
+                    ) : (
+                      <span className="mobileChatRowPreview muted">{preview}</span>
+                    )}
                     {showActivity && !unreadLabel ? (
                       <span className="mobileChatRowUnread" title={t("newActivity")} />
                     ) : null}
@@ -875,6 +902,9 @@ const Sidebar = forwardRef(function Sidebar(
             const timeLabel = c.last?.createdAt ? formatListTime(c.last.createdAt, lang) : "";
             const statusSubtitle =
               !isRoom && !isOfficial && other ? formatUserStatusLine(other, t, lang) : "";
+            const draftText = readMessageDraft(c.id);
+            const hasDraft = Boolean(draftText.trim());
+            const lastText = c.last?.text ? String(c.last.text).replace(/\s+/g, " ").trim() : "";
             const showDesktopChatMenu = Boolean(onChatDelete) && !isOfficial;
             return (
               <div
@@ -964,8 +994,13 @@ const Sidebar = forwardRef(function Sidebar(
                           {statusSubtitle}
                         </div>
                       ) : null}
-                      {c.last ? (
-                        <div className="chatLast">{c.last.text}</div>
+                      {hasDraft ? (
+                        <div className="chatLast chatLast--draft" title={draftText}>
+                          <span className="chatDraftLabel">{t("draftLabel")}:</span>{" "}
+                          {String(draftText).replace(/\s+/g, " ").trim()}
+                        </div>
+                      ) : c.last ? (
+                        <div className="chatLast">{lastText}</div>
                       ) : (
                         <div className="chatLast muted">{t("noMessages")}</div>
                       )}
