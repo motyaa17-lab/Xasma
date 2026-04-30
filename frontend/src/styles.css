@@ -6185,15 +6185,15 @@ body.body--mobileConversationOpen {
 
 .mobileChatSearchWrap {
   flex-shrink: 0;
-  padding: 8px 10px 6px;
+  padding: 10px 12px 6px;
 }
 
 .mobileChatSearch {
   width: 100%;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(11, 18, 32, 0.65);
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(2, 6, 23, 0.48);
   color: var(--text);
   font-size: 16px;
   outline: none;
@@ -6208,15 +6208,15 @@ body.body--mobileConversationOpen {
 
 .mobileArchivedRow {
   flex-shrink: 0;
-  margin: 2px 10px 8px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(11, 18, 32, 0.45);
+  margin: 4px 12px 10px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(2, 6, 23, 0.35);
   color: rgba(226, 232, 240, 0.95);
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
@@ -6227,13 +6227,13 @@ body.body--mobileConversationOpen {
 }
 
 .mobileArchivedIcon {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(2, 6, 23, 0.55);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: rgba(148, 163, 184, 0.95);
   font-size: 14px;
@@ -6241,10 +6241,11 @@ body.body--mobileConversationOpen {
 }
 
 .mobileArchivedLabel {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
   font-weight: 700;
   font-size: 14px;
+  text-align: center;
 }
 
 .mobileArchivedCount {
@@ -6258,7 +6259,7 @@ body.body--mobileConversationOpen {
   min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 0 8px max(8px, env(safe-area-inset-bottom));
+  padding: 0 10px max(10px, env(safe-area-inset-bottom));
 }
 
 .mobileChatListEmpty {
@@ -6293,10 +6294,10 @@ body.body--mobileConversationOpen {
   overflow: hidden;
   width: 100%;
   margin-bottom: 3px;
-  border-radius: 14px;
+  border-radius: 20px;
   flex-shrink: 0;
   /* Tighter rounded clip helps avoid subpixel bleed of the underlay at rest (Safari/Chrome). */
-  clip-path: inset(0 round 14px);
+  clip-path: inset(0 round 20px);
   /* Do NOT use contain: paint / isolation here — iOS Safari can blank the chat list (white layer)
      when many swipe rows sit inside .mobileChatListScroll. Clipping comes from overflow + radius;
      underlay stays hidden via opacity until .mobileChatRowSwipe--rails. */
@@ -6420,26 +6421,29 @@ body.body--mobileConversationOpen {
   align-items: stretch;
   gap: 10px;
   width: 100%;
-  padding: 10px 10px;
+  padding: 14px 14px;
   margin-bottom: 3px;
   border: none;
-  border-radius: 14px;
-  background: rgba(18, 26, 42, 0.38);
-  border: 1px solid rgba(255, 255, 255, 0.065);
+  border-radius: 20px;
+  background-color: rgba(24, 32, 52, 0.86);
+  background-image: linear-gradient(180deg, rgba(26, 34, 54, 0.92), rgba(20, 28, 46, 0.88));
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(11, 16, 28, 0.35);
   color: inherit;
   text-align: left;
   cursor: pointer;
-  min-height: 60px;
+  min-height: 72px;
 }
 
 .mobileChatRow:active {
-  background: rgba(28, 38, 58, 0.48);
+  background-color: rgba(28, 38, 60, 0.92);
+  background-image: linear-gradient(180deg, rgba(30, 40, 62, 0.96), rgba(24, 32, 52, 0.92));
   border-color: rgba(148, 163, 184, 0.12);
 }
 
 .mobileChatRowAvatar {
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   overflow: hidden;
   flex-shrink: 0;
@@ -6985,12 +6989,12 @@ body.body--mobileConversationOpen {
   align-items: stretch;
   justify-content: space-around;
   gap: 4px;
-  margin: 6px 10px 10px;
-  padding: 6px 8px;
+  margin: 10px 14px 14px;
+  padding: 8px 10px;
   padding-bottom: max(8px, env(safe-area-inset-bottom));
   border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 18px;
-  background: rgba(15, 23, 42, 0.90);
+  border-radius: 22px;
+  background: rgba(2, 6, 23, 0.55);
   backdrop-filter: blur(12px);
 }
 
