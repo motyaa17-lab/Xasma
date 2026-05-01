@@ -2411,25 +2411,32 @@ export default function App() {
                 onClick={() => setMobileStoriesExpanded((v) => !v)}
                 title={t("stories") ?? "Stories"}
               >
-                {chats.slice(0, 3).map((c) => {
+                {(() => {
+                  const hasStory = (c) =>
+                    Boolean(
+                      c?.hasStory ||
+                        c?.story?.items?.length ||
+                        c?.other?.hasStory ||
+                        c?.other?.storyUrl ||
+                        c?.other?.story?.items?.length
+                    );
+                  const storyUsers = chats
+                    .filter((c) => c && typeof c === "object")
+                    .filter((c) => c.type === "direct" && c.other?.id)
+                    .filter(hasStory)
+                    .slice(0, 3);
+
+                  return storyUsers.map((c) => {
                   const label =
-                    c.type === "group" || c.type === "channel"
-                      ? c.title || t("groupChat")
-                      : c.type === "official"
-                        ? c.title || t("appTitle")
-                        : c.other?.username || "";
-                  const url =
-                    c.type === "group" || c.type === "channel"
-                      ? c.avatar
-                      : c.type === "official"
-                        ? ""
-                        : c.other?.avatar;
+                    c.other?.username || "";
+                  const url = c.other?.avatar || "";
                   return (
                     <span key={`mini-story-${c.id}`} className="tgTopStoriesMiniAvatar" aria-hidden>
                       {url ? <img src={url} alt="" /> : <span>{String(label || "?").slice(0, 1).toUpperCase()}</span>}
                     </span>
                   );
-                })}
+                  });
+                })()}
               </button>
               <div className="tgTopActions">
                 <button

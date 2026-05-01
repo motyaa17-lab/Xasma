@@ -6634,6 +6634,87 @@ body.body--mobileConversationOpen {
   right: 0;
 }
 
+/* Minimal "Stories coming soon" screen (matches Telegram stub) */
+.tgStorySoonModal {
+  width: min(520px, calc(100vw - 24px));
+  height: min(920px, calc(100vh - 24px));
+  border-radius: 18px;
+  overflow: hidden;
+  position: relative;
+  background: radial-gradient(circle at 40% 20%, rgba(139, 92, 246, 0.65), rgba(2, 6, 23, 0.98) 65%),
+    radial-gradient(circle at 70% 70%, rgba(59, 130, 246, 0.35), transparent 60%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.55);
+}
+
+.tgStorySoonClose {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.10);
+  color: rgba(255, 255, 255, 0.95);
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 0;
+  z-index: 2;
+}
+
+.tgStorySoonBody {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 26px;
+  text-align: center;
+}
+
+.tgStorySoonAvatar {
+  width: 104px;
+  height: 104px;
+  position: relative;
+  margin: 0 auto 14px;
+}
+
+.tgStorySoonAvatarRing {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.95), rgba(59, 130, 246, 0.85));
+  filter: blur(0);
+  opacity: 0.9;
+}
+
+.tgStorySoonAvatarInner {
+  position: absolute;
+  inset: 4px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.10);
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.tgStorySoonAvatarInner img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tgStorySoonAvatarInner span {
+  font-weight: 900;
+  font-size: 34px;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.tgStorySoonText {
+  font-size: 14px;
+  color: rgba(203, 213, 225, 0.78);
+}
+
 .tgSearchWrap {
   flex-shrink: 0;
   padding: 6px 14px 8px;
@@ -7007,10 +7088,10 @@ body.body--mobileConversationOpen {
   width: 100%;
   border: none;
   background: transparent;
-  padding: 10px 14px;
+  padding: 8px 14px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   color: rgba(226, 232, 240, 0.98);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
@@ -7037,12 +7118,12 @@ body.body--mobileConversationOpen {
 }
 
 .tgChatRow::after {
-  left: 86px; /* aligns with iOS list: separator starts after avatar */
+  left: 78px; /* aligns with iOS list: separator starts after avatar */
 }
 
 .tgRowAvatar {
-  width: 54px;
-  height: 54px;
+  width: 46px;
+  height: 46px;
   border-radius: 999px;
   flex: 0 0 auto;
   overflow: hidden;
@@ -7064,7 +7145,7 @@ body.body--mobileConversationOpen {
 
 .tgRowInitials {
   font-weight: 900;
-  font-size: 18px;
+  font-size: 16px;
   color: rgba(226, 232, 240, 0.95);
 }
 
@@ -7086,7 +7167,7 @@ body.body--mobileConversationOpen {
 }
 
 .tgRowTitle {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 800;
   letter-spacing: -0.01em;
   min-width: 0;
@@ -7096,7 +7177,7 @@ body.body--mobileConversationOpen {
 }
 
 .tgRowSubtitle {
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.2;
   min-width: 0;
   white-space: nowrap;

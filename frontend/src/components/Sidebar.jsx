@@ -114,56 +114,27 @@ const Sidebar = forwardRef(function Sidebar(
   const [storyViewerOpen, setStoryViewerOpen] = useState(false);
   const [storyViewerLabel, setStoryViewerLabel] = useState("");
   const [storyViewerIndex, setStoryViewerIndex] = useState(0);
-  const [storyViewerProgress, setStoryViewerProgress] = useState(0);
 
-  const storyChats = chats.slice(0, 12);
+  function chatHasStory(c) {
+    // Backend story support may not exist yet; we only show items that explicitly claim a story.
+    // This keeps the strip true to Telegram: only users who posted a story appear.
+    return Boolean(
+      c?.hasStory ||
+        c?.story?.items?.length ||
+        c?.other?.hasStory ||
+        c?.other?.storyUrl ||
+        c?.other?.story?.items?.length
+    );
+  }
 
-  const storySlides = useMemo(() => {
-    return storyChats.map((c) => {
-      const isGroup = c.type === "group";
-      const isChannel = c.type === "channel";
-      const isOfficial = c.type === "official";
-      const other = c.other;
-      const label = isChannel
-        ? c.title || t("channelInfoTitle")
-        : isGroup
-          ? c.title || t("groupChat")
-          : isOfficial
-            ? c.title || t("appTitle")
-            : other?.username || "";
-      const avatarUrl = isGroup || isChannel ? c.avatar : isOfficial ? "" : other?.avatar;
-      return { chatId: c.id, label, avatarUrl };
-    });
-  }, [storyChats, t]);
-
-  useEffect(() => {
-    if (!storyViewerOpen) return undefined;
-    setStoryViewerProgress(0);
-    const TICK_MS = 50;
-    const DURATION_MS = 5200;
-    const id = window.setInterval(() => {
-      setStoryViewerProgress((p) => {
-        const next = p + TICK_MS / DURATION_MS;
-        return next >= 1 ? 1 : next;
-      });
-    }, TICK_MS);
-    return () => window.clearInterval(id);
-  }, [storyViewerOpen, storyViewerIndex]);
-
-  useEffect(() => {
-    if (!storyViewerOpen) return;
-    if (storyViewerProgress < 1) return;
-    setStoryViewerProgress(0);
-    setStoryViewerIndex((i) => {
-      const next = i + 1;
-      if (next >= storySlides.length) {
-        setStoryViewerOpen(false);
-        return 0;
-      }
-      setStoryViewerLabel(storySlides[next]?.label || "");
-      return next;
-    });
-  }, [storyViewerOpen, storyViewerProgress, storySlides]);
+  const storyChats = useMemo(() => {
+    return chats
+      .filter((c) => c && typeof c === "object")
+      .filter((c) => c.type === "direct") // only users (no groups/channels/official)
+      .filter((c) => c.other?.id) // must be a real chatted user
+      .filter(chatHasStory)
+      .slice(0, 24);
+  }, [chats]);
 
   const foldersStorageKey = "xasma.chatFolders.v1";
   const chatFolderKey = (chatId) => `xasma.chatFolder.v1.${Number(chatId)}`;
@@ -1189,86 +1160,28 @@ const Sidebar = forwardRef(function Sidebar(
 
         {storyViewerOpen ? (
           <div className="modalBackdrop modalBackdrop--app" role="dialog" aria-modal="true">
-            <div className="tgStoryViewer" role="document" aria-label={storyViewerLabel || (t("stories") ?? "Stories")}>
-              <div className="tgStoryViewerTop">
-                <div className="tgStoryProgress">
-                  {storySlides.map((s, i) => {
-                    const fill =
-                      i < storyViewerIndex ? 1 : i > storyViewerIndex ? 0 : storyViewerProgress;
-                    return (
-                      <div key={s.chatId} className="tgStoryProgressSeg" aria-hidden>
-                        <div className="tgStoryProgressFill" style={{ transform: `scaleX(${fill})` }} />
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="tgStoryViewerHeaderRow">
-                  <div className="tgStoryViewerHeaderLeft">
-                    <span className="tgStoryViewerAvatar" aria-hidden>
-                      {storySlides[storyViewerIndex]?.avatarUrl ? (
-                        <img src={storySlides[storyViewerIndex].avatarUrl} alt="" />
-                      ) : (
-                        <span className="tgStoryViewerInitial">
-                          {String(storySlides[storyViewerIndex]?.label || "?").slice(0, 1).toUpperCase()}
-                        </span>
-                      )}
-                    </span>
-                    <div className="tgStoryViewerTitleCol">
-                      <div className="tgStoryViewerTitle">{storySlides[storyViewerIndex]?.label || storyViewerLabel}</div>
-                      <div className="tgStoryViewerSub muted">{t("stories") ?? "Stories"}</div>
-                    </div>
-                  </div>
-                  <button type="button" className="tgStoryViewerClose" onClick={() => setStoryViewerOpen(false)} aria-label={t("close")}>
-                    ×
-                  </button>
-                </div>
-              </div>
-
+            <div className="tgStorySoonModal" role="document" aria-label={storyViewerLabel || (t("stories") ?? "Stories")}>
               <button
                 type="button"
-                className="tgStoryViewerTap tgStoryViewerTap--prev"
-                aria-label={t("back")}
-                onClick={() => {
-                  setStoryViewerProgress(0);
-                  setStoryViewerIndex((i) => {
-                    const next = Math.max(0, i - 1);
-                    setStoryViewerLabel(storySlides[next]?.label || "");
-                    return next;
-                  });
-                }}
-              />
-              <button
-                type="button"
-                className="tgStoryViewerTap tgStoryViewerTap--next"
-                aria-label={t("next") ?? "Next"}
-                onClick={() => {
-                  setStoryViewerProgress(0);
-                  setStoryViewerIndex((i) => {
-                    const next = i + 1;
-                    if (next >= storySlides.length) {
-                      setStoryViewerOpen(false);
-                      return 0;
-                    }
-                    setStoryViewerLabel(storySlides[next]?.label || "");
-                    return next;
-                  });
-                }}
-              />
-
-              <div className="tgStoryViewerStage" aria-hidden>
-                <div className="tgStoryViewerCard">
-                  <div className="tgStoryViewerCardGlow" />
-                  <div className="tgStoryViewerCardBody">
-                    <div className="tgStoryViewerBigAvatar">
-                      {storySlides[storyViewerIndex]?.avatarUrl ? (
-                        <img src={storySlides[storyViewerIndex].avatarUrl} alt="" />
-                      ) : (
-                        <span>{String(storySlides[storyViewerIndex]?.label || "?").slice(0, 1).toUpperCase()}</span>
-                      )}
-                    </div>
-                    <div className="tgStoryViewerHint">{t("storiesComingSoon") ?? t("comingSoon")}</div>
-                  </div>
+                className="tgStorySoonClose"
+                onClick={() => setStoryViewerOpen(false)}
+                aria-label={t("close")}
+              >
+                ×
+              </button>
+              <div className="tgStorySoonBody">
+                <div className="tgStorySoonAvatar" aria-hidden>
+                  <span className="tgStorySoonAvatarRing" />
+                  <span className="tgStorySoonAvatarInner">
+                    {(() => {
+                      const c = storyChats[storyViewerIndex];
+                      const label = storyViewerLabel || c?.other?.username || t("myStory") || "";
+                      const url = c?.other?.avatar || "";
+                      return url ? <img src={url} alt="" /> : <span>{initials(label)}</span>;
+                    })()}
+                  </span>
                 </div>
+                <div className="tgStorySoonText muted">{t("storiesComingSoon") ?? t("comingSoon")}</div>
               </div>
             </div>
           </div>
