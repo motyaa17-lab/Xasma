@@ -29,7 +29,7 @@ function mailto(email, subject) {
 }
 
 export default function LegalPage({ kind, t, lang, onBack }) {
-  const supportEmail = "support@xasma.app";
+  const supportEmail = "xasma.support@gmail.com";
   const lastUpdated = "2026-05-01";
 
   const title =
@@ -37,6 +37,8 @@ export default function LegalPage({ kind, t, lang, onBack }) {
       ? t("privacyPolicyTitle") ?? "Privacy Policy"
       : kind === "terms"
         ? t("termsTitle") ?? "Terms of Service"
+        : kind === "data-safety"
+          ? t("dataSafetyTitle") ?? "Data Safety"
         : t("dataDeletionTitle") ?? "Data deletion";
 
   const backLabel = t("back") ?? "Back";
@@ -148,6 +150,52 @@ export default function LegalPage({ kind, t, lang, onBack }) {
               <P>
                 {t("dataDeletionLocalBody") ??
                   "You can remove local-only data (drafts, settings, cached stories/contacts) by clearing site/app storage on your device."}
+              </P>
+            </Section>
+          </>
+        ) : null}
+
+        {kind === "data-safety" ? (
+          <>
+            <Section title={t("dataSafetyOverviewTitle") ?? "Overview"}>
+              <P>
+                {t("dataSafetyOverviewBody") ??
+                  "This page summarizes data handling to help with Google Play 'Data safety' disclosures."}
+              </P>
+            </Section>
+
+            <Section title={t("dataSafetyCollectedTitle") ?? "Data collected"}>
+              <Ul>
+                <Li>{t("dataSafetyCollectedAccount") ?? "Account info (username, email if provided)."} </Li>
+                <Li>{t("dataSafetyCollectedMessages") ?? "Messages (content and metadata required for delivery)."} </Li>
+                <Li>{t("dataSafetyCollectedMedia") ?? "Media you send (images/voice/video notes)."} </Li>
+              </Ul>
+            </Section>
+
+            <Section title={t("dataSafetyOptionalTitle") ?? "Optional access"}>
+              <Ul>
+                <Li>{t("dataSafetyOptionalContacts") ?? "Contacts: only if you explicitly allow it in Contacts tab."}</Li>
+                <Li>{t("dataSafetyOptionalNotifications") ?? "Notifications: only if you enable alerts."}</Li>
+                <Li>{t("dataSafetyOptionalMic") ?? "Microphone: only when recording voice/video note or during calls."}</Li>
+              </Ul>
+            </Section>
+
+            <Section title={t("dataSafetyRetentionTitle") ?? "Retention & deletion"}>
+              <P>{t("dataSafetyRetentionBody") ?? "You can request account deletion via the Data deletion page."}</P>
+              <P>
+                <a href="/data-deletion" className="legalLink">
+                  {t("dataDeletionTitle") ?? "Data deletion"}
+                </a>
+              </P>
+            </Section>
+
+            <Section title={t("privacyContactTitle") ?? "Contact"}>
+              <P>
+                {(t("termsContactBody") ?? "Support:") + " "}
+                <a href={mailto(supportEmail, "Data safety question")} className="legalLink">
+                  {supportEmail}
+                </a>
+                .
               </P>
             </Section>
           </>

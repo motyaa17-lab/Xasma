@@ -995,6 +995,10 @@ const UserMenu = forwardRef(function UserMenu(
           <div className="settingsSectionHeader">{t("legal")}</div>
           <div className="settingsSection">
             <SettingsRow
+              label={t("aboutAppTitle")}
+              onClick={() => setPanel("aboutApp")}
+            />
+            <SettingsRow
               label={t("privacyPolicyTitle")}
               onClick={() => {
                 try {
@@ -1027,6 +1031,18 @@ const UserMenu = forwardRef(function UserMenu(
                   setPanel(null);
                 } catch {
                   window.location.href = "/data-deletion";
+                }
+              }}
+            />
+            <SettingsRow
+              label={t("dataSafetyTitle")}
+              onClick={() => {
+                try {
+                  window.history.pushState({}, "", "/data-safety");
+                  window.dispatchEvent(new PopStateEvent("popstate"));
+                  setPanel(null);
+                } catch {
+                  window.location.href = "/data-safety";
                 }
               }}
             />
@@ -1502,6 +1518,74 @@ const UserMenu = forwardRef(function UserMenu(
                   <button type="button" className="ghostBtn donateSupportCloseBtn" onClick={() => setPanel(null)}>
                     {t("close")}
                   </button>
+                </div>
+              </div>
+            ) : panel === "aboutApp" ? (
+              <div className="settingsModalList">
+                <div className="settingsSection settingsSection--padded">
+                  <div className="settingsTitle">{t("aboutAppTitle")}</div>
+                  <div className="muted small" style={{ lineHeight: 1.5 }}>
+                    <div>
+                      <strong>{t("aboutDeveloper")}</strong>: Xasma Labs
+                    </div>
+                    <div>
+                      <strong>{t("aboutSupportEmail")}</strong>: xasma.support@gmail.com
+                    </div>
+                    <div>
+                      <strong>{t("aboutBuild")}</strong>: {String(import.meta.env.VITE_APP_BUILD || "web")}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="settingsSection">
+                  <SettingsRow
+                    label={t("privacyPolicyTitle")}
+                    onClick={() => {
+                      try {
+                        window.history.pushState({}, "", "/privacy");
+                        window.dispatchEvent(new PopStateEvent("popstate"));
+                        setPanel(null);
+                      } catch {
+                        window.location.href = "/privacy";
+                      }
+                    }}
+                  />
+                  <SettingsRow
+                    label={t("termsTitle")}
+                    onClick={() => {
+                      try {
+                        window.history.pushState({}, "", "/terms");
+                        window.dispatchEvent(new PopStateEvent("popstate"));
+                        setPanel(null);
+                      } catch {
+                        window.location.href = "/terms";
+                      }
+                    }}
+                  />
+                  <SettingsRow
+                    label={t("dataDeletionTitle")}
+                    onClick={() => {
+                      try {
+                        window.history.pushState({}, "", "/data-deletion");
+                        window.dispatchEvent(new PopStateEvent("popstate"));
+                        setPanel(null);
+                      } catch {
+                        window.location.href = "/data-deletion";
+                      }
+                    }}
+                  />
+                  <SettingsRow
+                    label={t("dataSafetyTitle")}
+                    onClick={() => {
+                      try {
+                        window.history.pushState({}, "", "/data-safety");
+                        window.dispatchEvent(new PopStateEvent("popstate"));
+                        setPanel(null);
+                      } catch {
+                        window.location.href = "/data-safety";
+                      }
+                    }}
+                  />
                 </div>
               </div>
             ) : (

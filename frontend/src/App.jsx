@@ -2263,6 +2263,7 @@ export default function App() {
     if (p === "/privacy" || p === "/privacy/") return "privacy";
     if (p === "/terms" || p === "/terms/") return "terms";
     if (p === "/data-deletion" || p === "/data-deletion/") return "data-deletion";
+    if (p === "/data-safety" || p === "/data-safety/") return "data-safety";
     return "";
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.lang, routeNonce]);
