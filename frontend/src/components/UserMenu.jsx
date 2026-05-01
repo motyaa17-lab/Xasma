@@ -35,6 +35,21 @@ import {
   openAndroidNotificationSettings,
   requestAndroidPostNotifications,
 } from "../notifyPermissions.js";
+import {
+  IconBattery,
+  IconBell,
+  IconDatabase,
+  IconDevices,
+  IconGlobe,
+  IconHelp,
+  IconInfo,
+  IconLock,
+  IconLogout,
+  IconPalette,
+  IconShield,
+  IconSliders,
+  IconUser,
+} from "./Icons.jsx";
 
 function formatShortDate(iso) {
   const d = new Date(iso);
@@ -794,6 +809,7 @@ const UserMenu = forwardRef(function UserMenu(
   if (variant === "mobilePage") {
     const chevron = "›";
     const [settingsSearch, setSettingsSearch] = useState("");
+    const [profileFromHeaderAnim, setProfileFromHeaderAnim] = useState(false);
 
     const statusLine = (() => {
       if (!me) return "";
@@ -859,7 +875,14 @@ const UserMenu = forwardRef(function UserMenu(
 
     return (
       <div className="settingsScreen settingsScreen--mobile" ref={rootRef}>
-        <button type="button" className="settingsTopProfile" onClick={() => setPanel("profile")}>
+        <button
+          type="button"
+          className="settingsTopProfile"
+          onClick={() => {
+            setProfileFromHeaderAnim(true);
+            setPanel("profile");
+          }}
+        >
           <span className="settingsTopAvatar">
             <span className={isPremiumActive(me) ? "avatarPremium" : undefined}>
               {me?.avatar ? <img src={me.avatar} alt="" /> : <span>{initials(me?.username)}</span>}
@@ -898,7 +921,11 @@ const UserMenu = forwardRef(function UserMenu(
             <div className="settingsSection">
               <SettingsRow
                 label={t("editProfileTitle") ?? "Edit Profile"}
-                icon={<span className="tgSettingsIcon tgSettingsIcon--blue" aria-hidden>👤</span>}
+                icon={
+                  <span className="tgSettingsIcon tgSettingsIcon--blue" aria-hidden>
+                    <IconUser size={18} />
+                  </span>
+                }
                 onClick={() => setPanel("profile")}
               />
             </div>
@@ -909,7 +936,11 @@ const UserMenu = forwardRef(function UserMenu(
               <SettingsRow
                 label={t("appearanceTitle") ?? "Appearance"}
                 right={chatBackgroundDisplayLabel(t, settings)}
-                icon={<span className="tgSettingsIcon tgSettingsIcon--purple" aria-hidden>🎨</span>}
+                icon={
+                  <span className="tgSettingsIcon tgSettingsIcon--purple" aria-hidden>
+                    <IconPalette size={18} />
+                  </span>
+                }
                 onClick={() => setPanel("chatBackground")}
               />
             ) : null}
@@ -917,7 +948,11 @@ const UserMenu = forwardRef(function UserMenu(
             {(showAll || match(t("privacyAndSecurityTitle") ?? "Privacy and Security")) ? (
               <SettingsRow
                 label={t("privacyAndSecurityTitle") ?? "Privacy and Security"}
-                icon={<span className="tgSettingsIcon tgSettingsIcon--red" aria-hidden>🔒</span>}
+                icon={
+                  <span className="tgSettingsIcon tgSettingsIcon--red" aria-hidden>
+                    <IconLock size={18} />
+                  </span>
+                }
                 onClick={() => setPanel("privacySecurity")}
               />
             ) : null}
@@ -926,7 +961,11 @@ const UserMenu = forwardRef(function UserMenu(
               <SettingsRow
                 label={t("notificationsAndSoundsTitle") ?? "Notifications and Sounds"}
                 right={settings?.messageNotificationsEnabled ? (t("on") ?? "On") : (t("off") ?? "Off")}
-                icon={<span className="tgSettingsIcon tgSettingsIcon--red" aria-hidden>🔔</span>}
+                icon={
+                  <span className="tgSettingsIcon tgSettingsIcon--red" aria-hidden>
+                    <IconBell size={18} />
+                  </span>
+                }
                 onClick={() => setPanel("notifications")}
               />
             ) : null}
@@ -934,7 +973,11 @@ const UserMenu = forwardRef(function UserMenu(
             {(showAll || match(t("dataAndStorageTitle") ?? "Data and Storage")) ? (
               <SettingsRow
                 label={t("dataAndStorageTitle") ?? "Data and Storage"}
-                icon={<span className="tgSettingsIcon tgSettingsIcon--blue" aria-hidden>💾</span>}
+                icon={
+                  <span className="tgSettingsIcon tgSettingsIcon--blue" aria-hidden>
+                    <IconDatabase size={18} />
+                  </span>
+                }
                 onClick={() => setPanel("dataStorage")}
               />
             ) : null}
@@ -943,7 +986,11 @@ const UserMenu = forwardRef(function UserMenu(
               <SettingsRow
                 label={t("powerSavingTitle") ?? "Power Saving"}
                 right={settings?.powerSavingEnabled ? (t("on") ?? "On") : (t("off") ?? "Off")}
-                icon={<span className="tgSettingsIcon tgSettingsIcon--purple" aria-hidden>🔋</span>}
+                icon={
+                  <span className="tgSettingsIcon tgSettingsIcon--purple" aria-hidden>
+                    <IconBattery size={18} />
+                  </span>
+                }
                 onClick={() => setPanel("powerSaving")}
               />
             ) : null}
@@ -951,7 +998,11 @@ const UserMenu = forwardRef(function UserMenu(
             {(showAll || match(t("devicesTitle") ?? "Devices")) ? (
               <SettingsRow
                 label={t("devicesTitle") ?? "Devices"}
-                icon={<span className="tgSettingsIcon tgSettingsIcon--blue" aria-hidden>💻</span>}
+                icon={
+                  <span className="tgSettingsIcon tgSettingsIcon--blue" aria-hidden>
+                    <IconDevices size={18} />
+                  </span>
+                }
                 onClick={() => setPanel("devices")}
               />
             ) : null}
@@ -960,7 +1011,11 @@ const UserMenu = forwardRef(function UserMenu(
               <SettingsRow
                 label={t("languageTitle") ?? t("language")}
                 right={currentLanguageLabel(settings?.lang, t)}
-                icon={<span className="tgSettingsIcon tgSettingsIcon--purple" aria-hidden>🌐</span>}
+                icon={
+                  <span className="tgSettingsIcon tgSettingsIcon--purple" aria-hidden>
+                    <IconGlobe size={18} />
+                  </span>
+                }
                 onClick={() => setPanel("language")}
               />
             ) : null}
@@ -968,7 +1023,11 @@ const UserMenu = forwardRef(function UserMenu(
             {(showAll || match(t("advancedTitle") ?? "Advanced")) ? (
               <SettingsRow
                 label={t("advancedTitle") ?? "Advanced"}
-                icon={<span className="tgSettingsIcon tgSettingsIcon--blue" aria-hidden>⚙️</span>}
+                icon={
+                  <span className="tgSettingsIcon tgSettingsIcon--blue" aria-hidden>
+                    <IconSliders size={18} />
+                  </span>
+                }
                 onClick={() => setPanel("advanced")}
               />
             ) : null}
@@ -1062,7 +1121,11 @@ const UserMenu = forwardRef(function UserMenu(
             {(showAll || match(t("askAQuestionTitle") ?? "Ask a Question") || match(t("settingsSupportAuthors"))) ? (
               <SettingsRow
                 label={t("askAQuestionTitle") ?? "Ask a Question"}
-                icon={<span className="tgSettingsIcon tgSettingsIcon--blue" aria-hidden>❓</span>}
+                icon={
+                  <span className="tgSettingsIcon tgSettingsIcon--blue" aria-hidden>
+                    <IconHelp size={18} />
+                  </span>
+                }
                 onClick={() => setPanel("support")}
               />
             ) : null}
@@ -1072,14 +1135,22 @@ const UserMenu = forwardRef(function UserMenu(
             {(showAll || match(t("privacyPolicyTitle")) || match(t("privacyPolicyShort") ?? "Privacy Policy")) ? (
               <SettingsRow
                 label={t("privacyPolicyShort") ?? t("privacyPolicyTitle")}
-                icon={<span className="tgSettingsIcon tgSettingsIcon--blue" aria-hidden>🛡️</span>}
+                icon={
+                  <span className="tgSettingsIcon tgSettingsIcon--blue" aria-hidden>
+                    <IconShield size={18} />
+                  </span>
+                }
                 onClick={() => openPath("/privacy")}
               />
             ) : null}
             {(showAll || match(t("aboutAppTitle")) || match(t("aboutTitleShort") ?? "About")) ? (
               <SettingsRow
                 label={t("aboutTitleShort") ?? t("aboutAppTitle")}
-                icon={<span className="tgSettingsIcon tgSettingsIcon--purple" aria-hidden>ℹ️</span>}
+                icon={
+                  <span className="tgSettingsIcon tgSettingsIcon--purple" aria-hidden>
+                    <IconInfo size={18} />
+                  </span>
+                }
                 onClick={() => setPanel("aboutApp")}
               />
             ) : null}
@@ -1087,7 +1158,16 @@ const UserMenu = forwardRef(function UserMenu(
 
           <div className="settingsSection">
             {(showAll || match(t("logout"))) ? (
-              <SettingsRow label={t("logout")} danger icon={<span className="tgSettingsIcon tgSettingsIcon--red" aria-hidden>⎋</span>} onClick={onLogout} />
+              <SettingsRow
+                label={t("logout")}
+                danger
+                icon={
+                  <span className="tgSettingsIcon tgSettingsIcon--red" aria-hidden>
+                    <IconLogout size={18} />
+                  </span>
+                }
+                onClick={onLogout}
+              />
             ) : null}
           </div>
         </div>
@@ -1121,9 +1201,12 @@ const UserMenu = forwardRef(function UserMenu(
                         ? t("settingsSupportAuthors")
                         : t("adminPanelTitle")
             }
-            onClose={() => setPanel(null)}
+            onClose={() => {
+              setPanel(null);
+              setProfileFromHeaderAnim(false);
+            }}
             t={t}
-            cardClassName={modalCardClass}
+            cardClassName={`${modalCardClass}${panel === "profile" && profileFromHeaderAnim ? " modalCard--profileFromHeader" : ""}`.trim()}
             usePortal
           >
             {panel === "profile" ? (

@@ -8752,6 +8752,10 @@ body.body--mobileConversationOpen {
   color: white;
 }
 
+.tgSettingsIcon svg {
+  display: block;
+}
+
 .tgSettingsIcon--blue {
   background: #0a84ff;
 }
@@ -8974,6 +8978,37 @@ body.body--mobileConversationOpen {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.modalCard--profileFromHeader {
+  animation: profileFromHeaderCardIn 0.28s var(--ease-tg-out) both;
+}
+
+.modalCard--profileFromHeader .settingsProfileAvatar,
+.modalCard--profileFromHeader .settingsProfileHeader img {
+  animation: profileFromHeaderAvatarIn 0.34s var(--ease-tg-pop) both;
+}
+
+@keyframes profileFromHeaderCardIn {
+  0% {
+    opacity: 0.01;
+    transform: translateY(18px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes profileFromHeaderAvatarIn {
+  0% {
+    transform: translateY(-6px) scale(0.92);
+    filter: brightness(1.1);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    filter: none;
+  }
 }
 
 .modalCard--mobileFriendly .modalHeader {
