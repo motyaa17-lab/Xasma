@@ -45,10 +45,10 @@ function formatShortDate(iso) {
   return `${dd}.${mm}.${yy}`;
 }
 
-async function fileToJpegDataUrl(file, { maxSizeBytes } = {}) {
-  if (!file) throw new Error("No file");
-  if (!String(file.type || "").startsWith("image/")) throw new Error("Not an image");
-  if (maxSizeBytes && Number(file.size || 0) > Number(maxSizeBytes)) throw new Error("Too large");
+async function fileToJpegDataUrl(file, t, { maxSizeBytes } = {}) {
+  if (!file) throw new Error(t("fileMissing"));
+  if (!String(file.type || "").startsWith("image/")) throw new Error(t("fileNotImage"));
+  if (maxSizeBytes && Number(file.size || 0) > Number(maxSizeBytes)) throw new Error(t("fileTooLarge"));
   // Reuse existing compression helper (keeps payload small enough for DB/HTTP).
   return compressImageFileToJpegDataUrl(file);
 }
@@ -682,7 +682,7 @@ const UserMenu = forwardRef(function UserMenu(
       setProfileBgBusy(true);
       setProfileSaveError("");
       try {
-        const dataUrl = await fileToJpegDataUrl(file, { maxSizeBytes: 6_000_000 });
+        const dataUrl = await fileToJpegDataUrl(file, t, { maxSizeBytes: 6_000_000 });
         setProfileBgPreview(dataUrl);
       } catch (e) {
         setProfileSaveError(e.message || t("errorGeneric"));
@@ -990,6 +990,46 @@ const UserMenu = forwardRef(function UserMenu(
           <div className="settingsSectionHeader">{t("settingsSupport")}</div>
           <div className="settingsSection">
             <SettingsRow label={t("settingsSupportAuthors")} onClick={() => setPanel("support")} />
+          </div>
+
+          <div className="settingsSectionHeader">{t("legal")}</div>
+          <div className="settingsSection">
+            <SettingsRow
+              label={t("privacyPolicyTitle")}
+              onClick={() => {
+                try {
+                  window.history.pushState({}, "", "/privacy");
+                  window.dispatchEvent(new PopStateEvent("popstate"));
+                  setPanel(null);
+                } catch {
+                  window.location.href = "/privacy";
+                }
+              }}
+            />
+            <SettingsRow
+              label={t("termsTitle")}
+              onClick={() => {
+                try {
+                  window.history.pushState({}, "", "/terms");
+                  window.dispatchEvent(new PopStateEvent("popstate"));
+                  setPanel(null);
+                } catch {
+                  window.location.href = "/terms";
+                }
+              }}
+            />
+            <SettingsRow
+              label={t("dataDeletionTitle")}
+              onClick={() => {
+                try {
+                  window.history.pushState({}, "", "/data-deletion");
+                  window.dispatchEvent(new PopStateEvent("popstate"));
+                  setPanel(null);
+                } catch {
+                  window.location.href = "/data-deletion";
+                }
+              }}
+            />
           </div>
 
           <div className="settingsSectionHeader">{t("logout")}</div>

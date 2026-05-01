@@ -10,6 +10,8 @@ import InstallDownloadPanel from "./components/InstallDownloadPanel.jsx";
 import { IconChats, IconCompose, IconContacts, IconPhone, IconSearch, IconSettings, IconDownload } from "./components/Icons.jsx";
 import CallOverlay from "./components/CallOverlay.jsx";
 import CallsScreen from "./components/CallsScreen.jsx";
+import ContactsScreen from "./components/ContactsScreen.jsx";
+import LegalPage from "./components/LegalPage.jsx";
 import { useIsMobile } from "./hooks/useIsMobile.js";
 import { t as tr, normalizeLang } from "./i18n.js";
 import {
@@ -2248,6 +2250,42 @@ export default function App() {
 
   const sessionRestoring = Boolean(token) && me == null;
 
+  const [routeNonce, setRouteNonce] = useState(0);
+  useEffect(() => {
+    const onPop = () => setRouteNonce((n) => n + 1);
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  const legalKind = useMemo(() => {
+    if (typeof window === "undefined") return "";
+    const p = String(window.location?.pathname || "");
+    if (p === "/privacy" || p === "/privacy/") return "privacy";
+    if (p === "/terms" || p === "/terms/") return "terms";
+    if (p === "/data-deletion" || p === "/data-deletion/") return "data-deletion";
+    return "";
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.lang, routeNonce]);
+
+  if (legalKind) {
+    return (
+      <div className="appRoot appRoot--auth">
+        <LegalPage
+          kind={legalKind}
+          t={(key) => tr(normalizeLang(settingsRef.current?.lang), key)}
+          lang={settingsRef.current?.lang}
+          onBack={() => {
+            try {
+              window.history.back();
+            } catch {
+              window.location.href = "/";
+            }
+          }}
+        />
+      </div>
+    );
+  }
+
   if (sessionRestoring) {
     return (
       <div className="appRoot appRoot--authBoot">
@@ -2536,11 +2574,13 @@ export default function App() {
         ) : null}
 
         {mobileTab === "contacts" ? (
-          <div className="mobilePane mobilePane--placeholder">
+          <div className="mobilePane mobilePane--contacts">
             <header className="mobileSubHeader">
               <h1 className="mobileSubHeaderTitle">{t("navContacts")}</h1>
             </header>
-            <div className="mobilePlaceholderBody muted">{t("comingSoon")}</div>
+            <div className="mobileContactsScroll">
+              <ContactsScreen t={t} lang={settings.lang} me={me} chats={chats} onStartChat={startChat} />
+            </div>
           </div>
         ) : null}
 

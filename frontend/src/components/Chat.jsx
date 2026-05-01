@@ -3303,7 +3303,7 @@ export default function Chat({
                     {t("recordingInline")} {formatRecordingClock(voiceRecMs)}
                   </span>
                   {voiceLocked ? (
-                    <span className="recBottomLock" aria-label="Locked">
+                    <span className="recBottomLock" aria-label={t("locked")}>
                       🔒
                     </span>
                   ) : (

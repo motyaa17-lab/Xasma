@@ -1369,7 +1369,7 @@ const Sidebar = forwardRef(function Sidebar(
               </div>
 
               <button type="button" className="tgStoryViewerTap tgStoryViewerTap--prev" aria-label={t("back")} onClick={goStoryPrev} />
-              <button type="button" className="tgStoryViewerTap tgStoryViewerTap--next" aria-label={t("next") ?? "Next"} onClick={goStoryNext} />
+              <button type="button" className="tgStoryViewerTap tgStoryViewerTap--next" aria-label={t("next")} onClick={goStoryNext} />
 
               <div className="tgStoryViewerStage" aria-hidden>
                 <div className="tgStoryViewerCard">
