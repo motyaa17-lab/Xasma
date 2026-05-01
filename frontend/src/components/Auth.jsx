@@ -108,6 +108,38 @@ export default function Auth({ onLogin, onRegister, error, t }) {
             {mode === "login" ? t("login") : t("createAccount")}
           </button>
         </form>
+
+        <div className="authLegal">
+          <div className="authLegalMeta muted small">
+            {(t("aboutDeveloper") ?? "Developer") + ": Xasma Labs · " + (t("aboutSupportEmail") ?? "Support") + ": xasma.support@gmail.com"}
+          </div>
+          <div className="authLegalLinks">
+            {[
+              { href: "/privacy", label: t("privacyPolicyTitle") },
+              { href: "/terms", label: t("termsTitle") },
+              { href: "/data-deletion", label: t("dataDeletionTitle") },
+              { href: "/data-safety", label: t("dataSafetyTitle") },
+              { href: "/permissions", label: t("permissionsTitle") },
+            ].map((x) => (
+              <a
+                key={x.href}
+                className="authLegalLink"
+                href={x.href}
+                onClick={(e) => {
+                  try {
+                    e.preventDefault();
+                    window.history.pushState({}, "", x.href);
+                    window.dispatchEvent(new PopStateEvent("popstate"));
+                  } catch {
+                    /* fallback to normal navigation */
+                  }
+                }}
+              >
+                {x.label}
+              </a>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

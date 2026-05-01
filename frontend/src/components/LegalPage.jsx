@@ -30,6 +30,7 @@ function mailto(email, subject) {
 
 export default function LegalPage({ kind, t, lang, onBack }) {
   const supportEmail = "xasma.support@gmail.com";
+  const developerName = "Xasma Labs";
   const lastUpdated = "2026-05-01";
 
   const title =
@@ -39,6 +40,8 @@ export default function LegalPage({ kind, t, lang, onBack }) {
         ? t("termsTitle") ?? "Terms of Service"
         : kind === "data-safety"
           ? t("dataSafetyTitle") ?? "Data Safety"
+          : kind === "permissions"
+            ? t("permissionsTitle") ?? "Permissions & Why"
         : t("dataDeletionTitle") ?? "Data deletion";
 
   const backLabel = t("back") ?? "Back";
@@ -196,6 +199,57 @@ export default function LegalPage({ kind, t, lang, onBack }) {
                   {supportEmail}
                 </a>
                 .
+              </P>
+            </Section>
+          </>
+        ) : null}
+
+        {kind === "permissions" ? (
+          <>
+            <Section title={t("permissionsOverviewTitle") ?? "Overview"}>
+              <P>
+                {t("permissionsOverviewBody") ??
+                  "Some features require permissions. We only request them when needed and you can deny them."}
+              </P>
+            </Section>
+
+            <Section title={t("permissionsListTitle") ?? "Permissions used by the app"}>
+              <Ul>
+                <Li>
+                  <strong>{t("permissionsContacts") ?? "Contacts"}</strong>:{" "}
+                  {t("permissionsContactsWhy") ??
+                    "Optional. Used only if you enable contact sync to find people you know."}
+                </Li>
+                <Li>
+                  <strong>{t("permissionsNotifications") ?? "Notifications"}</strong>:{" "}
+                  {t("permissionsNotificationsWhy") ??
+                    "Optional. Used to show new message alerts when the app is in background."}
+                </Li>
+                <Li>
+                  <strong>{t("permissionsMicrophone") ?? "Microphone"}</strong>:{" "}
+                  {t("permissionsMicrophoneWhy") ??
+                    "Used for voice messages and calls, only when you start recording or join a call."}
+                </Li>
+              </Ul>
+            </Section>
+
+            <Section title={t("permissionsManageTitle") ?? "How to manage permissions"}>
+              <P>
+                {t("permissionsManageBody") ??
+                  "You can change permissions in your device settings at any time."}
+              </P>
+            </Section>
+
+            <Section title={t("privacyContactTitle") ?? "Contact"}>
+              <P>
+                {(t("termsContactBody") ?? "Support:") + " "}
+                <a href={mailto(supportEmail, "Permissions question")} className="legalLink">
+                  {supportEmail}
+                </a>
+                .
+              </P>
+              <P className="muted">
+                {(t("aboutDeveloper") ?? "Developer") + ": " + developerName}
               </P>
             </Section>
           </>

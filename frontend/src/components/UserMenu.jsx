@@ -1046,6 +1046,18 @@ const UserMenu = forwardRef(function UserMenu(
                 }
               }}
             />
+            <SettingsRow
+              label={t("permissionsTitle")}
+              onClick={() => {
+                try {
+                  window.history.pushState({}, "", "/permissions");
+                  window.dispatchEvent(new PopStateEvent("popstate"));
+                  setPanel(null);
+                } catch {
+                  window.location.href = "/permissions";
+                }
+              }}
+            />
           </div>
 
           <div className="settingsSectionHeader">{t("logout")}</div>

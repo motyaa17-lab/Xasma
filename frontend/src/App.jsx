@@ -2264,6 +2264,7 @@ export default function App() {
     if (p === "/terms" || p === "/terms/") return "terms";
     if (p === "/data-deletion" || p === "/data-deletion/") return "data-deletion";
     if (p === "/data-safety" || p === "/data-safety/") return "data-safety";
+    if (p === "/permissions" || p === "/permissions/") return "permissions";
     return "";
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.lang, routeNonce]);
