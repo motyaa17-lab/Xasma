@@ -65,6 +65,7 @@ const Sidebar = forwardRef(function Sidebar(
     onCreateChannel,
     onChatListPinToggle,
     onChatDelete,
+    typingUntil = {},
     t,
     lang,
     mobileLayout = false,
@@ -112,8 +113,57 @@ const Sidebar = forwardRef(function Sidebar(
   const [chatMoveFolderId, setChatMoveFolderId] = useState("");
   const [storyViewerOpen, setStoryViewerOpen] = useState(false);
   const [storyViewerLabel, setStoryViewerLabel] = useState("");
+  const [storyViewerIndex, setStoryViewerIndex] = useState(0);
+  const [storyViewerProgress, setStoryViewerProgress] = useState(0);
 
   const storyChats = chats.slice(0, 12);
+
+  const storySlides = useMemo(() => {
+    return storyChats.map((c) => {
+      const isGroup = c.type === "group";
+      const isChannel = c.type === "channel";
+      const isOfficial = c.type === "official";
+      const other = c.other;
+      const label = isChannel
+        ? c.title || t("channelInfoTitle")
+        : isGroup
+          ? c.title || t("groupChat")
+          : isOfficial
+            ? c.title || t("appTitle")
+            : other?.username || "";
+      const avatarUrl = isGroup || isChannel ? c.avatar : isOfficial ? "" : other?.avatar;
+      return { chatId: c.id, label, avatarUrl };
+    });
+  }, [storyChats, t]);
+
+  useEffect(() => {
+    if (!storyViewerOpen) return undefined;
+    setStoryViewerProgress(0);
+    const TICK_MS = 50;
+    const DURATION_MS = 5200;
+    const id = window.setInterval(() => {
+      setStoryViewerProgress((p) => {
+        const next = p + TICK_MS / DURATION_MS;
+        return next >= 1 ? 1 : next;
+      });
+    }, TICK_MS);
+    return () => window.clearInterval(id);
+  }, [storyViewerOpen, storyViewerIndex]);
+
+  useEffect(() => {
+    if (!storyViewerOpen) return;
+    if (storyViewerProgress < 1) return;
+    setStoryViewerProgress(0);
+    setStoryViewerIndex((i) => {
+      const next = i + 1;
+      if (next >= storySlides.length) {
+        setStoryViewerOpen(false);
+        return 0;
+      }
+      setStoryViewerLabel(storySlides[next]?.label || "");
+      return next;
+    });
+  }, [storyViewerOpen, storyViewerProgress, storySlides]);
 
   const foldersStorageKey = "xasma.chatFolders.v1";
   const chatFolderKey = (chatId) => `xasma.chatFolder.v1.${Number(chatId)}`;
@@ -740,6 +790,7 @@ const Sidebar = forwardRef(function Sidebar(
             aria-label={t("myStory") ?? "My story"}
             onClick={() => {
               setStoryViewerLabel(t("myStory") ?? "Моя история");
+              setStoryViewerIndex(0);
               setStoryViewerOpen(true);
             }}
           >
@@ -772,6 +823,7 @@ const Sidebar = forwardRef(function Sidebar(
                 className="tgStoryItem"
                 onClick={() => {
                   setStoryViewerLabel(label);
+                  setStoryViewerIndex(storyChats.findIndex((x) => x.id === c.id));
                   setStoryViewerOpen(true);
                 }}
                 aria-label={label}
@@ -873,10 +925,13 @@ const Sidebar = forwardRef(function Sidebar(
                   : other?.username || "";
             const online = !isRoom && !isOfficial && Boolean(other?.isOnline);
             const draftText = readMessageDraft(c.id);
+            const typing = Boolean(typingUntil && typingUntil[c.id] > Date.now());
             const preview = draftText.trim()
               ? `${t("draftLabel")}: ${String(draftText).replace(/\s+/g, " ").trim()}`
-              : c.last?.text
-                ? String(c.last.text).replace(/\s+/g, " ").trim()
+              : typing
+                ? t("typing")
+                : c.last?.text
+                  ? String(c.last.text).replace(/\s+/g, " ").trim()
                 : t("noMessages");
             const showActivity =
               Boolean(c.last?.senderId && me?.id && Number(c.last.senderId) !== Number(me.id));
@@ -915,7 +970,10 @@ const Sidebar = forwardRef(function Sidebar(
                     </span>
                   </span>
                   <span className="tgRowBottomLine">
-                    <span className="tgRowSubtitle muted" title={draftText.trim() ? draftText : preview}>
+                    <span
+                      className={`tgRowSubtitle muted${typing ? " tgRowSubtitle--typing" : ""}`}
+                      title={draftText.trim() ? draftText : preview}
+                    >
                       {draftText.trim() ? (
                         <>
                           <span className="chatDraftLabel">{t("draftLabel")}:</span>{" "}
@@ -1131,15 +1189,86 @@ const Sidebar = forwardRef(function Sidebar(
 
         {storyViewerOpen ? (
           <div className="modalBackdrop modalBackdrop--app" role="dialog" aria-modal="true">
-            <div className="modalCard modalCard--mobileFriendly" style={{ maxWidth: 520, width: "min(520px, calc(100vw - 24px))" }}>
-              <div className="modalHeader">
-                <div className="modalTitle">{storyViewerLabel}</div>
-                <button type="button" className="iconCloseBtn" onClick={() => setStoryViewerOpen(false)} aria-label={t("close")}>
-                  ×
-                </button>
+            <div className="tgStoryViewer" role="document" aria-label={storyViewerLabel || (t("stories") ?? "Stories")}>
+              <div className="tgStoryViewerTop">
+                <div className="tgStoryProgress">
+                  {storySlides.map((s, i) => {
+                    const fill =
+                      i < storyViewerIndex ? 1 : i > storyViewerIndex ? 0 : storyViewerProgress;
+                    return (
+                      <div key={s.chatId} className="tgStoryProgressSeg" aria-hidden>
+                        <div className="tgStoryProgressFill" style={{ transform: `scaleX(${fill})` }} />
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="tgStoryViewerHeaderRow">
+                  <div className="tgStoryViewerHeaderLeft">
+                    <span className="tgStoryViewerAvatar" aria-hidden>
+                      {storySlides[storyViewerIndex]?.avatarUrl ? (
+                        <img src={storySlides[storyViewerIndex].avatarUrl} alt="" />
+                      ) : (
+                        <span className="tgStoryViewerInitial">
+                          {String(storySlides[storyViewerIndex]?.label || "?").slice(0, 1).toUpperCase()}
+                        </span>
+                      )}
+                    </span>
+                    <div className="tgStoryViewerTitleCol">
+                      <div className="tgStoryViewerTitle">{storySlides[storyViewerIndex]?.label || storyViewerLabel}</div>
+                      <div className="tgStoryViewerSub muted">{t("stories") ?? "Stories"}</div>
+                    </div>
+                  </div>
+                  <button type="button" className="tgStoryViewerClose" onClick={() => setStoryViewerOpen(false)} aria-label={t("close")}>
+                    ×
+                  </button>
+                </div>
               </div>
-              <div className="modalBody">
-                <div className="muted">{t("storiesComingSoon") ?? t("comingSoon")}</div>
+
+              <button
+                type="button"
+                className="tgStoryViewerTap tgStoryViewerTap--prev"
+                aria-label={t("back")}
+                onClick={() => {
+                  setStoryViewerProgress(0);
+                  setStoryViewerIndex((i) => {
+                    const next = Math.max(0, i - 1);
+                    setStoryViewerLabel(storySlides[next]?.label || "");
+                    return next;
+                  });
+                }}
+              />
+              <button
+                type="button"
+                className="tgStoryViewerTap tgStoryViewerTap--next"
+                aria-label={t("next") ?? "Next"}
+                onClick={() => {
+                  setStoryViewerProgress(0);
+                  setStoryViewerIndex((i) => {
+                    const next = i + 1;
+                    if (next >= storySlides.length) {
+                      setStoryViewerOpen(false);
+                      return 0;
+                    }
+                    setStoryViewerLabel(storySlides[next]?.label || "");
+                    return next;
+                  });
+                }}
+              />
+
+              <div className="tgStoryViewerStage" aria-hidden>
+                <div className="tgStoryViewerCard">
+                  <div className="tgStoryViewerCardGlow" />
+                  <div className="tgStoryViewerCardBody">
+                    <div className="tgStoryViewerBigAvatar">
+                      {storySlides[storyViewerIndex]?.avatarUrl ? (
+                        <img src={storySlides[storyViewerIndex].avatarUrl} alt="" />
+                      ) : (
+                        <span>{String(storySlides[storyViewerIndex]?.label || "?").slice(0, 1).toUpperCase()}</span>
+                      )}
+                    </div>
+                    <div className="tgStoryViewerHint">{t("storiesComingSoon") ?? t("comingSoon")}</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1300,19 +1429,14 @@ const Sidebar = forwardRef(function Sidebar(
                           ) : null}
                         </div>
                       </div>
-                      {!isRoom && !isOfficial && other?.userHandle ? (
-                        <div className="chatOtherAt muted small">{formatAtUserHandle(other.userHandle)}</div>
-                      ) : null}
-                      {!isRoom && !isOfficial && statusSubtitle ? (
-                        <div className="chatOtherStatus muted" title={statusSubtitle}>
-                          {statusSubtitle}
-                        </div>
-                      ) : null}
+                      {/* Desktop list: keep Telegram-like density (title + single preview line). */}
                       {hasDraft ? (
                         <div className="chatLast chatLast--draft" title={draftText}>
                           <span className="chatDraftLabel">{t("draftLabel")}:</span>{" "}
                           {String(draftText).replace(/\s+/g, " ").trim()}
                         </div>
+                      ) : Boolean(typingUntil && typingUntil[c.id] > Date.now()) ? (
+                        <div className="chatLast chatLast--typing">{t("typing")}</div>
                       ) : c.last ? (
                         <div className="chatLast">{lastText}</div>
                       ) : (

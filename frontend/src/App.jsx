@@ -2248,6 +2248,7 @@ export default function App() {
     onCreateChannel: handleCreateChannel,
     onChatListPinToggle: handleChatListPinToggle,
     onChatDelete: handleChatMembershipDelete,
+    typingUntil,
     t,
     lang: settings.lang,
   };

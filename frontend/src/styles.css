@@ -1993,9 +1993,9 @@ body.body--mobileConversationOpen {
 .chatItemTop {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px;
-  border-radius: 12px;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(11, 18, 32, 0.4);
 }
@@ -2036,6 +2036,7 @@ body.body--mobileConversationOpen {
 
 .chatOtherName {
   font-weight: 700;
+  font-size: 14px;
   flex: 1;
   min-width: 0;
   display: flex;
@@ -3074,7 +3075,7 @@ body.body--mobileConversationOpen {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 200px;
+  max-width: 240px;
 }
 
 .chatDraftLabel {
@@ -3084,6 +3085,11 @@ body.body--mobileConversationOpen {
 
 .chatLast--draft {
   color: rgba(203, 213, 225, 0.92);
+}
+
+.chatLast--typing {
+  color: rgba(96, 165, 250, 0.95);
+  font-weight: 700;
 }
 
 .avatarAuraOuter {
@@ -3494,10 +3500,70 @@ body.body--mobileConversationOpen {
   pointer-events: none;
   background: linear-gradient(
     180deg,
-    rgba(2, 6, 23, 0.78) 0%,
-    rgba(2, 6, 23, 0.52) 42%,
-    rgba(2, 6, 23, 0.62) 100%
+    rgba(2, 6, 23, 0.18) 0%,
+    rgba(2, 6, 23, 0.10) 42%,
+    rgba(2, 6, 23, 0.14) 100%
   );
+}
+
+/* When user sets a custom background image, use Telegram-like light bubbles */
+.chatTheme-custom .messages .bubble {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(15, 23, 42, 0.08);
+  color: rgba(15, 23, 42, 0.94);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.10);
+}
+
+.chatTheme-custom .messages .bubble.me {
+  background: rgba(217, 249, 157, 0.92);
+  border-color: rgba(34, 197, 94, 0.14);
+  color: rgba(15, 23, 42, 0.94);
+}
+
+.chatTheme-custom .messages .bubbleMeta {
+  opacity: 0.95;
+}
+
+.chatTheme-custom .messages .bubbleTime {
+  color: rgba(15, 23, 42, 0.55);
+}
+
+.chatTheme-custom .messages .bubble.me .bubbleTime {
+  color: rgba(15, 23, 42, 0.55);
+}
+
+.chatTheme-custom .messages .bubbleChecks {
+  color: rgba(15, 23, 42, 0.50);
+}
+
+.chatTheme-custom .messages .voiceMsgPill {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.chatTheme-custom .messages .voiceMsgPillOwn {
+  background: rgba(217, 249, 157, 0.92);
+}
+
+.chatTheme-custom .messages .voiceMsgPlayBtn {
+  background: rgba(59, 130, 246, 0.90);
+  color: white;
+}
+
+.chatTheme-custom .messages .voiceMsgPillOwn .voiceMsgPlayBtn {
+  background: rgba(34, 197, 94, 0.92);
+  color: white;
+}
+
+.chatTheme-custom .messages .voiceMsgWaveBar {
+  background: rgba(15, 23, 42, 0.20);
+}
+
+.chatTheme-custom .messages .voiceMsgWaveBarPlayed {
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.chatTheme-custom .messages .voiceMsgTimes {
+  color: rgba(15, 23, 42, 0.45);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -6367,6 +6433,207 @@ body.body--mobileConversationOpen {
   text-overflow: ellipsis;
 }
 
+/* Stories viewer (Telegram-like) */
+.tgStoryViewer {
+  width: min(520px, 100vw);
+  height: min(940px, 100vh);
+  max-height: 100vh;
+  max-width: 100vw;
+  margin: 0 auto;
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
+}
+
+.tgStoryViewerTop {
+  position: absolute;
+  inset: 0 0 auto 0;
+  padding: 10px 10px 8px;
+  z-index: 3;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+}
+
+.tgStoryProgress {
+  display: flex;
+  gap: 6px;
+}
+
+.tgStoryProgressSeg {
+  flex: 1;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.24);
+  overflow: hidden;
+}
+
+.tgStoryProgressFill {
+  height: 100%;
+  width: 100%;
+  transform-origin: left center;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.tgStoryViewerHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.tgStoryViewerHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.tgStoryViewerAvatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.10);
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.tgStoryViewerAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tgStoryViewerInitial {
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.tgStoryViewerTitleCol {
+  min-width: 0;
+}
+
+.tgStoryViewerTitle {
+  font-weight: 800;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.95);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tgStoryViewerSub {
+  font-size: 12px;
+  color: rgba(203, 213, 225, 0.75);
+}
+
+.tgStoryViewerClose {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.10);
+  color: rgba(255, 255, 255, 0.95);
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 0;
+}
+
+.tgStoryViewerClose:active {
+  transform: scale(0.98);
+}
+
+.tgStoryViewerStage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 1;
+  background: radial-gradient(circle at 35% 20%, rgba(139, 92, 246, 0.32), transparent 55%),
+    radial-gradient(circle at 70% 60%, rgba(59, 130, 246, 0.22), transparent 60%),
+    radial-gradient(circle at 40% 90%, rgba(16, 185, 129, 0.18), transparent 60%);
+}
+
+.tgStoryViewerCard {
+  width: min(420px, calc(100vw - 28px));
+  height: min(720px, calc(100vh - 140px));
+  border-radius: 20px;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.65), rgba(0, 0, 0, 0.65));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.tgStoryViewerCardGlow {
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(circle at 40% 30%, rgba(168, 85, 247, 0.40), transparent 55%),
+    radial-gradient(circle at 70% 70%, rgba(59, 130, 246, 0.28), transparent 55%);
+  filter: blur(22px);
+  opacity: 0.9;
+}
+
+.tgStoryViewerCardBody {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  text-align: center;
+}
+
+.tgStoryViewerBigAvatar {
+  width: 92px;
+  height: 92px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.10);
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  display: grid;
+  place-items: center;
+}
+
+.tgStoryViewerBigAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tgStoryViewerBigAvatar span {
+  font-weight: 900;
+  font-size: 34px;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.tgStoryViewerHint {
+  margin-top: 16px;
+  font-size: 14px;
+  color: rgba(203, 213, 225, 0.86);
+}
+
+.tgStoryViewerTap {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 44%;
+  border: none;
+  background: transparent;
+  z-index: 4;
+  cursor: pointer;
+}
+
+.tgStoryViewerTap--prev {
+  left: 0;
+}
+
+.tgStoryViewerTap--next {
+  right: 0;
+}
+
 .tgSearchWrap {
   flex-shrink: 0;
   padding: 6px 14px 8px;
@@ -6836,6 +7103,11 @@ body.body--mobileConversationOpen {
   overflow: hidden;
   text-overflow: ellipsis;
   color: rgba(148, 163, 184, 0.95);
+}
+
+.tgRowSubtitle--typing {
+  color: rgba(96, 165, 250, 0.98);
+  font-weight: 700;
 }
 
 .tgRowMeta {
