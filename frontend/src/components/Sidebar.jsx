@@ -11,6 +11,7 @@ import { formatAtUserHandle } from "../userHandleDisplay.js";
 import { IconEllipsis, IconSearch } from "./Icons.jsx";
 import { XASMA_LOGO_SRC } from "../branding.js";
 import { readMessageDraft } from "../messageDrafts.js";
+import { compressImageFileToJpegDataUrl } from "../chatBackgroundImage.js";
 
 function MobileChatListScroll({ className, onScroll, onDoublePullDown, children }) {
   const rootRef = useRef(null);
@@ -36,6 +37,9 @@ function MobileChatListScroll({ className, onScroll, onDoublePullDown, children 
       if (st > 0) return;
       const dy = t.clientY - cur.y0;
       if (dy < 54) return;
+      // Prevent "double scroll" feeling: only count quick pulls (not slow drags / momentum).
+      const dt = Date.now() - (cur.t0 || 0);
+      if (dt > 420) return;
       const now = Date.now();
       if (now - cur.lastPullAt < 900) cur.pullCount += 1;
       else cur.pullCount = 1;
@@ -113,7 +117,54 @@ const Sidebar = forwardRef(function Sidebar(
   const [chatMoveFolderId, setChatMoveFolderId] = useState("");
   const [storyViewerOpen, setStoryViewerOpen] = useState(false);
   const [storyViewerLabel, setStoryViewerLabel] = useState("");
-  const [storyViewerIndex, setStoryViewerIndex] = useState(0);
+  const [storyViewerIndex, setStoryViewerIndex] = useState(0); // user index in storyUsers
+  const [storyViewerItemIndex, setStoryViewerItemIndex] = useState(0); // item index within a user's stories
+  const [storyViewerProgress, setStoryViewerProgress] = useState(0); // 0..1
+  const [storyComposerOpen, setStoryComposerOpen] = useState(false);
+  const [storyComposerBusy, setStoryComposerBusy] = useState(false);
+  const [storyComposerError, setStoryComposerError] = useState("");
+  const storyFileRef = useRef(null);
+
+  const STORIES_STORAGE_KEY = "xasma.stories.v1";
+
+  function loadStoriesIndex() {
+    try {
+      const raw = localStorage.getItem(STORIES_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function saveStoriesIndex(next) {
+    try {
+      localStorage.setItem(STORIES_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function getUserStories(userId) {
+    const idx = loadStoriesIndex();
+    const list = idx?.[String(userId)];
+    const arr = Array.isArray(list) ? list : [];
+    const now = Date.now();
+    const TTL = 24 * 60 * 60 * 1000;
+    return arr
+      .filter((it) => it && typeof it === "object" && typeof it.mediaUrl === "string")
+      .filter((it) => {
+        const t = it.createdAt ? new Date(it.createdAt).getTime() : 0;
+        return t && now - t < TTL;
+      })
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  }
+
+  function userHasStories(userId) {
+    return getUserStories(userId).length > 0;
+  }
+
+  const myStories = useMemo(() => (me?.id ? getUserStories(me.id) : []), [me?.id]);
 
   function chatHasStory(c) {
     // Backend story support may not exist yet; we only show items that explicitly claim a story.
@@ -123,7 +174,8 @@ const Sidebar = forwardRef(function Sidebar(
         c?.story?.items?.length ||
         c?.other?.hasStory ||
         c?.other?.storyUrl ||
-        c?.other?.story?.items?.length
+        c?.other?.story?.items?.length ||
+        (c?.other?.id && userHasStories(c.other.id))
     );
   }
 
@@ -135,6 +187,99 @@ const Sidebar = forwardRef(function Sidebar(
       .filter(chatHasStory)
       .slice(0, 24);
   }, [chats]);
+
+  const storyUsers = useMemo(() => {
+    return storyChats
+      .map((c) => c?.other)
+      .filter(Boolean)
+      .map((u) => ({
+        userId: Number(u.id),
+        username: String(u.username || ""),
+        avatar: String(u.avatar || ""),
+      }))
+      .filter((u) => u.userId);
+  }, [storyChats]);
+
+  const storyViewerUserId = storyUsers[storyViewerIndex]?.userId || null;
+  const storyViewerStories = useMemo(
+    () => (storyViewerUserId ? getUserStories(storyViewerUserId) : []),
+    [storyViewerUserId]
+  );
+
+  useEffect(() => {
+    if (!storyViewerOpen) return undefined;
+    setStoryViewerProgress(0);
+    const TICK_MS = 50;
+    const DURATION_MS = 5200;
+    const id = window.setInterval(() => {
+      setStoryViewerProgress((p) => Math.min(1, p + TICK_MS / DURATION_MS));
+    }, TICK_MS);
+    return () => window.clearInterval(id);
+  }, [storyViewerOpen, storyViewerIndex, storyViewerItemIndex]);
+
+  const goStoryPrev = useCallback(() => {
+    setStoryViewerProgress(0);
+    setStoryViewerItemIndex((idx) => {
+      if (idx > 0) return idx - 1;
+      // prev user
+      setStoryViewerIndex((u) => Math.max(0, u - 1));
+      return 0;
+    });
+  }, []);
+
+  const goStoryNext = useCallback(() => {
+    setStoryViewerProgress(0);
+    setStoryViewerItemIndex((idx) => {
+      const count = storyViewerStories.length;
+      if (count && idx + 1 < count) return idx + 1;
+      // next user
+      setStoryViewerItemIndex(0);
+      setStoryViewerIndex((u) => {
+        const nextU = u + 1;
+        if (nextU >= storyUsers.length) {
+          setStoryViewerOpen(false);
+          return u;
+        }
+        return nextU;
+      });
+      return 0;
+    });
+  }, [storyUsers.length, storyViewerStories.length]);
+
+  useEffect(() => {
+    if (!storyViewerOpen) return;
+    if (storyViewerProgress < 1) return;
+    goStoryNext();
+  }, [storyViewerOpen, storyViewerProgress, goStoryNext]);
+
+  async function addMyStoryFromFile(file) {
+    if (!me?.id) return;
+    if (!file || !file.type?.startsWith("image/")) {
+      setStoryComposerError(t("groupAvatarChooseImage"));
+      return;
+    }
+    setStoryComposerBusy(true);
+    setStoryComposerError("");
+    try {
+      const dataUrl = await compressImageFileToJpegDataUrl(file);
+      const idx = loadStoriesIndex();
+      const key = String(me.id);
+      const prev = Array.isArray(idx[key]) ? idx[key] : [];
+      const item = {
+        id: `st_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+        createdAt: new Date().toISOString(),
+        mediaType: "image",
+        mediaUrl: dataUrl,
+      };
+      idx[key] = [item, ...prev].slice(0, 40);
+      saveStoriesIndex(idx);
+      setStoryComposerOpen(false);
+    } catch (e) {
+      setStoryComposerError(e?.message || t("errorGeneric"));
+    } finally {
+      setStoryComposerBusy(false);
+    }
+  }
 
   const foldersStorageKey = "xasma.chatFolders.v1";
   const chatFolderKey = (chatId) => `xasma.chatFolder.v1.${Number(chatId)}`;
@@ -215,15 +360,25 @@ const Sidebar = forwardRef(function Sidebar(
     return () => document.removeEventListener("mousedown", onDown);
   }, [desktopChatMenuId]);
 
-  const onMobileChatListScroll = useCallback(() => {
-    if (!MOBILE_CHAT_SWIPE_ENABLED) return;
-    if (chatListScrollCloseRaf.current != null) return;
-    chatListScrollCloseRaf.current = requestAnimationFrame(() => {
-      chatListScrollCloseRaf.current = null;
-      setSwipeOpenId(null);
-      setSwipeScrollNonce((n) => n + 1);
-    });
-  }, []);
+  const onMobileChatListScroll = useCallback(
+    (e) => {
+      const el = e?.currentTarget;
+      const st = el && typeof el.scrollTop === "number" ? el.scrollTop : 0;
+      // Telegram-like: when you start scrolling the list, stories collapse into mini avatars.
+      if (mobileStoriesExpanded && st > 10) {
+        onMobileStoriesExpandedChange?.(false);
+      }
+
+      if (!MOBILE_CHAT_SWIPE_ENABLED) return;
+      if (chatListScrollCloseRaf.current != null) return;
+      chatListScrollCloseRaf.current = requestAnimationFrame(() => {
+        chatListScrollCloseRaf.current = null;
+        setSwipeOpenId(null);
+        setSwipeScrollNonce((n) => n + 1);
+      });
+    },
+    [mobileStoriesExpanded, onMobileStoriesExpandedChange]
+  );
 
   const canSearch = useMemo(() => query.trim().length >= 1, [query]);
   const canGroupSearch = useMemo(() => groupQuery.trim().length >= 1, [groupQuery]);
@@ -755,14 +910,33 @@ const Sidebar = forwardRef(function Sidebar(
     const storyStrip = mobileStoriesExpanded ? (
       <div className="tgStoriesStrip tgStoriesStrip--expanded" aria-label={t("stories") ?? "Stories"}>
         <div className="tgStoriesScroll">
+          <input
+            ref={storyFileRef}
+            type="file"
+            accept="image/*"
+            className="fileInput"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (!f) return;
+              void addMyStoryFromFile(f);
+            }}
+          />
           <button
             type="button"
             className="tgStoryItem tgStoryItem--me"
             aria-label={t("myStory") ?? "My story"}
             onClick={() => {
-              setStoryViewerLabel(t("myStory") ?? "Моя история");
-              setStoryViewerIndex(0);
-              setStoryViewerOpen(true);
+              // If I have stories, open viewer; else open picker.
+              if (myStories.length) {
+                setStoryViewerLabel(t("myStory") ?? "Моя история");
+                setStoryViewerIndex(0);
+                setStoryViewerOpen(true);
+              } else {
+                setStoryComposerError("");
+                setStoryComposerOpen(true);
+                storyFileRef.current?.click();
+              }
             }}
           >
             <span className="tgStoryAvatar">
@@ -772,40 +946,24 @@ const Sidebar = forwardRef(function Sidebar(
             </span>
             <span className="tgStoryLabel">{t("myStory") ?? "Моя история"}</span>
           </button>
-          {storyChats.map((c) => {
-            const isGroup = c.type === "group";
-            const isChannel = c.type === "channel";
-            const isRoom = isGroup || isChannel;
-            const isOfficial = c.type === "official";
-            const other = c.other;
-            const label = isChannel
-              ? c.title || t("channelInfoTitle")
-              : isGroup
-                ? c.title || t("groupChat")
-                : isOfficial
-                  ? c.title || t("appTitle")
-                  : other?.username || "";
-            const avatarUrl = isRoom ? c.avatar : other?.avatar;
-
-            return (
-              <button
-                key={`story-${c.id}`}
-                type="button"
-                className="tgStoryItem"
-                onClick={() => {
-                  setStoryViewerLabel(label);
-                  setStoryViewerIndex(storyChats.findIndex((x) => x.id === c.id));
-                  setStoryViewerOpen(true);
-                }}
-                aria-label={label}
-              >
-                <span className="tgStoryAvatar">
-                  {avatarUrl ? <img src={avatarUrl} alt="" /> : <span className="tgStoryInitials">{initials(label)}</span>}
-                </span>
-                <span className="tgStoryLabel">{label}</span>
-              </button>
-            );
-          })}
+          {storyUsers.map((u, idx) => (
+            <button
+              key={`story-u-${u.userId}`}
+              type="button"
+              className="tgStoryItem"
+              onClick={() => {
+                setStoryViewerLabel(u.username || "");
+                setStoryViewerIndex(idx);
+                setStoryViewerOpen(true);
+              }}
+              aria-label={u.username}
+            >
+              <span className="tgStoryAvatar">
+                {u.avatar ? <img src={u.avatar} alt="" /> : <span className="tgStoryInitials">{initials(u.username)}</span>}
+              </span>
+              <span className="tgStoryLabel">{u.username}</span>
+            </button>
+          ))}
         </div>
       </div>
     ) : null;
@@ -862,7 +1020,7 @@ const Sidebar = forwardRef(function Sidebar(
 
         <MobileChatListScroll
           className="mobileChatListScroll"
-          onScroll={MOBILE_CHAT_SWIPE_ENABLED ? onMobileChatListScroll : undefined}
+          onScroll={onMobileChatListScroll}
           onDoublePullDown={() => onMobileStoriesExpandedChange?.(!mobileStoriesExpanded)}
         >
           {canSearch && searching ? (
@@ -1160,28 +1318,97 @@ const Sidebar = forwardRef(function Sidebar(
 
         {storyViewerOpen ? (
           <div className="modalBackdrop modalBackdrop--app" role="dialog" aria-modal="true">
-            <div className="tgStorySoonModal" role="document" aria-label={storyViewerLabel || (t("stories") ?? "Stories")}>
-              <button
-                type="button"
-                className="tgStorySoonClose"
-                onClick={() => setStoryViewerOpen(false)}
-                aria-label={t("close")}
-              >
-                ×
-              </button>
-              <div className="tgStorySoonBody">
-                <div className="tgStorySoonAvatar" aria-hidden>
-                  <span className="tgStorySoonAvatarRing" />
-                  <span className="tgStorySoonAvatarInner">
-                    {(() => {
-                      const c = storyChats[storyViewerIndex];
-                      const label = storyViewerLabel || c?.other?.username || t("myStory") || "";
-                      const url = c?.other?.avatar || "";
-                      return url ? <img src={url} alt="" /> : <span>{initials(label)}</span>;
-                    })()}
-                  </span>
+            <div className="tgStoryViewer" role="document" aria-label={storyViewerLabel || (t("stories") ?? "Stories")}>
+              <div className="tgStoryViewerTop">
+                <div className="tgStoryProgress">
+                  {(storyViewerStories.length ? storyViewerStories : [null]).map((s, i) => {
+                    const fill = i < storyViewerItemIndex ? 1 : i > storyViewerItemIndex ? 0 : storyViewerProgress;
+                    return (
+                      <div key={s?.id || `seg_${i}`} className="tgStoryProgressSeg" aria-hidden>
+                        <div className="tgStoryProgressFill" style={{ transform: `scaleX(${fill})` }} />
+                      </div>
+                    );
+                  })}
                 </div>
-                <div className="tgStorySoonText muted">{t("storiesComingSoon") ?? t("comingSoon")}</div>
+                <div className="tgStoryViewerHeaderRow">
+                  <div className="tgStoryViewerHeaderLeft">
+                    <span className="tgStoryViewerAvatar" aria-hidden>
+                      {storyUsers[storyViewerIndex]?.avatar ? (
+                        <img src={storyUsers[storyViewerIndex].avatar} alt="" />
+                      ) : (
+                        <span className="tgStoryViewerInitial">
+                          {String(storyUsers[storyViewerIndex]?.username || "?").slice(0, 1).toUpperCase()}
+                        </span>
+                      )}
+                    </span>
+                    <div className="tgStoryViewerTitleCol">
+                      <div className="tgStoryViewerTitle">{storyUsers[storyViewerIndex]?.username || storyViewerLabel}</div>
+                      <div className="tgStoryViewerSub muted">
+                        {storyViewerStories[storyViewerItemIndex]?.createdAt
+                          ? formatListTime(storyViewerStories[storyViewerItemIndex].createdAt, lang)
+                          : (t("stories") ?? "Stories")}
+                      </div>
+                    </div>
+                  </div>
+                  <button type="button" className="tgStoryViewerClose" onClick={() => setStoryViewerOpen(false)} aria-label={t("close")}>
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              <button type="button" className="tgStoryViewerTap tgStoryViewerTap--prev" aria-label={t("back")} onClick={goStoryPrev} />
+              <button type="button" className="tgStoryViewerTap tgStoryViewerTap--next" aria-label={t("next") ?? "Next"} onClick={goStoryNext} />
+
+              <div className="tgStoryViewerStage" aria-hidden>
+                <div className="tgStoryViewerCard">
+                  <div className="tgStoryViewerCardGlow" />
+                  <div className="tgStoryViewerCardBody">
+                    {storyViewerStories.length ? (
+                      <img
+                        src={storyViewerStories[storyViewerItemIndex]?.mediaUrl}
+                        alt=""
+                        className="tgStoryViewerMedia"
+                      />
+                    ) : (
+                      <div className="tgStoryViewerHint">{t("storiesComingSoon") ?? t("comingSoon")}</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {storyComposerOpen ? (
+          <div className="modalBackdrop modalBackdrop--app" role="dialog" aria-modal="true">
+            <div className="modalCard modalCard--mobileFriendly" style={{ maxWidth: 420, width: "min(420px, calc(100vw - 24px))" }}>
+              <div className="modalHeader">
+                <div className="modalTitle">{t("myStory") ?? "Моя история"}</div>
+                <button type="button" className="iconCloseBtn" onClick={() => !storyComposerBusy && setStoryComposerOpen(false)} aria-label={t("close")}>
+                  ×
+                </button>
+              </div>
+              <div className="modalBody">
+                <div className="muted">{t("stories") ?? "Stories"}</div>
+                <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className="primaryBtn"
+                    disabled={storyComposerBusy}
+                    onClick={() => storyFileRef.current?.click()}
+                  >
+                    {storyComposerBusy ? t("saving") : (t("groupChangeAvatar") ?? "Choose photo")}
+                  </button>
+                  <button
+                    type="button"
+                    className="ghostBtn"
+                    disabled={storyComposerBusy}
+                    onClick={() => setStoryComposerOpen(false)}
+                  >
+                    {t("close")}
+                  </button>
+                </div>
+                {storyComposerError ? <div className="authError" style={{ marginTop: 12 }}>{storyComposerError}</div> : null}
               </div>
             </div>
           </div>

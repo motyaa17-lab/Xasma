@@ -96,6 +96,42 @@ export default function App() {
   const [typingUntil, setTypingUntil] = useState({}); // chatId -> ms timestamp
   const [presenceTick, setPresenceTick] = useState(0);
 
+  const STORIES_STORAGE_KEY = "xasma.stories.v1";
+
+  function loadStoriesIndex() {
+    try {
+      const raw = localStorage.getItem(STORIES_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function applyLocalStoriesToChats(list) {
+    const stories = loadStoriesIndex();
+    const hasActive = (userId) => {
+      const arr = stories?.[String(userId)];
+      if (!Array.isArray(arr) || arr.length === 0) return false;
+      const now = Date.now();
+      // 24h TTL, Telegram-like.
+      return arr.some((it) => {
+        const t = it?.createdAt ? new Date(it.createdAt).getTime() : 0;
+        return t && now - t < 24 * 60 * 60 * 1000;
+      });
+    };
+
+    const out = Array.isArray(list) ? list.slice() : [];
+    return out.map((c) => {
+      if (!c || typeof c !== "object") return c;
+      if (c.type !== "direct") return c;
+      const other = c.other;
+      if (!other || typeof other !== "object" || !other.id) return c;
+      const nextOther = { ...other, hasStory: Boolean(other.hasStory) || hasActive(other.id) };
+      return other === nextOther ? c : { ...c, other: nextOther };
+    });
+  }
+
   const socketRef = useRef(null);
   const selectedChatIdRef = useRef(null);
   const lastReadSentRef = useRef({}); // chatId -> messageId
@@ -955,7 +991,7 @@ export default function App() {
       try {
         const list = await getChats();
         if (cancelled) return;
-        setChats(list);
+        setChats(applyLocalStoriesToChats(list));
       } catch (e) {
         // Ignore at first; user can reload or interact.
       }
@@ -1014,7 +1050,7 @@ export default function App() {
         debugLog("socket resync", { reason });
         try {
           const list = await getChats();
-          setChats(list);
+          setChats(applyLocalStoriesToChats(list));
         } catch (e) {
           debugLog("socket resync: getChats failed", e?.message || e);
         }
@@ -1824,21 +1860,21 @@ export default function App() {
   async function handleCreateGroup({ title, memberUserIds }) {
     const chatId = await createGroup({ title, memberUserIds });
     const list = await getChats();
-    setChats(list);
+    setChats(applyLocalStoriesToChats(list));
     await selectChat(chatId);
   }
 
   async function handleCreateChannel({ title, avatar, memberUserIds }) {
     const chatId = await createChannel({ title, avatar, memberUserIds });
     const list = await getChats();
-    setChats(list);
+    setChats(applyLocalStoriesToChats(list));
     await selectChat(chatId);
   }
 
   async function refreshChatsList() {
     try {
       const list = await getChats();
-      setChats(list);
+      setChats(applyLocalStoriesToChats(list));
     } catch {
       // ignore
     }
@@ -2394,7 +2430,7 @@ export default function App() {
     <div className="appShell appShell--mobile">
       <div className="mobileStage">
         {mobileTab === "chats" && !selectedChatId ? (
-          <div className="mobilePane mobilePane--inbox">
+          <div className={mobileStoriesExpanded ? "mobilePane mobilePane--inbox mobilePane--storiesExpanded" : "mobilePane mobilePane--inbox"}>
             <header className="mobileMainHeader">
               <button
                 type="button"
