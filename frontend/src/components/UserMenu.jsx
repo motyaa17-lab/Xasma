@@ -873,7 +873,10 @@ const UserMenu = forwardRef(function UserMenu(
               </span>
               <ActivityBadge messageCount={me?.messageCount} t={t} />
             </span>
-            <span className="settingsTopStatus">{statusLine}</span>
+            <span className="settingsTopStatus">
+              {me?.userHandle ? formatAtUserHandle(me.userHandle) + " · " : ""}
+              {statusLine}
+            </span>
           </span>
           <span className="settingsTopChevron" aria-hidden>
             {chevron}
@@ -1063,19 +1066,6 @@ const UserMenu = forwardRef(function UserMenu(
                 onClick={() => setPanel("support")}
               />
             ) : null}
-            {(showAll || match(t("telegramFaqTitle") ?? "Telegram FAQ")) ? (
-              <SettingsRow
-                label={t("telegramFaqTitle") ?? "Telegram FAQ"}
-                icon={<span className="tgSettingsIcon tgSettingsIcon--purple" aria-hidden>📖</span>}
-                onClick={() => {
-                  try {
-                    window.open("https://telegram.org/faq", "_blank", "noopener,noreferrer");
-                  } catch {
-                    // ignore
-                  }
-                }}
-              />
-            ) : null}
           </div>
 
           <div className="settingsSection">
@@ -1107,6 +1097,8 @@ const UserMenu = forwardRef(function UserMenu(
             title={
               panel === "profile"
                 ? t("myProfile")
+                : panel === "profileAppearance"
+                  ? (t("profileAppearanceTitle") ?? "Profile appearance")
                 : panel === "language"
                   ? t("language")
                   : panel === "notifications"
@@ -1137,7 +1129,6 @@ const UserMenu = forwardRef(function UserMenu(
             {panel === "profile" ? (
               <div className="settingsModalList">
                 {avatarError ? <div className="authError">{avatarError}</div> : null}
-                {profileEmailError ? <div className="authError">{profileEmailError}</div> : null}
                 <div className="settingsProfileHeader">
                   <AvatarAura auraColor={profileAuraColor}>
                     {(() => {
@@ -1179,28 +1170,6 @@ const UserMenu = forwardRef(function UserMenu(
                   </div>
                 </div>
 
-                <div className="settingsSection settingsSection--padded">
-                  <div className="settingsTitle">{t("authEmailLabel")}</div>
-                  <input
-                    value={profileEmail}
-                    onChange={(e) => setProfileEmail(e.target.value)}
-                    inputMode="email"
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    placeholder="name@example.com"
-                  />
-                  <div className="profileActions" style={{ marginTop: 10 }}>
-                    <button
-                      type="button"
-                      className="primaryBtn"
-                      onClick={saveEmail}
-                      disabled={profileEmailSaving || !String(profileEmail || "").trim()}
-                    >
-                      {profileEmailSaving ? t("saving") : t("save")}
-                    </button>
-                  </div>
-                </div>
-
                 <div className="settingsSection">
                   <SettingsRow
                     label={t("changeAvatar")}
@@ -1232,6 +1201,46 @@ const UserMenu = forwardRef(function UserMenu(
                   />
                 </div>
 
+                <div className="settingsSection">
+                  <SettingsRow
+                    label={t("profileAppearanceTitle") ?? "Profile appearance"}
+                    right={t("customize") ?? "Customize"}
+                    onClick={() => setPanel("profileAppearance")}
+                  />
+                  <SettingsRow
+                    label={t("statusLabel")}
+                    right={(() => {
+                      const k = String(profileStatusKind || "");
+                      const st = String(profileStatusText || "").trim();
+                      if (k === "online") return t("statusOnline");
+                      if (k === "dnd") return t("statusDnd");
+                      if (k === "away") return t("statusAway");
+                      if (k === "custom" && st) return st;
+                      return t("lastSeen");
+                    })()}
+                    onClick={() => setPanel("statusPick")}
+                  />
+                  <SettingsRow
+                    label={t("aboutLabel")}
+                    right={String(profileAbout || "").trim() ? t("settingsFilled") : t("settingsEmpty")}
+                    onClick={() => setPanel("aboutEdit")}
+                  />
+                </div>
+
+                {profileSaveError ? <div className="authError">{profileSaveError}</div> : null}
+                <div className="settingsFooter">
+                  <button
+                    className="primaryBtn"
+                    type="button"
+                    onClick={saveProfile}
+                    disabled={profileSaving || !onChangeProfile}
+                  >
+                    {profileSaving ? t("saving") : t("save")}
+                  </button>
+                </div>
+              </div>
+            ) : panel === "profileAppearance" ? (
+              <div className="settingsModalList">
                 <div className="settingsSection settingsSection--padded profileAuraSection">
                   <div className="settingsTitle">{t("profileAuraLabel")}</div>
                   <p className="muted small profileAuraHint">{t("profileAuraHint")}</p>
@@ -1324,36 +1333,9 @@ const UserMenu = forwardRef(function UserMenu(
                   )}
                 </div>
 
-                <div className="settingsSection">
-                  <SettingsRow
-                    label={t("statusLabel")}
-                    right={(() => {
-                      const k = String(profileStatusKind || "");
-                      const st = String(profileStatusText || "").trim();
-                      if (k === "online") return t("statusOnline");
-                      if (k === "dnd") return t("statusDnd");
-                      if (k === "away") return t("statusAway");
-                      if (k === "custom" && st) return st;
-                      return t("lastSeen");
-                    })()}
-                    onClick={() => setPanel("statusPick")}
-                  />
-                  <SettingsRow
-                    label={t("aboutLabel")}
-                    right={String(profileAbout || "").trim() ? t("settingsFilled") : t("settingsEmpty")}
-                    onClick={() => setPanel("aboutEdit")}
-                  />
-                </div>
-
-                {profileSaveError ? <div className="authError">{profileSaveError}</div> : null}
                 <div className="settingsFooter">
-                  <button
-                    className="primaryBtn"
-                    type="button"
-                    onClick={saveProfile}
-                    disabled={profileSaving || !onChangeProfile}
-                  >
-                    {profileSaving ? t("saving") : t("save")}
+                  <button className="primaryBtn" type="button" onClick={() => setPanel("profile")}>
+                    {t("done") ?? "Done"}
                   </button>
                 </div>
               </div>

@@ -8465,21 +8465,44 @@ body.body--mobileConversationOpen {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 10px;
-  border-radius: 14px;
+  padding: 16px 12px;
+  border-radius: 18px;
   border: none;
-  background: rgba(28, 28, 30, 0.92);
+  background: linear-gradient(180deg, rgba(28, 28, 30, 0.92) 0%, rgba(20, 20, 22, 0.92) 100%);
+  position: relative;
   color: var(--text);
   cursor: pointer;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  transform: translateZ(0);
+}
+
+.settingsTopProfile::before {
+  content: "";
+  position: absolute;
+  inset: -40px -20px auto -20px;
+  height: 120px;
+  background: radial-gradient(closest-side, rgba(59, 130, 246, 0.22), rgba(59, 130, 246, 0) 70%);
+  pointer-events: none;
+}
+
+.settingsTopProfile::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 18px;
+  pointer-events: none;
 }
 
 .settingsTopProfile:active {
-  background: rgba(37, 99, 235, 0.14);
+  transform: scale(0.99);
+  filter: brightness(1.05);
 }
 
 .settingsTopAvatar {
-  width: 44px;
-  height: 44px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
   overflow: hidden;
   background: rgba(37, 99, 235, 0.25);
@@ -8488,6 +8511,7 @@ body.body--mobileConversationOpen {
   align-items: center;
   justify-content: center;
   font-weight: 800;
+  flex: 0 0 auto;
 }
 
 .settingsTopAvatar img {
@@ -8506,8 +8530,8 @@ body.body--mobileConversationOpen {
 }
 
 .settingsTopName {
-  font-size: 16px;
-  font-weight: 800;
+  font-size: 18px;
+  font-weight: 900;
   line-height: 1.2;
   display: flex;
   flex-wrap: wrap;
