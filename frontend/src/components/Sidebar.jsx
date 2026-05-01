@@ -124,6 +124,7 @@ const Sidebar = forwardRef(function Sidebar(
   const [storyComposerBusy, setStoryComposerBusy] = useState(false);
   const [storyComposerError, setStoryComposerError] = useState("");
   const storyFileRef = useRef(null);
+  const [storiesRev, setStoriesRev] = useState(0);
 
   const STORIES_STORAGE_KEY = "xasma.stories.v1";
 
@@ -145,6 +146,16 @@ const Sidebar = forwardRef(function Sidebar(
     }
   }
 
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (!e) return;
+      if (e.key && String(e.key) !== STORIES_STORAGE_KEY) return;
+      setStoriesRev((n) => n + 1);
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
   function getUserStories(userId) {
     const idx = loadStoriesIndex();
     const list = idx?.[String(userId)];
@@ -164,7 +175,7 @@ const Sidebar = forwardRef(function Sidebar(
     return getUserStories(userId).length > 0;
   }
 
-  const myStories = useMemo(() => (me?.id ? getUserStories(me.id) : []), [me?.id]);
+  const myStories = useMemo(() => (me?.id ? getUserStories(me.id) : []), [me?.id, storiesRev]);
 
   function chatHasStory(c) {
     // Backend story support may not exist yet; we only show items that explicitly claim a story.
@@ -186,7 +197,7 @@ const Sidebar = forwardRef(function Sidebar(
       .filter((c) => c.other?.id) // must be a real chatted user
       .filter(chatHasStory)
       .slice(0, 24);
-  }, [chats]);
+  }, [chats, storiesRev]);
 
   const storyUsers = useMemo(() => {
     return storyChats
@@ -203,7 +214,7 @@ const Sidebar = forwardRef(function Sidebar(
   const storyViewerUserId = storyUsers[storyViewerIndex]?.userId || null;
   const storyViewerStories = useMemo(
     () => (storyViewerUserId ? getUserStories(storyViewerUserId) : []),
-    [storyViewerUserId]
+    [storyViewerUserId, storiesRev]
   );
 
   useEffect(() => {
@@ -273,6 +284,7 @@ const Sidebar = forwardRef(function Sidebar(
       };
       idx[key] = [item, ...prev].slice(0, 40);
       saveStoriesIndex(idx);
+      setStoriesRev((n) => n + 1);
       setStoryComposerOpen(false);
     } catch (e) {
       setStoryComposerError(e?.message || t("errorGeneric"));
