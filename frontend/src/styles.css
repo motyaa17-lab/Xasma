@@ -9011,6 +9011,28 @@ body.body--mobileConversationOpen {
   }
 }
 
+.tgSharedAvatarFly {
+  position: fixed;
+  z-index: 9999;
+  border-radius: 999px;
+  overflow: hidden;
+  pointer-events: none;
+  transform-origin: top left;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  background: rgba(37, 99, 235, 0.25);
+  color: rgba(226, 232, 240, 0.96);
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  -webkit-font-smoothing: antialiased;
+}
+
+.tgSharedAvatarFly--initials {
+  background: radial-gradient(circle at 30% 30%, rgba(59, 130, 246, 0.35), rgba(15, 23, 42, 0.85));
+}
+
 .modalCard--mobileFriendly .modalHeader {
   flex-shrink: 0;
 }

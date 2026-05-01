@@ -810,6 +810,13 @@ const UserMenu = forwardRef(function UserMenu(
     const chevron = "›";
     const [settingsSearch, setSettingsSearch] = useState("");
     const [profileFromHeaderAnim, setProfileFromHeaderAnim] = useState(false);
+    const headerAvatarRef = useRef(null);
+    const profileSharedAnimRef = useRef({
+      active: false,
+      startRect: null,
+      src: "",
+      initials: "",
+    });
 
     const statusLine = (() => {
       if (!me) return "";
@@ -873,18 +880,131 @@ const UserMenu = forwardRef(function UserMenu(
     const showAll = !q;
     const match = (s) => String(s || "").toLowerCase().includes(q);
 
+    useEffect(() => {
+      if (panel !== "profile") return;
+      if (!profileFromHeaderAnim) return;
+      const snap = profileSharedAnimRef.current;
+      if (!snap?.active || !snap.startRect) return;
+      if (snap.active && snap.startRect && snap.startRect.width <= 0) return;
+
+      let cleanup = () => {};
+      let cancelled = false;
+
+      const run = () => {
+        if (cancelled) return;
+        const target = document.querySelector('[data-shared-avatar="profile"]');
+        if (!target) return;
+        const endRect = target.getBoundingClientRect?.();
+        if (!endRect || endRect.width <= 0 || endRect.height <= 0) return;
+
+        const start = snap.startRect;
+        const overlay = document.createElement("div");
+        overlay.className = "tgSharedAvatarFly";
+        overlay.style.left = `${start.left}px`;
+        overlay.style.top = `${start.top}px`;
+        overlay.style.width = `${start.width}px`;
+        overlay.style.height = `${start.height}px`;
+
+        if (snap.src) {
+          overlay.style.backgroundImage = `url(${snap.src})`;
+          overlay.style.backgroundSize = "cover";
+          overlay.style.backgroundPosition = "center";
+        } else {
+          overlay.textContent = snap.initials || "?";
+          overlay.classList.add("tgSharedAvatarFly--initials");
+        }
+
+        // Hide destination avatar briefly to sell the “teleport”.
+        const prevOpacity = target.style.opacity;
+        target.style.opacity = "0";
+
+        document.body.appendChild(overlay);
+
+        const dx = endRect.left - start.left;
+        const dy = endRect.top - start.top;
+        const sx = endRect.width / start.width;
+        const sy = endRect.height / start.height;
+
+        const anim = overlay.animate(
+          [
+            { transform: "translate3d(0,0,0) scale(1,1)", opacity: 1 },
+            { transform: `translate3d(${dx}px, ${dy}px, 0) scale(${sx}, ${sy})`, opacity: 1 },
+          ],
+          { duration: 360, easing: "cubic-bezier(0.2, 0.9, 0.2, 1)", fill: "forwards" }
+        );
+
+        const fade = overlay.animate(
+          [{ opacity: 1 }, { opacity: 0 }],
+          { duration: 140, easing: "ease-out", fill: "forwards", delay: 300 }
+        );
+
+        const done = () => {
+          try {
+            overlay.remove();
+          } catch {
+            // ignore
+          }
+          target.style.opacity = prevOpacity || "";
+          profileSharedAnimRef.current = { active: false, startRect: null, src: "", initials: "" };
+        };
+
+        anim.onfinish = done;
+        fade.onfinish = () => {};
+
+        cleanup = () => {
+          try {
+            anim.cancel();
+            fade.cancel();
+          } catch {
+            // ignore
+          }
+          try {
+            overlay.remove();
+          } catch {
+            // ignore
+          }
+          target.style.opacity = prevOpacity || "";
+        };
+      };
+
+      // Wait a frame so the modal content is measured.
+      const id = window.requestAnimationFrame(() => window.requestAnimationFrame(run));
+      cleanup = () => window.cancelAnimationFrame(id);
+
+      return () => {
+        cancelled = true;
+        cleanup();
+      };
+    }, [panel, profileFromHeaderAnim]);
+
     return (
       <div className="settingsScreen settingsScreen--mobile" ref={rootRef}>
         <button
           type="button"
           className="settingsTopProfile"
           onClick={() => {
+            try {
+              const el = headerAvatarRef.current;
+              const rect = el?.getBoundingClientRect?.();
+              if (rect && rect.width > 0 && rect.height > 0) {
+                profileSharedAnimRef.current = {
+                  active: true,
+                  startRect: rect,
+                  src: String(me?.avatar || ""),
+                  initials: initials(me?.username),
+                };
+              } else {
+                profileSharedAnimRef.current = { active: false, startRect: null, src: "", initials: "" };
+              }
+            } catch {
+              profileSharedAnimRef.current = { active: false, startRect: null, src: "", initials: "" };
+            }
             setProfileFromHeaderAnim(true);
             setPanel("profile");
           }}
         >
           <span className="settingsTopAvatar">
-            <span className={isPremiumActive(me) ? "avatarPremium" : undefined}>
+            <span ref={headerAvatarRef} className={isPremiumActive(me) ? "avatarPremium" : undefined}>
               {me?.avatar ? <img src={me.avatar} alt="" /> : <span>{initials(me?.username)}</span>}
             </span>
           </span>
@@ -1217,7 +1337,7 @@ const UserMenu = forwardRef(function UserMenu(
                     {(() => {
                       const ringC = avatarRingWrapClass(isPremiumActive(me) ? profileAvatarRing : "");
                       const inner = (
-                        <div className="settingsProfileAvatar">
+                        <div className="settingsProfileAvatar" data-shared-avatar="profile">
                           {avatarPreview || me?.avatar ? (
                             <img src={avatarPreview || me.avatar} alt="" />
                           ) : (
