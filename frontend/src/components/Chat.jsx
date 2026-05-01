@@ -45,6 +45,53 @@ const SWIPE_REPLY_CANCEL_Y_PX = 14;
 const SWIPE_REPLY_TRIGGER_PX = 56;
 const SWIPE_REPLY_MAX_PX = 82;
 
+function isUrlLike(s) {
+  return /^https?:\/\/\S+$/i.test(String(s || ""));
+}
+
+function renderTextWithLinks(text) {
+  const t = String(text ?? "");
+  if (!t.trim()) return t;
+  const parts = t.split(/(\s+)/);
+  return parts.map((p, i) => {
+    if (!p) return p;
+    if (/^\s+$/.test(p)) return p;
+    const token = p.replace(/[)\],.;!?]+$/g, (m) => m); // keep punctuation; browser handles it
+    if (isUrlLike(token)) {
+      // eslint-disable-next-line react/no-array-index-key
+      return (
+        <a key={i} href={token} target="_blank" rel="noopener noreferrer" className="msgLink">
+          {p}
+        </a>
+      );
+    }
+    return p;
+  });
+}
+
+function dayKey(iso) {
+  const d = iso ? new Date(iso) : null;
+  if (!d || Number.isNaN(d.getTime())) return "";
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function formatDayLabel(iso, t, lang) {
+  const d = iso ? new Date(iso) : null;
+  if (!d || Number.isNaN(d.getTime())) return "";
+  const now = new Date();
+  const sameDay = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+  if (sameDay) return t("today") ?? "Today";
+  const y = new Date(now);
+  y.setDate(now.getDate() - 1);
+  const yesterday = d.getFullYear() === y.getFullYear() && d.getMonth() === y.getMonth() && d.getDate() === y.getDate();
+  if (yesterday) return t("yesterday") ?? "Yesterday";
+  try {
+    return d.toLocaleDateString(localeForLang(lang), { month: "long", day: "numeric", year: "numeric" });
+  } catch {
+    return d.toDateString();
+  }
+}
+
 const MessageActionMenuPanel = forwardRef(function MessageActionMenuPanel(
   {
     t,
@@ -52,6 +99,7 @@ const MessageActionMenuPanel = forwardRef(function MessageActionMenuPanel(
     hasSecondaryActions,
     canEditOwn,
     canForward,
+    canCopy,
     canDeleteOwn,
     canDeleteForAll,
     canReport,
@@ -63,6 +111,7 @@ const MessageActionMenuPanel = forwardRef(function MessageActionMenuPanel(
     onToggleReaction,
     onEdit,
     onForward,
+    onCopy,
     onDeleteSelf,
     onDeleteForAll,
     onReport,
@@ -136,6 +185,22 @@ const MessageActionMenuPanel = forwardRef(function MessageActionMenuPanel(
           }}
         >
           {t("forward")}
+        </button>
+      ) : null}
+      {canCopy ? (
+        <button
+          type="button"
+          className="msgMenuItem"
+          role="menuitem"
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            closeMenu();
+            onCopy?.();
+          }}
+        >
+          {t("copy") ?? "Copy"}
         </button>
       ) : null}
       {canDeleteForAll ? (
@@ -526,13 +591,21 @@ export default function Chat({
   const chatBgParallaxRef = useRef(null);
   const parallaxRafRef = useRef(0);
   const parallaxMotionOkRef = useRef(true);
+  const nearBottomRef = useRef(true);
+  const [scrollDownVisible, setScrollDownVisible] = useState(false);
+  const [scrollDownUnread, setScrollDownUnread] = useState(0);
+  const [firstNewIncomingId, setFirstNewIncomingId] = useState(null);
+  const [jumpFlashId, setJumpFlashId] = useState(null);
+  const jumpFlashTimerRef = useRef(null);
   const scrollToMessageById = useCallback((mid) => {
     const id = Number(mid);
     if (!id || !listRef.current) return;
     const el = listRef.current.querySelector(`[data-message-id="${id}"]`);
     el?.scrollIntoView({ block: "center", behavior: "smooth" });
+    setJumpFlashId(id);
+    if (jumpFlashTimerRef.current) window.clearTimeout(jumpFlashTimerRef.current);
+    jumpFlashTimerRef.current = window.setTimeout(() => setJumpFlashId(null), 900);
   }, []);
-  const nearBottomRef = useRef(true);
   const scrollAfterSendRef = useRef(false);
   const scrollAfterSendClearTimerRef = useRef(null);
   const prevMessagesScrollMetaRef = useRef({ chatId: null, len: 0, tailId: null });
@@ -1009,6 +1082,11 @@ export default function Chat({
       const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
       nearBottomRef.current = distance <= SCROLL_NEAR_BOTTOM_PX;
       if (isMobileChat) clearBubbleLongPress();
+      setScrollDownVisible(!nearBottomRef.current && el.scrollHeight > el.clientHeight + 40);
+      if (nearBottomRef.current) {
+        setScrollDownUnread(0);
+        setFirstNewIncomingId(null);
+      }
     }
     onScroll();
     el.addEventListener("scroll", onScroll, { passive: true });
@@ -1130,6 +1208,17 @@ export default function Chat({
       meta.tailId = tailId;
       scrollMessagesListToEnd("smooth");
       return;
+    }
+
+    // Incoming while not at bottom -> Telegram-like "new messages" indicator.
+    if (lenGrew && !nearBottomRef.current) {
+      const last = messages[messages.length - 1];
+      const incoming =
+        last && last.senderId && Number(last.senderId) !== Number(meId) && last.type !== "system";
+      if (incoming) {
+        setScrollDownUnread((n) => Math.min(99, n + 1));
+        setFirstNewIncomingId((prev) => (prev == null ? Number(last.id) : prev));
+      }
     }
 
     meta.len = messages.length;
@@ -2710,14 +2799,34 @@ export default function Chat({
           ) : null}
 
           <div className="messages" ref={listRef}>
-            {safeMessages.map((m) =>
-              m.type === "system" ? (
-                <div
-                  key={m.id}
-                  className={`systemMessageRow${
-                    m.systemKind === "official_broadcast" ? " systemMessageRow--officialBroadcast" : ""
-                  }${enteringMessageIds.has(String(m.id)) ? " systemMessageRow--enter" : ""}`}
-                >
+            {safeMessages.map((m, idx) => {
+              const prev = safeMessages[idx - 1];
+              const curDay = dayKey(m?.createdAt);
+              const prevDay = prev ? dayKey(prev?.createdAt) : "";
+              const dayBreak = Boolean(curDay && curDay !== prevDay);
+              const unreadBreak = firstNewIncomingId != null && Number(m?.id) === Number(firstNewIncomingId);
+
+              return (
+                <React.Fragment key={m.id}>
+                  {dayBreak ? (
+                    <div className="dateDivider" aria-label="Date">
+                      <span className="dateDividerPill">{formatDayLabel(m.createdAt, t, lang)}</span>
+                    </div>
+                  ) : null}
+                  {unreadBreak ? (
+                    <div className="unreadDivider" role="separator" aria-label={t("unread") ?? "Unread messages"}>
+                      <span className="unreadDividerLine" aria-hidden />
+                      <span className="unreadDividerPill">{t("unread") ?? "Unread messages"}</span>
+                      <span className="unreadDividerLine" aria-hidden />
+                    </div>
+                  ) : null}
+
+                  {m.type === "system" ? (
+                    <div
+                      className={`systemMessageRow${
+                        m.systemKind === "official_broadcast" ? " systemMessageRow--officialBroadcast" : ""
+                      }${enteringMessageIds.has(String(m.id)) ? " systemMessageRow--enter" : ""}`}
+                    >
                   <div className="systemMessageInner">
                     {m.systemKind === "official_broadcast" ? (
                       <>
@@ -2729,9 +2838,9 @@ export default function Chat({
                     )}
                   </div>
                   <div className="systemMessageTime">{formatTime(m.createdAt, lang)}</div>
-                </div>
-              ) : (
-                (() => {
+                    </div>
+                  ) : (
+                    (() => {
                   const textTrim = String(m.text ?? "").trim();
                   const isCircleVideoOnly =
                     Boolean(m.videoUrl) && !m.imageUrl && !m.audioUrl && !textTrim && !m.editedAt;
@@ -2770,7 +2879,6 @@ export default function Chat({
 
                   return (
                 <div
-                  key={m.id}
                   data-message-id={m.id}
                   className={`bubbleRow${m.senderId === meId ? " me" : ""}${
                     enteringMessageIds.has(String(m.id))
@@ -2780,7 +2888,7 @@ export default function Chat({
                       : ""
                   }${
                     !isMobileChat && showMenuButton && menuMessageId === m.id ? " bubbleRow--msgMenuOpen" : ""
-                  }`}
+                  }${jumpFlashId === Number(m.id) ? " bubbleRow--jumpFlash" : ""}`}
                 >
                   <AvatarAura auraColor={msgAura}>
                     {(() => {
@@ -2923,7 +3031,15 @@ export default function Chat({
                       </div>
                     ) : null}
                     {m.replyTo ? (
-                      <div className="replyBlock" aria-label={t("replyTo")}>
+                      <button
+                        type="button"
+                        className="replyBlock replyBlock--tap"
+                        aria-label={t("replyTo")}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (m.replyTo?.id) scrollToMessageById(m.replyTo.id);
+                        }}
+                      >
                         <div className="replyBlockSender">{m.replyTo.senderUsername || t("notifyUnknownSender")}</div>
                         <div className="replyBlockPreview muted">
                           {m.replyTo.imageUrl
@@ -2934,7 +3050,7 @@ export default function Chat({
                                 ? t("notifyPreviewVideo")
                                 : String(m.replyTo.text || "").replace(/\s+/g, " ").trim() || t("notifyBodyFallback")}
                         </div>
-                      </div>
+                      </button>
                     ) : null}
                     {m.imageUrl ? (
                       <a
@@ -2992,7 +3108,7 @@ export default function Chat({
                     ) : null}
                     {String(m.text ?? "").trim() ? (
                       <div className="bubbleText">
-                        {m.text}
+                        {renderTextWithLinks(m.text)}
                         {m.editedAt ? (
                           <span className="bubbleEdited"> {t("edited")}</span>
                         ) : null}
@@ -3063,14 +3179,36 @@ export default function Chat({
                 </div>
                   );
                 })()
-              )
-            )}
+                  )}
+                </React.Fragment>
+              );
+            })}
             {chatId && !messages.some((m) => m.type !== "system") ? (
               <div className="chatEmptyState" role="status">
                 <p className="chatEmptyStateText">{t("chatEmptyPrompt")}</p>
               </div>
             ) : null}
           </div>
+
+          {scrollDownVisible ? (
+            <button
+              type="button"
+              className="scrollDownFab"
+              aria-label={t("scrollToBottom") ?? "Scroll to bottom"}
+              onClick={() => {
+                scrollMessagesListToEnd("smooth");
+                setScrollDownUnread(0);
+                setFirstNewIncomingId(null);
+              }}
+            >
+              <span className="scrollDownFabGlyph" aria-hidden>
+                ↓
+              </span>
+              {scrollDownUnread ? (
+                <span className="scrollDownFabBadge">{scrollDownUnread > 99 ? "99+" : String(scrollDownUnread)}</span>
+              ) : null}
+            </button>
+          ) : null}
 
           <div
             className={`typingIndicator${otherTyping && chatId && !isOfficial ? " typingIndicator--on" : ""}`}
@@ -3462,6 +3600,7 @@ export default function Chat({
                     hasSecondaryActions={mobileMenuFlags.hasSecondaryActions}
                     canReply={mobileMenuFlags.canReply}
                     canForward={mobileMenuFlags.canForward}
+                    canCopy={Boolean(String(mobileMenuTarget?.text ?? "").trim())}
                     canEditOwn={mobileMenuFlags.canEditOwn}
                     canDeleteOwn={mobileMenuFlags.canDeleteOwn}
                     canDeleteForAll={mobileMenuFlags.canDeleteForAll}
@@ -3510,6 +3649,29 @@ export default function Chat({
                       setForwardError("");
                       setForwardQuery("");
                       setForwardTargetMessage(mobileMenuTarget);
+                    }}
+                    onCopy={() => {
+                      const text = String(mobileMenuTarget?.text ?? "").trim();
+                      if (!text) return;
+                      try {
+                        if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+                          void navigator.clipboard.writeText(text);
+                        } else {
+                          const ta = document.createElement("textarea");
+                          ta.value = text;
+                          ta.style.position = "fixed";
+                          ta.style.left = "-9999px";
+                          ta.style.top = "-9999px";
+                          document.body.appendChild(ta);
+                          ta.focus();
+                          ta.select();
+                          document.execCommand("copy");
+                          ta.remove();
+                        }
+                        setReportFeedback(t("copied") ?? "Copied");
+                      } catch {
+                        setReportFeedback(t("copyFailed") ?? "Copy failed");
+                      }
                     }}
                     onDeleteSelf={() => onDeleteMessage?.(mobileMenuTarget.id, "self")}
                     onDeleteForAll={() => onDeleteMessage?.(mobileMenuTarget.id, "both")}
