@@ -866,6 +866,28 @@ const UserMenu = forwardRef(function UserMenu(
       );
     }
 
+    function SettingsToggleRow({ label, value, onChange, disabled }) {
+      const on = Boolean(value);
+      return (
+        <button
+          type="button"
+          className={`settingsRow settingsRow--toggle${disabled ? " settingsRow--disabled" : ""}`.trim()}
+          onClick={() => !disabled && onChange?.(!on)}
+          disabled={disabled}
+          aria-pressed={on}
+        >
+          <span className="settingsRowLeft">
+            <span className="settingsRowLabel">{label}</span>
+          </span>
+          <span className="settingsRowRight">
+            <span className={on ? "tgSwitch tgSwitch--on" : "tgSwitch"} aria-hidden>
+              <span className="tgSwitchThumb" />
+            </span>
+          </span>
+        </button>
+      );
+    }
+
     function openPath(p) {
       try {
         window.history.pushState({}, "", p);
@@ -1862,15 +1884,15 @@ const UserMenu = forwardRef(function UserMenu(
                   <div className="muted small">{t("dataAndStorageHint") ?? "Media download and storage preferences for this client."}</div>
                 </div>
                 <div className="settingsSection">
-                  <SettingsChoiceRow
+                  <SettingsToggleRow
                     label={t("autoDownloadMediaLabel") ?? "Auto-download media"}
-                    selected={Boolean(settings?.autoDownloadMedia)}
-                    onClick={() => onChangeSettings?.({ autoDownloadMedia: !settings?.autoDownloadMedia })}
+                    value={Boolean(settings?.autoDownloadMedia)}
+                    onChange={(v) => onChangeSettings?.({ autoDownloadMedia: Boolean(v) })}
                   />
-                  <SettingsChoiceRow
+                  <SettingsToggleRow
                     label={t("saveToGalleryLabel") ?? "Save to Gallery"}
-                    selected={Boolean(settings?.saveToGallery)}
-                    onClick={() => onChangeSettings?.({ saveToGallery: !settings?.saveToGallery })}
+                    value={Boolean(settings?.saveToGallery)}
+                    onChange={(v) => onChangeSettings?.({ saveToGallery: Boolean(v) })}
                   />
                 </div>
               </div>
@@ -1881,15 +1903,15 @@ const UserMenu = forwardRef(function UserMenu(
                   <div className="muted small">{t("powerSavingHint") ?? "Reduce visual effects to save battery."}</div>
                 </div>
                 <div className="settingsSection">
-                  <SettingsChoiceRow
+                  <SettingsToggleRow
                     label={t("powerSavingEnableLabel") ?? "Enable Power Saving"}
-                    selected={Boolean(settings?.powerSavingEnabled)}
-                    onClick={() => onChangeSettings?.({ powerSavingEnabled: !settings?.powerSavingEnabled })}
+                    value={Boolean(settings?.powerSavingEnabled)}
+                    onChange={(v) => onChangeSettings?.({ powerSavingEnabled: Boolean(v) })}
                   />
-                  <SettingsChoiceRow
+                  <SettingsToggleRow
                     label={t("reduceMotionLabel") ?? "Reduce motion"}
-                    selected={Boolean(settings?.reduceMotion)}
-                    onClick={() => onChangeSettings?.({ reduceMotion: !settings?.reduceMotion })}
+                    value={Boolean(settings?.reduceMotion)}
+                    onChange={(v) => onChangeSettings?.({ reduceMotion: Boolean(v) })}
                   />
                 </div>
               </div>
@@ -1911,10 +1933,10 @@ const UserMenu = forwardRef(function UserMenu(
                   <div className="muted small">{t("advancedHint") ?? "Extra options for this client."}</div>
                 </div>
                 <div className="settingsSection">
-                  <SettingsChoiceRow
+                  <SettingsToggleRow
                     label={t("reduceMotionLabel") ?? "Reduce motion"}
-                    selected={Boolean(settings?.reduceMotion)}
-                    onClick={() => onChangeSettings?.({ reduceMotion: !settings?.reduceMotion })}
+                    value={Boolean(settings?.reduceMotion)}
+                    onChange={(v) => onChangeSettings?.({ reduceMotion: Boolean(v) })}
                   />
                 </div>
               </div>
