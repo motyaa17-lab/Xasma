@@ -793,6 +793,7 @@ const UserMenu = forwardRef(function UserMenu(
 
   if (variant === "mobilePage") {
     const chevron = "›";
+    const [settingsSearch, setSettingsSearch] = useState("");
 
     const statusLine = (() => {
       if (!me) return "";
@@ -842,6 +843,20 @@ const UserMenu = forwardRef(function UserMenu(
       );
     }
 
+    function openPath(p) {
+      try {
+        window.history.pushState({}, "", p);
+        window.dispatchEvent(new PopStateEvent("popstate"));
+        setPanel(null);
+      } catch {
+        window.location.href = p;
+      }
+    }
+
+    const q = String(settingsSearch || "").trim().toLowerCase();
+    const showAll = !q;
+    const match = (s) => String(s || "").toLowerCase().includes(q);
+
     return (
       <div className="settingsScreen settingsScreen--mobile" ref={rootRef}>
         <button type="button" className="settingsTopProfile" onClick={() => setPanel("profile")}>
@@ -866,42 +881,94 @@ const UserMenu = forwardRef(function UserMenu(
         </button>
 
         <div className="settingsList">
-          <div className="settingsSectionHeader">{t("profile")}</div>
-          <div className="settingsSection">
-            <SettingsRow
-              label={t("myProfile")}
-              icon={<span className="tgSettingsIcon tgSettingsIcon--red" aria-hidden>👤</span>}
-              onClick={() => setPanel("profile")}
+          <div className="tgSettingsSearchWrap">
+            <input
+              className="tgSettingsSearchInput"
+              value={settingsSearch}
+              onChange={(e) => setSettingsSearch(e.target.value)}
+              placeholder={t("settingsSearchPlaceholder") ?? "Search Settings and FAQ"}
+              aria-label={t("settingsSearchPlaceholder") ?? "Search Settings and FAQ"}
             />
           </div>
 
-          <div className="settingsSectionHeader">{t("language")}</div>
-          <div className="settingsSection">
-            <SettingsRow
-              label={t("language")}
-              right={currentLanguageLabel(settings?.lang, t)}
-              icon={<span className="tgSettingsIcon tgSettingsIcon--purple" aria-hidden>🌐</span>}
-              onClick={() => setPanel("language")}
-            />
-          </div>
+          {(showAll || match(t("editProfileTitle") ?? "Edit Profile") || match(t("myProfile"))) ? (
+            <div className="settingsSection">
+              <SettingsRow
+                label={t("editProfileTitle") ?? "Edit Profile"}
+                icon={<span className="tgSettingsIcon tgSettingsIcon--blue" aria-hidden>👤</span>}
+                onClick={() => setPanel("profile")}
+              />
+            </div>
+          ) : null}
 
-          <div className="settingsSectionHeader">{t("notifySettingsTitle")}</div>
           <div className="settingsSection">
-            <SettingsRow
-              label={t("notifyEnableLabel")}
-              icon={<span className="tgSettingsIcon tgSettingsIcon--red" aria-hidden>🔔</span>}
-              onClick={() => setPanel("notifications")}
-            />
-          </div>
+            {(showAll || match(t("appearanceTitle") ?? "Appearance") || match(t("chatBackground"))) ? (
+              <SettingsRow
+                label={t("appearanceTitle") ?? "Appearance"}
+                right={chatBackgroundDisplayLabel(t, settings)}
+                icon={<span className="tgSettingsIcon tgSettingsIcon--purple" aria-hidden>🎨</span>}
+                onClick={() => setPanel("chatBackground")}
+              />
+            ) : null}
 
-          <div className="settingsSectionHeader">{t("chatBackground")}</div>
-          <div className="settingsSection">
-            <SettingsRow
-              label={t("settingsCurrentBackground")}
-              right={chatBackgroundDisplayLabel(t, settings)}
-              icon={<span className="tgSettingsIcon tgSettingsIcon--blue" aria-hidden>🎨</span>}
-              onClick={() => setPanel("chatBackground")}
-            />
+            {(showAll || match(t("privacyAndSecurityTitle") ?? "Privacy and Security")) ? (
+              <SettingsRow
+                label={t("privacyAndSecurityTitle") ?? "Privacy and Security"}
+                icon={<span className="tgSettingsIcon tgSettingsIcon--red" aria-hidden>🔒</span>}
+                onClick={() => setPanel("privacySecurity")}
+              />
+            ) : null}
+
+            {(showAll || match(t("notifySettingsTitle")) || match(t("notificationsAndSoundsTitle") ?? "Notifications and Sounds")) ? (
+              <SettingsRow
+                label={t("notificationsAndSoundsTitle") ?? "Notifications and Sounds"}
+                right={settings?.messageNotificationsEnabled ? (t("on") ?? "On") : (t("off") ?? "Off")}
+                icon={<span className="tgSettingsIcon tgSettingsIcon--red" aria-hidden>🔔</span>}
+                onClick={() => setPanel("notifications")}
+              />
+            ) : null}
+
+            {(showAll || match(t("dataAndStorageTitle") ?? "Data and Storage")) ? (
+              <SettingsRow
+                label={t("dataAndStorageTitle") ?? "Data and Storage"}
+                icon={<span className="tgSettingsIcon tgSettingsIcon--blue" aria-hidden>💾</span>}
+                onClick={() => setPanel("dataStorage")}
+              />
+            ) : null}
+
+            {(showAll || match(t("powerSavingTitle") ?? "Power Saving")) ? (
+              <SettingsRow
+                label={t("powerSavingTitle") ?? "Power Saving"}
+                right={settings?.powerSavingEnabled ? (t("on") ?? "On") : (t("off") ?? "Off")}
+                icon={<span className="tgSettingsIcon tgSettingsIcon--purple" aria-hidden>🔋</span>}
+                onClick={() => setPanel("powerSaving")}
+              />
+            ) : null}
+
+            {(showAll || match(t("devicesTitle") ?? "Devices")) ? (
+              <SettingsRow
+                label={t("devicesTitle") ?? "Devices"}
+                icon={<span className="tgSettingsIcon tgSettingsIcon--blue" aria-hidden>💻</span>}
+                onClick={() => setPanel("devices")}
+              />
+            ) : null}
+
+            {(showAll || match(t("language")) || match(t("languageTitle") ?? "Language")) ? (
+              <SettingsRow
+                label={t("languageTitle") ?? t("language")}
+                right={currentLanguageLabel(settings?.lang, t)}
+                icon={<span className="tgSettingsIcon tgSettingsIcon--purple" aria-hidden>🌐</span>}
+                onClick={() => setPanel("language")}
+              />
+            ) : null}
+
+            {(showAll || match(t("advancedTitle") ?? "Advanced")) ? (
+              <SettingsRow
+                label={t("advancedTitle") ?? "Advanced"}
+                icon={<span className="tgSettingsIcon tgSettingsIcon--blue" aria-hidden>⚙️</span>}
+                onClick={() => setPanel("advanced")}
+              />
+            ) : null}
           </div>
 
           <div className="settingsSectionHeader">{t("inviteFriendsTitle")}</div>
@@ -989,80 +1056,49 @@ const UserMenu = forwardRef(function UserMenu(
 
           <div className="settingsSectionHeader">{t("settingsSupport")}</div>
           <div className="settingsSection">
-            <SettingsRow label={t("settingsSupportAuthors")} onClick={() => setPanel("support")} />
+            {(showAll || match(t("askAQuestionTitle") ?? "Ask a Question") || match(t("settingsSupportAuthors"))) ? (
+              <SettingsRow
+                label={t("askAQuestionTitle") ?? "Ask a Question"}
+                icon={<span className="tgSettingsIcon tgSettingsIcon--blue" aria-hidden>❓</span>}
+                onClick={() => setPanel("support")}
+              />
+            ) : null}
+            {(showAll || match(t("telegramFaqTitle") ?? "Telegram FAQ")) ? (
+              <SettingsRow
+                label={t("telegramFaqTitle") ?? "Telegram FAQ"}
+                icon={<span className="tgSettingsIcon tgSettingsIcon--purple" aria-hidden>📖</span>}
+                onClick={() => {
+                  try {
+                    window.open("https://telegram.org/faq", "_blank", "noopener,noreferrer");
+                  } catch {
+                    // ignore
+                  }
+                }}
+              />
+            ) : null}
           </div>
 
-          <div className="settingsSectionHeader">{t("legal")}</div>
           <div className="settingsSection">
-            <SettingsRow
-              label={t("aboutAppTitle")}
-              onClick={() => setPanel("aboutApp")}
-            />
-            <SettingsRow
-              label={t("privacyPolicyTitle")}
-              onClick={() => {
-                try {
-                  window.history.pushState({}, "", "/privacy");
-                  window.dispatchEvent(new PopStateEvent("popstate"));
-                  setPanel(null);
-                } catch {
-                  window.location.href = "/privacy";
-                }
-              }}
-            />
-            <SettingsRow
-              label={t("termsTitle")}
-              onClick={() => {
-                try {
-                  window.history.pushState({}, "", "/terms");
-                  window.dispatchEvent(new PopStateEvent("popstate"));
-                  setPanel(null);
-                } catch {
-                  window.location.href = "/terms";
-                }
-              }}
-            />
-            <SettingsRow
-              label={t("dataDeletionTitle")}
-              onClick={() => {
-                try {
-                  window.history.pushState({}, "", "/data-deletion");
-                  window.dispatchEvent(new PopStateEvent("popstate"));
-                  setPanel(null);
-                } catch {
-                  window.location.href = "/data-deletion";
-                }
-              }}
-            />
-            <SettingsRow
-              label={t("dataSafetyTitle")}
-              onClick={() => {
-                try {
-                  window.history.pushState({}, "", "/data-safety");
-                  window.dispatchEvent(new PopStateEvent("popstate"));
-                  setPanel(null);
-                } catch {
-                  window.location.href = "/data-safety";
-                }
-              }}
-            />
-            <SettingsRow
-              label={t("permissionsTitle")}
-              onClick={() => {
-                try {
-                  window.history.pushState({}, "", "/permissions");
-                  window.dispatchEvent(new PopStateEvent("popstate"));
-                  setPanel(null);
-                } catch {
-                  window.location.href = "/permissions";
-                }
-              }}
-            />
+            {(showAll || match(t("privacyPolicyTitle")) || match(t("privacyPolicyShort") ?? "Privacy Policy")) ? (
+              <SettingsRow
+                label={t("privacyPolicyShort") ?? t("privacyPolicyTitle")}
+                icon={<span className="tgSettingsIcon tgSettingsIcon--blue" aria-hidden>🛡️</span>}
+                onClick={() => openPath("/privacy")}
+              />
+            ) : null}
+            {(showAll || match(t("aboutAppTitle")) || match(t("aboutTitleShort") ?? "About")) ? (
+              <SettingsRow
+                label={t("aboutTitleShort") ?? t("aboutAppTitle")}
+                icon={<span className="tgSettingsIcon tgSettingsIcon--purple" aria-hidden>ℹ️</span>}
+                onClick={() => setPanel("aboutApp")}
+              />
+            ) : null}
           </div>
 
-          <div className="settingsSectionHeader">{t("logout")}</div>
           <div className="settingsSection">
-            <SettingsRow label={t("logout")} danger onClick={onLogout} />
+            {(showAll || match(t("logout"))) ? (
+              <SettingsRow label={t("logout")} danger icon={<span className="tgSettingsIcon tgSettingsIcon--red" aria-hidden>⎋</span>} onClick={onLogout} />
+            ) : null}
           </div>
         </div>
 
@@ -1077,6 +1113,16 @@ const UserMenu = forwardRef(function UserMenu(
                     ? t("notifySettingsTitle")
                     : panel === "chatBackground"
                       ? t("chatBackground")
+                      : panel === "privacySecurity"
+                        ? (t("privacyAndSecurityTitle") ?? "Privacy and Security")
+                        : panel === "dataStorage"
+                          ? (t("dataAndStorageTitle") ?? "Data and Storage")
+                          : panel === "powerSaving"
+                            ? (t("powerSavingTitle") ?? "Power Saving")
+                            : panel === "devices"
+                              ? (t("devicesTitle") ?? "Devices")
+                              : panel === "advanced"
+                                ? (t("advancedTitle") ?? "Advanced")
                       : panel === "premium"
                         ? t("premiumTitle")
                       : panel === "support"
@@ -1597,6 +1643,93 @@ const UserMenu = forwardRef(function UserMenu(
                         window.location.href = "/data-safety";
                       }
                     }}
+                  />
+                </div>
+              </div>
+            ) : panel === "privacySecurity" ? (
+              <div className="settingsModalList">
+                <div className="settingsSection settingsSection--padded">
+                  <div className="settingsTitle">{t("privacyAndSecurityTitle") ?? "Privacy and Security"}</div>
+                  <div className="muted small">{t("privacyAndSecurityHint") ?? "Controls that affect privacy in this client."}</div>
+                </div>
+                <div className="settingsSection">
+                  <SettingsChoiceRow
+                    label={t("privacyPolicyShort") ?? t("privacyPolicyTitle")}
+                    selected={false}
+                    onClick={() => openPath("/privacy")}
+                  />
+                  <SettingsChoiceRow
+                    label={t("permissionsTitle")}
+                    selected={false}
+                    onClick={() => openPath("/permissions")}
+                  />
+                  <SettingsChoiceRow
+                    label={t("dataSafetyTitle")}
+                    selected={false}
+                    onClick={() => openPath("/data-safety")}
+                  />
+                </div>
+              </div>
+            ) : panel === "dataStorage" ? (
+              <div className="settingsModalList">
+                <div className="settingsSection settingsSection--padded">
+                  <div className="settingsTitle">{t("dataAndStorageTitle") ?? "Data and Storage"}</div>
+                  <div className="muted small">{t("dataAndStorageHint") ?? "Media download and storage preferences for this client."}</div>
+                </div>
+                <div className="settingsSection">
+                  <SettingsChoiceRow
+                    label={t("autoDownloadMediaLabel") ?? "Auto-download media"}
+                    selected={Boolean(settings?.autoDownloadMedia)}
+                    onClick={() => onChangeSettings?.({ autoDownloadMedia: !settings?.autoDownloadMedia })}
+                  />
+                  <SettingsChoiceRow
+                    label={t("saveToGalleryLabel") ?? "Save to Gallery"}
+                    selected={Boolean(settings?.saveToGallery)}
+                    onClick={() => onChangeSettings?.({ saveToGallery: !settings?.saveToGallery })}
+                  />
+                </div>
+              </div>
+            ) : panel === "powerSaving" ? (
+              <div className="settingsModalList">
+                <div className="settingsSection settingsSection--padded">
+                  <div className="settingsTitle">{t("powerSavingTitle") ?? "Power Saving"}</div>
+                  <div className="muted small">{t("powerSavingHint") ?? "Reduce visual effects to save battery."}</div>
+                </div>
+                <div className="settingsSection">
+                  <SettingsChoiceRow
+                    label={t("powerSavingEnableLabel") ?? "Enable Power Saving"}
+                    selected={Boolean(settings?.powerSavingEnabled)}
+                    onClick={() => onChangeSettings?.({ powerSavingEnabled: !settings?.powerSavingEnabled })}
+                  />
+                  <SettingsChoiceRow
+                    label={t("reduceMotionLabel") ?? "Reduce motion"}
+                    selected={Boolean(settings?.reduceMotion)}
+                    onClick={() => onChangeSettings?.({ reduceMotion: !settings?.reduceMotion })}
+                  />
+                </div>
+              </div>
+            ) : panel === "devices" ? (
+              <div className="settingsModalList">
+                <div className="settingsSection settingsSection--padded">
+                  <div className="settingsTitle">{t("devicesTitle") ?? "Devices"}</div>
+                  <div className="muted small">{t("devicesHint") ?? "Active sessions are managed by the server. This client shows basic info."}</div>
+                </div>
+                <div className="settingsSection settingsSection--padded">
+                  <div className="settingsTitle">{t("thisDeviceTitle") ?? "This device"}</div>
+                  <div className="muted small">{navigator.userAgent}</div>
+                </div>
+              </div>
+            ) : panel === "advanced" ? (
+              <div className="settingsModalList">
+                <div className="settingsSection settingsSection--padded">
+                  <div className="settingsTitle">{t("advancedTitle") ?? "Advanced"}</div>
+                  <div className="muted small">{t("advancedHint") ?? "Extra options for this client."}</div>
+                </div>
+                <div className="settingsSection">
+                  <SettingsChoiceRow
+                    label={t("reduceMotionLabel") ?? "Reduce motion"}
+                    selected={Boolean(settings?.reduceMotion)}
+                    onClick={() => onChangeSettings?.({ reduceMotion: !settings?.reduceMotion })}
                   />
                 </div>
               </div>

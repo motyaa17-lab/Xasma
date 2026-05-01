@@ -8533,19 +8533,40 @@ body.body--mobileConversationOpen {
 }
 
 .settingsList {
-  margin-top: 14px;
+  margin-top: 12px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+}
+
+.tgSettingsSearchWrap {
+  padding: 0 2px;
+}
+
+.tgSettingsSearchInput {
+  width: 100%;
+  border-radius: 12px;
+  padding: 12px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(226, 232, 240, 0.96);
+  outline: none;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.tgSettingsSearchInput::placeholder {
+  color: rgba(148, 163, 184, 0.85);
+}
+
+.tgSettingsSearchInput:focus-visible {
+  border-color: rgba(59, 130, 246, 0.38);
+  box-shadow: var(--glow-focus);
 }
 
 .settingsSectionHeader {
-  padding: 0 10px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  opacity: 0.72;
+  display: none;
 }
 
 .settingsSection {

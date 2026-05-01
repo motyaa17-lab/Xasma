@@ -80,6 +80,11 @@ export default function App() {
         chatTheme,
         chatBackgroundImageUrl,
         messageNotificationsEnabled: Boolean(parsed.messageNotificationsEnabled),
+        // Telegram-like extra settings (safe to ignore elsewhere)
+        powerSavingEnabled: Boolean(parsed.powerSavingEnabled),
+        reduceMotion: Boolean(parsed.reduceMotion),
+        autoDownloadMedia: parsed.autoDownloadMedia == null ? true : Boolean(parsed.autoDownloadMedia),
+        saveToGallery: Boolean(parsed.saveToGallery),
       };
     } catch {
       return {
@@ -87,6 +92,10 @@ export default function App() {
         chatTheme: "darkGradient",
         chatBackgroundImageUrl: null,
         messageNotificationsEnabled: false,
+        powerSavingEnabled: false,
+        reduceMotion: false,
+        autoDownloadMedia: true,
+        saveToGallery: false,
       };
     }
   });
