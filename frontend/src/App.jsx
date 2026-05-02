@@ -33,6 +33,7 @@ import {
   updateMyAvatar,
   updateMyProfile,
   updateMyEmail,
+  updateMyUserHandle,
   forwardMessage,
   deleteMessage,
 } from "./api.js";
@@ -1598,6 +1599,21 @@ export default function App() {
       );
     });
 
+    socket.on("user:userHandle", ({ userId, userHandle } = {}) => {
+      const uid = Number(userId);
+      if (!uid) return;
+      const uh = typeof userHandle === "string" ? userHandle : "";
+      setMe((prev) => (prev && prev.id === uid ? { ...prev, userHandle: uh } : prev));
+      setChats((prev) =>
+        prev.map((c) => (c.other?.id === uid ? { ...c, other: { ...c.other, userHandle: uh } } : c))
+      );
+      setMessages((prev) =>
+        prev.map((m) =>
+          Number(m.senderId) === uid && m.sender ? { ...m, sender: { ...m.sender, userHandle: uh } } : m
+        )
+      );
+    });
+
     socket.on(
       "user:tagUpdated",
       ({ userId, tag, tagColor, tagStyle, usernameStyle, avatarRing } = {}) => {
@@ -1711,6 +1727,7 @@ export default function App() {
       socket.off("user:banned");
       socket.off("group:avatarUpdated");
       socket.off("user:auraColor");
+      socket.off("user:userHandle");
       socket.off("user:tagUpdated");
       socket.off("user:profileStatus");
       socket.off("user:messageCount");
@@ -2236,6 +2253,20 @@ export default function App() {
     }
   }
 
+  async function changeMyUserHandle(nextHandle) {
+    const raw = String(nextHandle || "").trim().replace(/^@+/, "").toLowerCase();
+    if (!raw) return;
+    const prevHandle = me?.userHandle || "";
+    setMe((prev) => (prev ? { ...prev, userHandle: raw } : prev));
+    try {
+      const saved = await updateMyUserHandle(raw);
+      setMe((prev) => (prev ? { ...prev, userHandle: saved || raw } : prev));
+    } catch (e) {
+      setMe((prev) => (prev ? { ...prev, userHandle: prevHandle } : prev));
+      throw e;
+    }
+  }
+
   function goMobileTab(tab) {
     stashCurrentChatMessagesToCache(selectedChatIdRef.current);
     setMobileTab(tab);
@@ -2347,6 +2378,7 @@ export default function App() {
     onChangeAvatar: changeMyAvatar,
     onChangeProfile: changeMyProfile,
     onChangeEmail: changeMyEmail,
+    onChangeUserHandle: changeMyUserHandle,
     settings,
     onChangeSettings: (next) => setSettings((prev) => ({ ...prev, ...next })),
     t,

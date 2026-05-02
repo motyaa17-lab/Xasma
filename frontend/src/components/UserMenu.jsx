@@ -518,6 +518,7 @@ const UserMenu = forwardRef(function UserMenu(
     onChangeAvatar,
     onChangeProfile,
     onChangeEmail,
+    onChangeUserHandle,
     settings,
     onChangeSettings,
     t,
@@ -568,9 +569,11 @@ const UserMenu = forwardRef(function UserMenu(
   const [profileBgBusy, setProfileBgBusy] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaveError, setProfileSaveError] = useState("");
-  const [inviteCopied, setInviteCopied] = useState(false);
   const [premiumBusy, setPremiumBusy] = useState(false);
   const [premiumNotice, setPremiumNotice] = useState("");
+  const [privacyUserHandle, setPrivacyUserHandle] = useState("");
+  const [privacyHandleSaving, setPrivacyHandleSaving] = useState(false);
+  const [privacyHandleError, setPrivacyHandleError] = useState("");
   const chatBgFileInputRef = useRef(null);
   const [chatBgError, setChatBgError] = useState("");
   const [adminUsers, setAdminUsers] = useState([]);
@@ -622,8 +625,6 @@ const UserMenu = forwardRef(function UserMenu(
     setProfileStatusText(String(me?.statusText || ""));
     setProfileAbout(String(me?.about || ""));
     setProfileAuraColor(String(me?.auraColor || "").trim() || DEFAULT_AURA_COLOR);
-    setProfileEmail(String(me?.email || ""));
-    setProfileEmailError("");
     setProfileUserTag(me?.tag ? String(me.tag) : "");
     setProfileTagColor(String(me?.tagColor || "#64748b"));
     setProfileTagStyle(me?.tagStyle === "gradient" ? "gradient" : "solid");
@@ -631,13 +632,13 @@ const UserMenu = forwardRef(function UserMenu(
     setProfileAvatarRing(String(me?.avatarRing || ""));
     setProfileBgPreview(String(me?.profileBackground || ""));
     setProfileSaveError("");
+    setProfileEmailError("");
   }, [
     panel,
     me?.statusKind,
     me?.statusText,
     me?.about,
     me?.auraColor,
-    me?.email,
     me?.profileBackground,
     me?.tag,
     me?.tagColor,
@@ -645,6 +646,14 @@ const UserMenu = forwardRef(function UserMenu(
     me?.usernameStyle,
     me?.avatarRing,
   ]);
+
+  useEffect(() => {
+    if (panel !== "privacySecurity") return;
+    setProfileEmail(String(me?.email || ""));
+    setProfileEmailError("");
+    setPrivacyUserHandle(String(me?.userHandle || "").trim());
+    setPrivacyHandleError("");
+  }, [panel, me?.email, me?.userHandle]);
 
   async function saveEmail() {
     if (!onChangeEmail) return;
@@ -658,6 +667,25 @@ const UserMenu = forwardRef(function UserMenu(
       setProfileEmailError(e.message || t("errorGeneric"));
     } finally {
       setProfileEmailSaving(false);
+    }
+  }
+
+  async function saveUserHandle() {
+    if (!onChangeUserHandle) return;
+    const h = String(privacyUserHandle || "")
+      .trim()
+      .replace(/^@+/, "")
+      .toLowerCase();
+    if (!h) return;
+    setPrivacyHandleSaving(true);
+    setPrivacyHandleError("");
+    try {
+      await onChangeUserHandle(h);
+      setPrivacyUserHandle(h);
+    } catch (e) {
+      setPrivacyHandleError(e.message || t("errorGeneric"));
+    } finally {
+      setPrivacyHandleSaving(false);
     }
   }
 
@@ -804,6 +832,83 @@ const UserMenu = forwardRef(function UserMenu(
     [onChangeSettings, t]
   );
 
+  function navigateLegalPage(path) {
+    try {
+      window.history.pushState({}, "", path);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+      setPanel(null);
+    } catch {
+      window.location.href = path;
+    }
+  }
+
+  function renderPrivacyAccountPanel() {
+    return (
+      <div className="settingsModalList">
+        <div className="settingsSection settingsSection--padded">
+          <div className="settingsTitle">{t("privacyAndSecurityTitle") ?? "Privacy and Security"}</div>
+          <div className="muted small">{t("privacyAccountHint")}</div>
+        </div>
+        <div className="settingsSection settingsSection--padded">
+          <div className="settingsTitle">{t("userHandle")}</div>
+          <p className="muted small">{t("privacyChangeHandleHint")}</p>
+          <input
+            className="input"
+            value={privacyUserHandle}
+            onChange={(e) =>
+              setPrivacyUserHandle(
+                e.target.value.replace(/^@+/, "").replace(/\s/g, "").toLowerCase()
+              )
+            }
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            placeholder="username"
+            aria-label={t("userHandle")}
+          />
+          {privacyHandleError ? <div className="authError">{privacyHandleError}</div> : null}
+          <div className="profileActions" style={{ marginTop: 10 }}>
+            <button
+              type="button"
+              className="primaryBtn"
+              onClick={() => void saveUserHandle()}
+              disabled={
+                privacyHandleSaving ||
+                !String(privacyUserHandle || "").trim() ||
+                String(privacyUserHandle || "").trim() === String(me?.userHandle || "").trim()
+              }
+            >
+              {privacyHandleSaving ? t("saving") : t("save")}
+            </button>
+          </div>
+        </div>
+        <div className="settingsSection settingsSection--padded">
+          <div className="settingsTitle">{t("authEmailLabel")}</div>
+          <input
+            className="input"
+            value={profileEmail}
+            onChange={(e) => setProfileEmail(e.target.value)}
+            inputMode="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            placeholder="name@example.com"
+          />
+          {profileEmailError ? <div className="authError">{profileEmailError}</div> : null}
+          <div className="profileActions" style={{ marginTop: 10 }}>
+            <button
+              type="button"
+              className="primaryBtn"
+              onClick={() => void saveEmail()}
+              disabled={profileEmailSaving || !String(profileEmail || "").trim()}
+            >
+              {profileEmailSaving ? t("saving") : t("save")}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const modalCardClass = variant === "mobilePage" ? "modalCard--mobileFriendly" : "";
 
   if (variant === "mobilePage") {
@@ -886,16 +991,6 @@ const UserMenu = forwardRef(function UserMenu(
           </span>
         </button>
       );
-    }
-
-    function openPath(p) {
-      try {
-        window.history.pushState({}, "", p);
-        window.dispatchEvent(new PopStateEvent("popstate"));
-        setPanel(null);
-      } catch {
-        window.location.href = p;
-      }
     }
 
     const q = String(settingsSearch || "").trim().toLowerCase();
@@ -1175,60 +1270,6 @@ const UserMenu = forwardRef(function UserMenu(
             ) : null}
           </div>
 
-          <div className="settingsSectionHeader">{t("inviteFriendsTitle")}</div>
-          <div className="settingsSection settingsSection--padded">
-            {me?.referralCode ? (
-              (() => {
-                const link =
-                  typeof window !== "undefined"
-                    ? `${window.location.origin}/invite/${String(me.referralCode)}`
-                    : `/invite/${String(me.referralCode)}`;
-                const count = Math.max(0, Number(me?.referralsCount) || 0);
-                return (
-                  <>
-                    <div className="settingsTitle">{t("inviteFriendsCount").replace("{count}", String(count))}</div>
-                    <div className="inviteLinkRow">
-                      <div className="inviteLinkText" title={link}>
-                        {link}
-                      </div>
-                      <button
-                        type="button"
-                        className="ghostBtn"
-                        onClick={async () => {
-                          try {
-                            await navigator.clipboard?.writeText?.(link);
-                            setInviteCopied(true);
-                            window.setTimeout(() => setInviteCopied(false), 1200);
-                          } catch {
-                            try {
-                              const el = document.createElement("textarea");
-                              el.value = link;
-                              el.style.position = "fixed";
-                              el.style.left = "-9999px";
-                              document.body.appendChild(el);
-                              el.focus();
-                              el.select();
-                              document.execCommand("copy");
-                              document.body.removeChild(el);
-                              setInviteCopied(true);
-                              window.setTimeout(() => setInviteCopied(false), 1200);
-                            } catch {
-                              // ignore
-                            }
-                          }
-                        }}
-                      >
-                        {inviteCopied ? t("inviteFriendsCopied") : t("inviteFriendsCopy")}
-                      </button>
-                    </div>
-                  </>
-                );
-              })()
-            ) : (
-              <div className="muted small">{t("errorGeneric")}</div>
-            )}
-          </div>
-
           <div className="settingsSectionHeader">{t("settingsSupport")}</div>
           <div className="settingsSection">
             {(showAll || match(t("askAQuestionTitle") ?? "Ask a Question") || match(t("settingsSupportAuthors"))) ? (
@@ -1245,17 +1286,6 @@ const UserMenu = forwardRef(function UserMenu(
           </div>
 
           <div className="settingsSection">
-            {(showAll || match(t("privacyPolicyTitle")) || match(t("privacyPolicyShort") ?? "Privacy Policy")) ? (
-              <SettingsRow
-                label={t("privacyPolicyShort") ?? t("privacyPolicyTitle")}
-                icon={
-                  <span className="tgSettingsIcon tgSettingsIcon--blue" aria-hidden>
-                    <IconShield size={18} />
-                  </span>
-                }
-                onClick={() => openPath("/privacy")}
-              />
-            ) : null}
             {(showAll || match(t("aboutAppTitle")) || match(t("aboutTitleShort") ?? "About")) ? (
               <SettingsRow
                 label={t("aboutTitleShort") ?? t("aboutAppTitle")}
@@ -1300,7 +1330,9 @@ const UserMenu = forwardRef(function UserMenu(
                       ? t("chatBackground")
                       : panel === "privacySecurity"
                         ? (t("privacyAndSecurityTitle") ?? "Privacy and Security")
-                        : panel === "dataStorage"
+                        : panel === "aboutApp"
+                          ? t("aboutAppTitle")
+                          : panel === "dataStorage"
                           ? (t("dataAndStorageTitle") ?? "Data and Storage")
                           : panel === "powerSaving"
                             ? (t("powerSavingTitle") ?? "Power Saving")
@@ -1774,80 +1806,15 @@ const UserMenu = forwardRef(function UserMenu(
                 </div>
 
                 <div className="settingsSection">
-                  <SettingsRow
-                    label={t("privacyPolicyTitle")}
-                    onClick={() => {
-                      try {
-                        window.history.pushState({}, "", "/privacy");
-                        window.dispatchEvent(new PopStateEvent("popstate"));
-                        setPanel(null);
-                      } catch {
-                        window.location.href = "/privacy";
-                      }
-                    }}
-                  />
-                  <SettingsRow
-                    label={t("termsTitle")}
-                    onClick={() => {
-                      try {
-                        window.history.pushState({}, "", "/terms");
-                        window.dispatchEvent(new PopStateEvent("popstate"));
-                        setPanel(null);
-                      } catch {
-                        window.location.href = "/terms";
-                      }
-                    }}
-                  />
-                  <SettingsRow
-                    label={t("dataDeletionTitle")}
-                    onClick={() => {
-                      try {
-                        window.history.pushState({}, "", "/data-deletion");
-                        window.dispatchEvent(new PopStateEvent("popstate"));
-                        setPanel(null);
-                      } catch {
-                        window.location.href = "/data-deletion";
-                      }
-                    }}
-                  />
-                  <SettingsRow
-                    label={t("dataSafetyTitle")}
-                    onClick={() => {
-                      try {
-                        window.history.pushState({}, "", "/data-safety");
-                        window.dispatchEvent(new PopStateEvent("popstate"));
-                        setPanel(null);
-                      } catch {
-                        window.location.href = "/data-safety";
-                      }
-                    }}
-                  />
+                  <SettingsRow label={t("privacyPolicyTitle")} onClick={() => navigateLegalPage("/privacy")} />
+                  <SettingsRow label={t("permissionsTitle")} onClick={() => navigateLegalPage("/permissions")} />
+                  <SettingsRow label={t("termsTitle")} onClick={() => navigateLegalPage("/terms")} />
+                  <SettingsRow label={t("dataDeletionTitle")} onClick={() => navigateLegalPage("/data-deletion")} />
+                  <SettingsRow label={t("dataSafetyTitle")} onClick={() => navigateLegalPage("/data-safety")} />
                 </div>
               </div>
             ) : panel === "privacySecurity" ? (
-              <div className="settingsModalList">
-                <div className="settingsSection settingsSection--padded">
-                  <div className="settingsTitle">{t("privacyAndSecurityTitle") ?? "Privacy and Security"}</div>
-                  <div className="muted small">{t("privacyAndSecurityHint") ?? "Controls that affect privacy in this client."}</div>
-                </div>
-                <div className="settingsSection">
-                  <SettingsChoiceRow
-                    label={t("privacyPolicyShort") ?? t("privacyPolicyTitle")}
-                    selected={false}
-                    onClick={() => openPath("/privacy")}
-                  />
-                  <SettingsChoiceRow
-                    label={t("permissionsTitle")}
-                    selected={false}
-                    onClick={() => openPath("/permissions")}
-                  />
-                  <SettingsChoiceRow
-                    label={t("dataSafetyTitle")}
-                    selected={false}
-                    onClick={() => openPath("/data-safety")}
-                  />
-                </div>
-              </div>
+              renderPrivacyAccountPanel()
             ) : panel === "dataStorage" ? (
               <div className="settingsModalList">
                 <div className="settingsSection settingsSection--padded">
@@ -2179,11 +2146,15 @@ const UserMenu = forwardRef(function UserMenu(
               ? t("myProfile")
               : panel === "settings"
                 ? t("settings")
-                : panel === "premium"
-                  ? t("premiumTitle")
-                : panel === "support"
-                  ? t("settingsSupportAuthors")
-                  : t("adminPanelTitle")
+                : panel === "privacySecurity"
+                  ? t("privacyAndSecurityTitle")
+                  : panel === "aboutApp"
+                    ? t("aboutAppTitle")
+                    : panel === "premium"
+                      ? t("premiumTitle")
+                      : panel === "support"
+                        ? t("settingsSupportAuthors")
+                        : t("adminPanelTitle")
           }
           onClose={() => setPanel(null)}
           t={t}
@@ -2192,7 +2163,6 @@ const UserMenu = forwardRef(function UserMenu(
           {panel === "profile" ? (
             <div>
               {avatarError ? <div className="authError">{avatarError}</div> : null}
-              {profileEmailError ? <div className="authError">{profileEmailError}</div> : null}
               <div className="profilePanel">
                 <AvatarAura auraColor={profileAuraColor}>
                   {(() => {
@@ -2238,28 +2208,6 @@ const UserMenu = forwardRef(function UserMenu(
                   <div className="profileHint muted small">
                     {me?.isOnline ? t("online") : me?.lastSeenAt ? t("lastSeenAt").replace("{time}", formatLastSeen(me.lastSeenAt, settings?.lang)) : t("lastSeen")}
                   </div>
-                </div>
-              </div>
-
-              <div className="settingsSection settingsSection--padded">
-                <div className="settingsTitle">{t("authEmailLabel")}</div>
-                <input
-                  value={profileEmail}
-                  onChange={(e) => setProfileEmail(e.target.value)}
-                  inputMode="email"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  placeholder="name@example.com"
-                />
-                <div className="profileActions" style={{ marginTop: 10 }}>
-                  <button
-                    type="button"
-                    className="primaryBtn"
-                    onClick={saveEmail}
-                    disabled={profileEmailSaving || !String(profileEmail || "").trim()}
-                  >
-                    {profileEmailSaving ? t("saving") : t("save")}
-                  </button>
                 </div>
               </div>
 
@@ -2559,65 +2507,54 @@ const UserMenu = forwardRef(function UserMenu(
               </div>
 
               <div className="settingsSection">
-                <div className="settingsTitle">{t("inviteFriendsTitle")}</div>
-                {me?.referralCode ? (
-                  (() => {
-                    const link =
-                      typeof window !== "undefined"
-                        ? `${window.location.origin}/invite/${String(me.referralCode)}`
-                        : `/invite/${String(me.referralCode)}`;
-                    const count = Math.max(0, Number(me?.referralsCount) || 0);
-                    return (
-                      <>
-                        <div className="muted small">
-                          {t("inviteFriendsCount").replace("{count}", String(count))}
-                        </div>
-                        <div className="inviteLinkRow">
-                          <div className="inviteLinkText" title={link}>
-                            {link}
-                          </div>
-                          <button
-                            type="button"
-                            className="ghostBtn"
-                            onClick={async () => {
-                              try {
-                                await navigator.clipboard?.writeText?.(link);
-                                setInviteCopied(true);
-                                window.setTimeout(() => setInviteCopied(false), 1200);
-                              } catch {
-                                try {
-                                  const el = document.createElement("textarea");
-                                  el.value = link;
-                                  el.style.position = "fixed";
-                                  el.style.left = "-9999px";
-                                  document.body.appendChild(el);
-                                  el.focus();
-                                  el.select();
-                                  document.execCommand("copy");
-                                  document.body.removeChild(el);
-                                  setInviteCopied(true);
-                                  window.setTimeout(() => setInviteCopied(false), 1200);
-                                } catch {
-                                  // ignore
-                                }
-                              }
-                            }}
-                          >
-                            {inviteCopied ? t("inviteFriendsCopied") : t("inviteFriendsCopy")}
-                          </button>
-                        </div>
-                      </>
-                    );
-                  })()
-                ) : (
-                  <div className="muted small">{t("errorGeneric")}</div>
-                )}
+                <button type="button" className="dropdownItem" onClick={() => setPanel("privacySecurity")}>
+                  {t("privacyAndSecurityTitle")}
+                </button>
+                <button type="button" className="dropdownItem" onClick={() => setPanel("aboutApp")}>
+                  {t("aboutTitleShort") ?? t("aboutAppTitle")}
+                </button>
               </div>
 
               <div className="settingsSection">
                 <div className="settingsTitle">{t("settingsSupport")}</div>
                 <button type="button" className="dropdownItem" onClick={() => setPanel("support")}>
                   {t("settingsSupportAuthors")}
+                </button>
+              </div>
+            </div>
+          ) : panel === "privacySecurity" ? (
+            renderPrivacyAccountPanel()
+          ) : panel === "aboutApp" ? (
+            <div className="settingsModalList">
+              <div className="settingsSection settingsSection--padded">
+                <div className="settingsTitle">{t("aboutAppTitle")}</div>
+                <div className="muted small" style={{ lineHeight: 1.5 }}>
+                  <div>
+                    <strong>{t("aboutDeveloper")}</strong>: Xasma Labs
+                  </div>
+                  <div>
+                    <strong>{t("aboutSupportEmail")}</strong>: xasma.support@gmail.com
+                  </div>
+                  <div>
+                    <strong>{t("aboutBuild")}</strong>: {String(import.meta.env.VITE_APP_BUILD || "web")}
+                  </div>
+                </div>
+              </div>
+              <div className="settingsSection">
+                <button type="button" className="dropdownItem" onClick={() => navigateLegalPage("/privacy")}>
+                  {t("privacyPolicyTitle")}
+                </button>
+                <button type="button" className="dropdownItem" onClick={() => navigateLegalPage("/permissions")}>
+                  {t("permissionsTitle")}
+                </button>
+                <button type="button" className="dropdownItem" onClick={() => navigateLegalPage("/terms")}>
+                  {t("termsTitle")}
+                </button>
+                <button type="button" className="dropdownItem" onClick={() => navigateLegalPage("/data-deletion")}>
+                  {t("dataDeletionTitle")}
+                </button>
+                <button type="button" className="dropdownItem" onClick={() => navigateLegalPage("/data-safety")}>
+                  {t("dataSafetyTitle")}
                 </button>
               </div>
             </div>

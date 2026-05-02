@@ -166,6 +166,14 @@ export async function updateMyEmail(email) {
   return data.email || "";
 }
 
+export async function updateMyUserHandle(userHandle) {
+  const data = await apiFetch("/api/me/user-handle", {
+    method: "PUT",
+    body: { userHandle: String(userHandle || "").trim() },
+  });
+  return data.userHandle || "";
+}
+
 export async function updateMyProfile({
   statusKind,
   statusText,

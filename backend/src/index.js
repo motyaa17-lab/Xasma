@@ -1425,6 +1425,38 @@ app.put("/api/me/email", authRequired, async (req, res) => {
   }
 });
 
+/** Public @handle: lowercase letters, digits, underscore; 3–32 chars; not reserved. */
+function normalizeUserHandleInput(raw) {
+  const h = loginHandleNormalized(raw);
+  if (h.length < 3 || h.length > 32) return { ok: false, error: "Handle must be 3–32 characters" };
+  if (!/^[a-z0-9_]+$/.test(h)) return { ok: false, error: "Handle may only use letters, digits, and underscore" };
+  if (RESERVED_USER_HANDLES.has(h)) return { ok: false, error: "This handle is reserved" };
+  return { ok: true, value: h };
+}
+
+app.put("/api/me/user-handle", authRequired, async (req, res) => {
+  const uid = Number(req.user.id);
+  const parsed = normalizeUserHandleInput(typeof req.body?.userHandle === "string" ? req.body.userHandle : "");
+  if (!parsed.ok) return res.status(400).json({ error: parsed.error });
+
+  const existing = await query(`SELECT id FROM users WHERE user_handle = $1 AND id != $2`, [parsed.value, uid]);
+  if (existing.rows[0]) return res.status(409).json({ error: "Handle already taken" });
+
+  try {
+    const up = await query(`UPDATE users SET user_handle = $1 WHERE id = $2 RETURNING user_handle`, [parsed.value, uid]);
+    if (!up.rows[0]) return res.status(404).json({ error: "User not found" });
+    const userHandle = userHandleApi(up.rows[0]);
+    emitToAll("user:userHandle", { userId: uid, userHandle });
+    return res.json({ userHandle });
+  } catch (e) {
+    const msg = String(e?.message || "").toLowerCase();
+    if (msg.includes("user_handle") && (msg.includes("duplicate") || msg.includes("unique"))) {
+      return res.status(409).json({ error: "Handle already taken" });
+    }
+    throw e;
+  }
+});
+
 app.put("/api/me/profile", authRequired, (req, res) => {
   const statusKindRaw = typeof req.body?.statusKind === "string" ? req.body.statusKind.trim() : "";
   const statusTextRaw = typeof req.body?.statusText === "string" ? req.body.statusText.trim() : "";
