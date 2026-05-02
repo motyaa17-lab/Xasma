@@ -11,6 +11,7 @@ import { IconChats, IconCompose, IconContacts, IconPhone, IconSearch, IconSettin
 import CallOverlay from "./components/CallOverlay.jsx";
 import CallsScreen from "./components/CallsScreen.jsx";
 import ContactsScreen from "./components/ContactsScreen.jsx";
+import AdminPage from "./components/AdminPage.jsx";
 import LegalPage from "./components/LegalPage.jsx";
 import { useIsMobile } from "./hooks/useIsMobile.js";
 import { t as tr, normalizeLang } from "./i18n.js";
@@ -2278,6 +2279,13 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.lang, routeNonce]);
 
+  const isAdminRoute = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    const p = String(window.location?.pathname || "");
+    return p === "/admin" || p === "/admin/";
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeNonce]);
+
   if (legalKind) {
     return (
       <div className="appRoot appRoot--auth">
@@ -2309,6 +2317,26 @@ export default function App() {
     return (
       <div className="appRoot appRoot--auth">
         <Auth onLogin={handleLogin} onRegister={handleRegister} error={authError} t={t} />
+      </div>
+    );
+  }
+
+  if (isAdminRoute) {
+    return (
+      <div className="appRoot appRoot--admin">
+        <AdminPage
+          me={me}
+          t={t}
+          lang={settings.lang}
+          onBack={() => {
+            try {
+              window.history.pushState({}, "", "/");
+              window.dispatchEvent(new PopStateEvent("popstate"));
+            } catch {
+              window.location.href = "/";
+            }
+          }}
+        />
       </div>
     );
   }

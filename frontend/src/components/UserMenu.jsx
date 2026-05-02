@@ -1229,35 +1229,6 @@ const UserMenu = forwardRef(function UserMenu(
             )}
           </div>
 
-          <div className="settingsSectionHeader">{t("premiumTitleShort")}</div>
-          <div className="settingsSection">
-            <SettingsRow
-              label={t("premiumButton")}
-              right={me?.isPremium ? t("premiumActive") : t("premiumInactive")}
-              onClick={() => {
-                setPremiumNotice("");
-                setPanel("premium");
-              }}
-            />
-          </div>
-
-          {me?.role === "admin" ? (
-            <>
-              <div className="settingsSectionHeader">{t("adminPanelTitle")}</div>
-              <div className="settingsSection">
-                <SettingsRow
-                  label={t("adminPanelTitle")}
-                  onClick={() => {
-                    setPanel("admin");
-                    loadAdminUsers();
-                    loadAdminFlagged();
-                    loadAdminReports();
-                  }}
-                />
-              </div>
-            </>
-          ) : null}
-
           <div className="settingsSectionHeader">{t("settingsSupport")}</div>
           <div className="settingsSection">
             {(showAll || match(t("askAQuestionTitle") ?? "Ask a Question") || match(t("settingsSupportAuthors"))) ? (
@@ -2185,22 +2156,6 @@ const UserMenu = forwardRef(function UserMenu(
           >
             {t("settings")}
           </button>
-          {me?.role === "admin" ? (
-            <button
-              className="dropdownItem"
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                setPanel("admin");
-                loadAdminUsers();
-                loadAdminFlagged();
-                loadAdminReports();
-              }}
-            >
-              {t("adminPanelTitle")}
-            </button>
-          ) : null}
           <div className="dropdownSep" />
           <button
             className="dropdownItem danger"
@@ -2657,28 +2612,6 @@ const UserMenu = forwardRef(function UserMenu(
                 ) : (
                   <div className="muted small">{t("errorGeneric")}</div>
                 )}
-              </div>
-
-              <div className="settingsSection">
-                <div className="settingsTitle">{t("premiumTitleShort")}</div>
-                <button
-                  type="button"
-                  className="dropdownItem"
-                  onClick={() => {
-                    setPremiumNotice("");
-                    setPanel("premium");
-                  }}
-                >
-                  {t("premiumButton")} · {me?.isPremium ? t("premiumActive") : t("premiumInactive")}
-                </button>
-                <div className="muted small">
-                  {t("premiumTypeLabel")}:{" "}
-                  {me?.isPremium && me?.premiumType ? t(`premiumType_${me.premiumType}`) : t("premiumTypeNone")}
-                  <br />
-                  {t("premiumUntil")}: {me?.isPremium && me?.premiumExpiresAt ? formatShortDate(me.premiumExpiresAt) : "—"}
-                  <br />
-                  {t("premiumDaysLeft", { days: me?.isPremium ? me?.premiumDaysLeft || 0 : 0 })}
-                </div>
               </div>
 
               <div className="settingsSection">

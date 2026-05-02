@@ -247,14 +247,11 @@ function registrationDateIso(createdAt) {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
-/** Early adopters: first accounts by id, or joined before public launch window. */
+/** Early tester badge is currently disabled; keep field shape stable for clients. */
 function isEarlyTesterUser(userId, createdAt) {
-  const uid = Number(userId);
-  if (uid > 0 && uid <= 5000) return true;
-  if (!createdAt) return false;
-  const d = new Date(createdAt);
-  if (Number.isNaN(d.getTime())) return false;
-  return d < new Date("2027-01-01T00:00:00.000Z");
+  void userId;
+  void createdAt;
+  return false;
 }
 
 const PORT = process.env.PORT || 4000;
