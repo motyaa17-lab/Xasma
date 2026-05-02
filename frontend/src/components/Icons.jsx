@@ -379,6 +379,70 @@ export function IconInfo(props) {
   );
 }
 
+export function IconMic(props) {
+  return (
+    <svg {...baseProps(props)} fill="none">
+      <path
+        d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <path d="M19 11a7 7 0 0 1-14 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M12 18v3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function IconMicOff(props) {
+  return (
+    <svg {...baseProps(props)} fill="none">
+      <path
+        d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-5.2-2.1"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <path d="M9 9v2a3 3 0 0 0 3.7 2.9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M19 11a7 7 0 0 1-2.1 4.4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M12 18v3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M4 4l16 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function IconSpeaker(props) {
+  return (
+    <svg {...baseProps(props)} fill="none">
+      <path
+        d="M11 5L6 9H3v6h3l5 4V5z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M15.5 9.5a4 4 0 0 1 0 5M18 7a7 7 0 0 1 0 10"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export function IconHandset(props) {
+  return (
+    <svg {...baseProps(props)} fill="none">
+      <path
+        d="M5.2 4.8c.4-.4 1.1-.4 1.5 0l2.1 2.1c.4.4.4 1.1 0 1.5l-.9.9c1.2 2.1 3.1 4 5.2 5.2l.9-.9c.4-.4 1.1-.4 1.5 0l2.1 2.1c.4.4.4 1.1 0 1.5l-1.1 1.1c-.4.4-1 .6-1.6.6h-.2C8.5 18 4 13.5 4 7.8v-.2c0-.6.2-1.2.6-1.6l1.1-1.1z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function IconLogout(props) {
   return (
     <svg {...baseProps(props)} fill="none">

@@ -13,7 +13,7 @@ import {
   adminRemovePremium,
 } from "../api.js";
 import { compressImageFileToJpegDataUrl } from "../chatBackgroundImage.js";
-import { currentLanguageLabel, localeForLang } from "../i18n.js";
+import { currentLanguageLabel, localeForLang, translateKnownApiError } from "../i18n.js";
 import { DONATION_ALERTS_URL } from "../config/donation.js";
 import { DEFAULT_AURA_COLOR } from "../avatarAura.js";
 import { USER_STATUS_TEXT_MAX } from "../userStatusLine.js";
@@ -671,7 +671,7 @@ const UserMenu = forwardRef(function UserMenu(
     try {
       await onChangeEmail(email);
     } catch (e) {
-      setProfileEmailError(e.message || t("errorGeneric"));
+      setProfileEmailError(translateKnownApiError(e?.message, t) || t("errorGeneric"));
     } finally {
       setProfileEmailSaving(false);
     }
@@ -690,7 +690,7 @@ const UserMenu = forwardRef(function UserMenu(
       await onChangeUserHandle(h);
       setPrivacyUserHandle(h);
     } catch (e) {
-      setPrivacyHandleError(e.message || t("errorGeneric"));
+      setPrivacyHandleError(translateKnownApiError(e?.message, t) || t("errorGeneric"));
     } finally {
       setPrivacyHandleSaving(false);
     }

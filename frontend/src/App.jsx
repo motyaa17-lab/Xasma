@@ -14,6 +14,7 @@ import ContactsScreen from "./components/ContactsScreen.jsx";
 import AdminPage from "./components/AdminPage.jsx";
 import LegalPage from "./components/LegalPage.jsx";
 import { useIsMobile } from "./hooks/useIsMobile.js";
+import { useCallVoiceLevels } from "./useCallVoiceLevels.js";
 import { t as tr, normalizeLang } from "./i18n.js";
 import {
   createChat,
@@ -214,6 +215,7 @@ export default function App() {
       return [];
     }
   });
+  const [callSpeakerphone, setCallSpeakerphone] = useState(true);
   const mobileConversationOpen = Boolean(isMobile && mobileTab === "chats" && selectedChatId);
 
   // /invite/:code (simple route capture, no router).
@@ -393,6 +395,7 @@ export default function App() {
   function resetCallState() {
     clearCallTimers();
     outgoingCancelBeforeCallIdRef.current = false;
+    setCallSpeakerphone(true);
     setCall({
       phase: "idle",
       direction: null,
@@ -537,6 +540,11 @@ export default function App() {
   const remoteTrackSeenRef = useRef(false);
   const audioResumeArmedRef = useRef(false);
   const audioResumeCleanupRef = useRef(null);
+
+  const callVoiceActive = call.phase === "connecting" || call.phase === "connected";
+  const callVoiceLevels = useCallVoiceLevels(callVoiceActive, localStreamRef, remoteStreamRef, call.muted);
+  const callSinkSupported =
+    typeof HTMLMediaElement !== "undefined" && "setSinkId" in HTMLMediaElement.prototype;
 
   function cleanupWebrtc() {
     try {
@@ -894,6 +902,53 @@ export default function App() {
       audioResumeArmedRef.current = false;
     };
   }, [call.phase]);
+
+  useEffect(() => {
+    if (call.phase !== "connecting" && call.phase !== "connected") return undefined;
+    if (!callSinkSupported) return undefined;
+    const el = remoteAudioRef.current;
+    if (!el) return undefined;
+
+    let cancelled = false;
+    const applySink = async () => {
+      try {
+        const list = await navigator.mediaDevices.enumerateDevices();
+        if (cancelled || !remoteAudioRef.current) return;
+        const outs = list.filter((d) => d.kind === "audiooutput");
+        if (!outs.length) return;
+        let speakerId = "";
+        let earId = "";
+        for (const d of outs) {
+          const lb = String(d.label || "").toLowerCase();
+          if (/headphone|headset|наушн/i.test(lb) && !/mic/i.test(lb)) continue;
+          if (/speaker|loud|динамик|встроен|builtin/.test(lb)) {
+            speakerId = d.deviceId;
+          }
+          if (
+            (/receiver|earpiece|ear|handset|phone|communication|телефон/i.test(lb) && !/speaker/i.test(lb)) ||
+            d.deviceId === "default"
+          ) {
+            if (!earId) earId = d.deviceId;
+          }
+        }
+        if (!speakerId && outs.length >= 2) speakerId = outs[outs.length - 1].deviceId;
+        if (!earId) earId = outs[0].deviceId;
+        const id = callSpeakerphone ? speakerId || "" : earId || "";
+        await el.setSinkId(id);
+        tryPlayRemoteAudio();
+      } catch {
+        /* ignore */
+      }
+    };
+
+    void applySink();
+    const onMeta = () => void applySink();
+    el.addEventListener("loadedmetadata", onMeta);
+    return () => {
+      cancelled = true;
+      el.removeEventListener("loadedmetadata", onMeta);
+    };
+  }, [call.phase, call.callId, callSpeakerphone, callSinkSupported]);
 
   function makeClientTempId() {
     try {
@@ -2775,6 +2830,10 @@ export default function App() {
       onReject={rejectIncomingCall}
       onEnd={endOrCancelCall}
       onToggleMute={toggleMuteUi}
+      voiceLevels={callVoiceLevels}
+      speakerphone={callSpeakerphone}
+      onToggleSpeakerphone={() => setCallSpeakerphone((v) => !v)}
+      speakerToggleSupported={callSinkSupported}
     />
   );
 

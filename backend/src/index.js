@@ -1428,7 +1428,7 @@ app.put("/api/me/email", authRequired, async (req, res) => {
 /** Public @handle: lowercase letters, digits, underscore; 3–32 chars; not reserved. */
 function normalizeUserHandleInput(raw) {
   const h = loginHandleNormalized(raw);
-  if (h.length < 3 || h.length > 32) return { ok: false, error: "Handle must be 3–32 characters" };
+  if (h.length < 3 || h.length > 32) return { ok: false, error: "Handle must be 3-32 characters" };
   if (!/^[a-z0-9_]+$/.test(h)) return { ok: false, error: "Handle may only use letters, digits, and underscore" };
   if (RESERVED_USER_HANDLES.has(h)) return { ok: false, error: "This handle is reserved" };
   return { ok: true, value: h };

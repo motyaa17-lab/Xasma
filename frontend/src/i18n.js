@@ -118,7 +118,8 @@ export const translations = {
     aboutTitleShort: "About",
     privacyAndSecurityHint: "Controls that affect privacy in this client.",
     privacyAccountHint: "Change the @username and email tied to your account.",
-    privacyChangeHandleHint: "3–32 characters: Latin letters, digits, underscore. Shown as @name (without typing @).",
+    privacyChangeHandleHint:
+      "3–32 characters: Latin letters, digits, underscore. Shown as @name (without typing @). System names like xasma or admin cannot be used.",
     dataAndStorageHint: "Media download and storage preferences for this client.",
     autoDownloadMediaLabel: "Auto-download media",
     saveToGalleryLabel: "Save to Gallery",
@@ -470,6 +471,13 @@ export const translations = {
     groupAvatarChooseImage: "Choose an image file",
     groupAvatarFileTooLarge: "File too large",
     errorGeneric: "Something went wrong",
+    apiErrorHandleReserved: "This @username is reserved for the app (e.g. xasma, admin). Choose another.",
+    apiErrorHandleTaken: "This @username is already taken.",
+    apiErrorHandleLength: "Use 3–32 characters for your @username.",
+    apiErrorHandleChars: "Only Latin letters, digits, and underscore are allowed.",
+    apiErrorEmailExists: "This email is already in use.",
+    apiErrorEmailInvalid: "Invalid email address.",
+    apiErrorEmailRequired: "Email is required.",
     authSessionFailed: "Authentication failed",
     authBootSessionCheck: "Checking session…",
     avatarUpdateFailed: "Could not update avatar",
@@ -521,6 +529,8 @@ export const translations = {
     callCancel: "Cancel",
     callEnd: "End",
     callMute: "Mute",
+    callSpeaker: "Speaker",
+    callEarpiece: "Earpiece",
     callUnmute: "Unmute",
     close: "Close",
     callEventMissed: "📞 Missed call",
@@ -705,7 +715,8 @@ export const translations = {
     aboutTitleShort: "О приложении",
     privacyAndSecurityHint: "Параметры, влияющие на приватность в этом клиенте.",
     privacyAccountHint: "Смена @username и почты, привязанных к аккаунту.",
-    privacyChangeHandleHint: "3–32 символа: латиница, цифры, подчёркивание. В интерфейсе отображается как @ник.",
+    privacyChangeHandleHint:
+      "3–32 символа: латиница, цифры, подчёркивание. В интерфейсе — как @ник. Системные имена (xasma, admin и т.п.) недоступны.",
     dataAndStorageHint: "Настройки загрузки медиа и хранения для этого клиента.",
     autoDownloadMediaLabel: "Автозагрузка медиа",
     saveToGalleryLabel: "Сохранять в галерею",
@@ -1058,6 +1069,14 @@ export const translations = {
     groupAvatarChooseImage: "Выберите изображение",
     groupAvatarFileTooLarge: "Файл слишком большой",
     errorGeneric: "Что-то пошло не так",
+    apiErrorHandleReserved:
+      "Этот @username зарезервирован для приложения (например xasma, admin). Выберите другой.",
+    apiErrorHandleTaken: "Такой @username уже занят.",
+    apiErrorHandleLength: "Длина @username — от 3 до 32 символов.",
+    apiErrorHandleChars: "Допустимы только латиница, цифры и подчёркивание.",
+    apiErrorEmailExists: "Этот email уже используется.",
+    apiErrorEmailInvalid: "Некорректный email.",
+    apiErrorEmailRequired: "Укажите email.",
     authSessionFailed: "Ошибка авторизации",
     authBootSessionCheck: "Проверяем сессию…",
     avatarUpdateFailed: "Не удалось обновить аватар",
@@ -1110,6 +1129,8 @@ export const translations = {
     callCancel: "Отмена",
     callEnd: "Завершить",
     callMute: "Выключить микрофон",
+    callSpeaker: "Громкая связь",
+    callEarpiece: "Разговорный динамик",
     callUnmute: "Включить микрофон",
     close: "Закрыть",
     callEventMissed: "📞 Пропущенный звонок",
@@ -1294,7 +1315,8 @@ export const translations = {
     aboutTitleShort: "Про застосунок",
     privacyAndSecurityHint: "Параметри, що впливають на приватність у цьому клієнті.",
     privacyAccountHint: "Зміна @username та пошти, прив’язаних до акаунта.",
-    privacyChangeHandleHint: "3–32 символи: латиниця, цифри, підкреслення. У інтерфейсі показується як @нік.",
+    privacyChangeHandleHint:
+      "3–32 символи: латиниця, цифри, підкреслення. У інтерфейсі — як @нік. Системні імена (xasma, admin тощо) недоступні.",
     dataAndStorageHint: "Налаштування завантаження медіа та зберігання для цього клієнта.",
     autoDownloadMediaLabel: "Автозавантаження медіа",
     saveToGalleryLabel: "Зберігати в галерею",
@@ -1646,6 +1668,14 @@ export const translations = {
     groupAvatarChooseImage: "Оберіть файл зображення",
     groupAvatarFileTooLarge: "Файл завеликий",
     errorGeneric: "Щось пішло не так",
+    apiErrorHandleReserved:
+      "Цей @username зарезервовано для застосунку (наприклад xasma, admin). Оберіть інший.",
+    apiErrorHandleTaken: "Такий @username вже зайнятий.",
+    apiErrorHandleLength: "Довжина @username — від 3 до 32 символів.",
+    apiErrorHandleChars: "Дозволені лише латиниця, цифри та підкреслення.",
+    apiErrorEmailExists: "Цей email уже використовується.",
+    apiErrorEmailInvalid: "Некоректний email.",
+    apiErrorEmailRequired: "Вкажіть email.",
     authSessionFailed: "Помилка автентифікації",
     authBootSessionCheck: "Перевіряємо сесію…",
     avatarUpdateFailed: "Не вдалося оновити аватар",
@@ -1698,6 +1728,8 @@ export const translations = {
     callCancel: "Скасувати",
     callEnd: "Завершити",
     callMute: "Вимкнути мікрофон",
+    callSpeaker: "Гучний зв'язок",
+    callEarpiece: "Динамік біля вуха",
     callUnmute: "Увімкнути мікрофон",
     close: "Закрити",
     callEventMissed: "📞 Пропущений дзвінок",
@@ -1814,6 +1846,23 @@ export function tf(lang, key, vars) {
     s = s.replaceAll(`{${k}}`, String(v[k]));
   });
   return s;
+}
+
+/** Maps common backend `error` strings to localized UI text. Unknown messages pass through. */
+export function translateKnownApiError(message, t) {
+  const m = String(message || "").trim();
+  if (!m) return "";
+  const table = {
+    "This handle is reserved": "apiErrorHandleReserved",
+    "Handle already taken": "apiErrorHandleTaken",
+    "Handle must be 3-32 characters": "apiErrorHandleLength",
+    "Handle may only use letters, digits, and underscore": "apiErrorHandleChars",
+    "Email already exists": "apiErrorEmailExists",
+    "Invalid email": "apiErrorEmailInvalid",
+    "Email is required": "apiErrorEmailRequired",
+  };
+  const key = table[m];
+  return key ? t(key) : m;
 }
 
 /** Maps login/register failures to a clear UX message (uses `t` from current language). */
