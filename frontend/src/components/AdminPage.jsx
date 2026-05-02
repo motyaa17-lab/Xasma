@@ -2,13 +2,16 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   adminBroadcastOfficial,
   adminDeleteMessage,
+  adminGrantPremium,
   adminListFlaggedMessages,
   adminListMessageReports,
   adminListUsers,
   adminPatchUserTag,
+  adminRemovePremium,
   adminSetUserBanned,
   adminSetUserRole,
 } from "../api.js";
+import { isPremiumActive } from "../premium.js";
 import { formatAtUserHandle } from "../userHandleDisplay.js";
 import { TAG_COLOR_PRESETS } from "../userPersonalization.js";
 import UserTagBadge from "./UserTagBadge.jsx";
@@ -86,6 +89,8 @@ export default function AdminPage({ me, t, lang, onBack }) {
   const [filter, setFilter] = useState("all");
   const [broadcastText, setBroadcastText] = useState("");
   const [broadcastBusy, setBroadcastBusy] = useState(false);
+  const [adminPremDaysById, setAdminPremDaysById] = useState({});
+  const [adminPremTypeById, setAdminPremTypeById] = useState({});
 
   const isAdmin = me?.role === "admin";
 
@@ -102,6 +107,8 @@ export default function AdminPage({ me, t, lang, onBack }) {
       setUsers(Array.isArray(u.users) ? u.users : []);
       setFlagged(Array.isArray(f.messages) ? f.messages : []);
       setReports(Array.isArray(r.reports) ? r.reports : []);
+      setAdminPremDaysById({});
+      setAdminPremTypeById({});
     } catch (e) {
       setError(e?.message || t("adminRequestFailed"));
     } finally {
@@ -119,7 +126,8 @@ export default function AdminPage({ me, t, lang, onBack }) {
     const online = users.filter((u) => u.is_online).length;
     const banned = users.filter((u) => u.banned).length;
     const admins = users.filter((u) => u.role === "admin").length;
-    return { total, online, banned, admins, flagged: flagged.length, reports: reports.length };
+    const premium = users.filter((u) => isPremiumActive(u)).length;
+    return { total, online, banned, admins, premium, flagged: flagged.length, reports: reports.length };
   }, [users, flagged.length, reports.length]);
 
   const filteredUsers = useMemo(() => {
@@ -128,6 +136,7 @@ export default function AdminPage({ me, t, lang, onBack }) {
       if (filter === "banned" && !u.banned) return false;
       if (filter === "online" && !u.is_online) return false;
       if (filter === "admins" && u.role !== "admin") return false;
+      if (filter === "premium" && !isPremiumActive(u)) return false;
       if (!q) return true;
       return [u.username, u.userHandle, String(u.id)].some((x) => String(x || "").toLowerCase().includes(q));
     });
@@ -204,6 +213,7 @@ export default function AdminPage({ me, t, lang, onBack }) {
           [t("online") || "Online", stats.online],
           [t("adminStatusBanned") || "Banned", stats.banned],
           [t("adminRoleAdmin") || "Admins", stats.admins],
+          [t("premiumTitleShort") || "Premium", stats.premium],
           [t("adminFlaggedTitle") || "Flagged", stats.flagged],
           [t("adminMessageReportsTitle") || "Reports", stats.reports],
         ].map(([label, value]) => (
@@ -298,6 +308,7 @@ export default function AdminPage({ me, t, lang, onBack }) {
               ["online", t("online") || "Online"],
               ["banned", t("adminStatusBanned") || "Banned"],
               ["admins", t("adminRoleAdmin") || "Admins"],
+              ["premium", t("premiumTitleShort") || "Premium"],
             ].map(([id, label]) => (
               <button
                 key={id}
@@ -327,6 +338,14 @@ export default function AdminPage({ me, t, lang, onBack }) {
                   ID {u.id} · {t("adminRoleLabel")}: {u.role} ·{" "}
                   {u.banned ? t("adminStatusBanned") : t("adminStatusActive")} ·{" "}
                   {t("adminMessagesCount") || "Messages"}: {u.messageCount}
+                </div>
+                <div className="adminUserMeta muted small">
+                  {t("premiumTitleShort")}: {isPremiumActive(u) ? t("premiumActive") : t("premiumInactive")}
+                  {u.isPremium && u.premiumType ? ` · ${t("premiumTypeLabel")}: ${t(`premiumType_${u.premiumType}`)}` : ""}
+                  {u.premiumExpiresAt ? ` · ${t("premiumUntil")} ${fmtDate(u.premiumExpiresAt, lang)}` : ""}
+                  {isPremiumActive(u) && typeof u.premiumDaysLeft === "number"
+                    ? ` · ${t("premiumDaysLeft", { days: u.premiumDaysLeft })}`
+                    : ""}
                 </div>
                 <div className="adminUserMeta muted small">{fmtDate(u.created_at, lang)}</div>
               </div>
@@ -366,6 +385,76 @@ export default function AdminPage({ me, t, lang, onBack }) {
                 >
                   {u.banned ? t("adminUnban") : t("adminBan")}
                 </button>
+              </div>
+
+              <div className="adminPremiumControls">
+                <select
+                  className="input adminPremSelect"
+                  value={adminPremTypeById[u.id] || "admin"}
+                  onChange={(e) => setAdminPremTypeById((prev) => ({ ...prev, [u.id]: e.target.value }))}
+                >
+                  <option value="admin">{t("premiumType_admin")}</option>
+                  <option value="paid">{t("premiumType_paid")}</option>
+                  <option value="invite">{t("premiumType_invite")}</option>
+                </select>
+                <input
+                  className="input adminPremDays"
+                  inputMode="numeric"
+                  placeholder="30"
+                  value={adminPremDaysById[u.id] ?? ""}
+                  onChange={(e) => setAdminPremDaysById((prev) => ({ ...prev, [u.id]: e.target.value }))}
+                />
+                <button
+                  type="button"
+                  className="ghostBtn"
+                  onClick={async () => {
+                    setError("");
+                    setNotice("");
+                    const type = adminPremTypeById[u.id] || "admin";
+                    const daysRaw = adminPremDaysById[u.id];
+                    const days = Math.max(1, Math.min(3650, parseInt(String(daysRaw || "30"), 10) || 30));
+                    try {
+                      const res = await adminGrantPremium(u.id, { type, days });
+                      setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, ...res.user } : x)));
+                      setNotice(t("adminPremiumGranted"));
+                    } catch (e) {
+                      setError(e?.message || t("adminRequestFailed"));
+                      void refreshAll();
+                    }
+                  }}
+                >
+                  {t("adminPremiumGrant")}
+                </button>
+                <button
+                  type="button"
+                  className="ghostBtn"
+                  onClick={async () => {
+                    setError("");
+                    setNotice("");
+                    try {
+                      const res = await adminRemovePremium(u.id);
+                      setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, ...res.user } : x)));
+                      setNotice(t("adminPremiumRemoved"));
+                    } catch (e) {
+                      setError(e?.message || t("adminRequestFailed"));
+                      void refreshAll();
+                    }
+                  }}
+                >
+                  {t("adminPremiumRemove")}
+                </button>
+                <div className="adminPremPresets">
+                  {[14, 30, 90].map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      className="ghostBtn adminPremPresetBtn"
+                      onClick={() => setAdminPremDaysById((prev) => ({ ...prev, [u.id]: String(d) }))}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <AdminTagEditor
