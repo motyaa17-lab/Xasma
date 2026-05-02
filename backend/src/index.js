@@ -1445,7 +1445,8 @@ app.put("/api/me/user-handle", authRequired, async (req, res) => {
   try {
     const up = await query(`UPDATE users SET user_handle = $1 WHERE id = $2 RETURNING user_handle`, [parsed.value, uid]);
     if (!up.rows[0]) return res.status(404).json({ error: "User not found" });
-    const userHandle = userHandleApi(up.rows[0]);
+    // Use normalized request value for API/socket — pg row keys vary; empty here would wipe clients.
+    const userHandle = userHandleApi(up.rows[0]) || parsed.value;
     emitToAll("user:userHandle", { userId: uid, userHandle });
     return res.json({ userHandle });
   } catch (e) {

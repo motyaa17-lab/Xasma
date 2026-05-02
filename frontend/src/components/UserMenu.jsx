@@ -647,8 +647,15 @@ const UserMenu = forwardRef(function UserMenu(
     me?.avatarRing,
   ]);
 
+  const privacyPanelWasOpenRef = useRef(false);
   useEffect(() => {
-    if (panel !== "privacySecurity") return;
+    if (panel !== "privacySecurity") {
+      privacyPanelWasOpenRef.current = false;
+      return;
+    }
+    const justEntered = !privacyPanelWasOpenRef.current;
+    privacyPanelWasOpenRef.current = true;
+    if (!justEntered) return;
     setProfileEmail(String(me?.email || ""));
     setProfileEmailError("");
     setPrivacyUserHandle(String(me?.userHandle || "").trim());

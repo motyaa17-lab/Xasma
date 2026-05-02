@@ -1602,7 +1602,8 @@ export default function App() {
     socket.on("user:userHandle", ({ userId, userHandle } = {}) => {
       const uid = Number(userId);
       if (!uid) return;
-      const uh = typeof userHandle === "string" ? userHandle : "";
+      const uh = typeof userHandle === "string" ? userHandle.trim() : "";
+      if (!uh) return;
       setMe((prev) => (prev && prev.id === uid ? { ...prev, userHandle: uh } : prev));
       setChats((prev) =>
         prev.map((c) => (c.other?.id === uid ? { ...c, other: { ...c.other, userHandle: uh } } : c))
