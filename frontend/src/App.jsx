@@ -15,6 +15,7 @@ import AdminPage from "./components/AdminPage.jsx";
 import LegalPage from "./components/LegalPage.jsx";
 import { useIsMobile } from "./hooks/useIsMobile.js";
 import { useCallVoiceLevels } from "./useCallVoiceLevels.js";
+import { getRtcIceServers } from "./webrtcIceServers.js";
 import { t as tr, normalizeLang } from "./i18n.js";
 import {
   createChat,
@@ -715,7 +716,7 @@ export default function App() {
     if (!socket || !id) return null;
 
     const pc = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+      iceServers: getRtcIceServers(),
     });
 
     webrtcLog("pc:create", { callId: id });

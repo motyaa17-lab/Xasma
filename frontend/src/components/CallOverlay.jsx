@@ -64,7 +64,7 @@ export default function CallOverlay({
   const showDuration = call.phase === "connected" && call?.connectedAtMs;
   const isConnected = call.phase === "connected";
   const isEnding = call.phase === "ended";
-  const showOrbit = call.phase === "calling" || isRinging || showActiveControls;
+  const showOrbit = call.phase === "calling" || call.phase === "ringing" || showActiveControls;
 
   const vl = voiceLevels || { local: 0, remote: 0 };
   const remoteTalk = Math.min(1, Number(vl.remote) || 0);
