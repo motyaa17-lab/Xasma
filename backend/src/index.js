@@ -1401,6 +1401,35 @@ app.get("/api/me", authRequired, (req, res) => {
   });
 });
 
+/**
+ * Metered TURN/STUN for WebRTC. Set `METERED_TURN_DOMAIN` (e.g. xasma.metered.live) and
+ * `METERED_TURN_SECRET` (app secret from dashboard). Never put the secret in Vite env.
+ */
+app.get("/api/webrtc/ice-servers", authRequired, async (_req, res) => {
+  const rawDomain = String(process.env.METERED_TURN_DOMAIN || process.env.METERED_APP_DOMAIN || "").trim();
+  const secret = String(process.env.METERED_TURN_SECRET || process.env.METERED_SECRET_KEY || "").trim();
+  const host = rawDomain.replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
+  if (!host || !secret) {
+    return res.json({ iceServers: null });
+  }
+
+  const url = `https://${host}/api/v1/turn/credentials?apiKey=${encodeURIComponent(secret)}`;
+  try {
+    const r = await fetch(url, { method: "GET", headers: { Accept: "application/json" } });
+    const data = await r.json().catch(() => null);
+    if (!r.ok) {
+      const msg = data && typeof data.message === "string" ? data.message : `HTTP ${r.status}`;
+      return res.status(502).json({ error: "metered_upstream", detail: msg });
+    }
+    if (!Array.isArray(data) || !data.length) {
+      return res.status(502).json({ error: "metered_bad_response" });
+    }
+    return res.json({ iceServers: data });
+  } catch (e) {
+    return res.status(502).json({ error: "metered_unreachable", detail: String(e?.message || e) });
+  }
+});
+
 app.put("/api/me/email", authRequired, async (req, res) => {
   const uid = Number(req.user.id);
   const emailRaw = typeof req.body?.email === "string" ? req.body.email.trim() : "";

@@ -23,6 +23,7 @@ import {
   createChannel,
   getChats,
   getMe,
+  getWebRtcIceServers,
   getMessages,
   patchChatPin,
   patchChatListPin,
@@ -538,6 +539,8 @@ export default function App() {
   const remoteStreamRef = useRef(null); // MediaStream | null
   const remoteAudioRef = useRef(null); // HTMLAudioElement | null
   const pendingIceRef = useRef([]); // RTCIceCandidateInit[]
+  /** Fresh fetch each call after `cleanupWebrtc` clears this. */
+  const rtcIceFetchRef = useRef(null);
   const remoteTrackSeenRef = useRef(false);
   const audioResumeArmedRef = useRef(false);
   const audioResumeCleanupRef = useRef(null);
@@ -576,6 +579,7 @@ export default function App() {
     remoteStreamRef.current = null;
     remoteTrackSeenRef.current = false;
     pendingIceRef.current = [];
+    rtcIceFetchRef.current = null;
 
     const el = remoteAudioRef.current;
     if (el) {
@@ -709,17 +713,60 @@ export default function App() {
     );
   }
 
-  function ensurePeerConnection(callId) {
+  function iceServerListHasTurn(iceServers) {
+    for (const s of iceServers || []) {
+      const urls = s.urls;
+      const list = Array.isArray(urls) ? urls : urls != null ? [urls] : [];
+      for (const u of list) {
+        if (/^turns?:/i.test(String(u || ""))) return true;
+      }
+    }
+    return false;
+  }
+
+  async function resolveRtcIceServers() {
+    if (rtcIceFetchRef.current && typeof rtcIceFetchRef.current.then === "function") {
+      return rtcIceFetchRef.current;
+    }
+    rtcIceFetchRef.current = (async () => {
+      const fallback = getRtcIceServers();
+      try {
+        const data = await getWebRtcIceServers();
+        if (Array.isArray(data?.iceServers) && data.iceServers.length) {
+          // Metered list + public STUN: avoids one side on STUN-only while the other has TURN.
+          return [...data.iceServers, ...fallback];
+        }
+      } catch {
+        /* use fallback only */
+      }
+      return fallback;
+    })();
+    return rtcIceFetchRef.current;
+  }
+
+  async function ensurePeerConnection(callId) {
     if (pcRef.current) return pcRef.current;
     const id = String(callId || "");
     const socket = socketRef.current;
     if (!socket || !id) return null;
 
+    const iceServers = await resolveRtcIceServers();
+    let forceAllIce = false;
+    try {
+      forceAllIce = typeof localStorage !== "undefined" && localStorage.getItem("xasma_webrtc_force_all_ice") === "1";
+    } catch {
+      /* ignore */
+    }
+    const hasTurn = iceServerListHasTurn(iceServers);
+    // Cross-network: skip slow host/srflx checks when TURN is available (often ~10–20s faster to media).
+    const iceTransportPolicy = hasTurn && !forceAllIce ? "relay" : "all";
     const pc = new RTCPeerConnection({
-      iceServers: getRtcIceServers(),
+      iceServers,
+      iceTransportPolicy,
+      iceCandidatePoolSize: hasTurn ? 10 : 0,
     });
 
-    webrtcLog("pc:create", { callId: id });
+    webrtcLog("pc:create", { callId: id, iceTransportPolicy, hasTurn });
 
     pc.onicecandidate = (ev) => {
       if (!ev.candidate) {
@@ -846,7 +893,7 @@ export default function App() {
       const stream = await ensureLocalAudioOrFail();
       if (!stream || cancelled) return;
 
-      const pc = ensurePeerConnection(call.callId);
+      const pc = await ensurePeerConnection(call.callId);
       if (!pc || cancelled) return;
 
       // Attach local tracks once.
@@ -1379,7 +1426,7 @@ export default function App() {
       const stream = await ensureLocalAudioOrFail();
       if (!isActiveCallSession(id) || !stream) return;
 
-      const pc = ensurePeerConnection(id);
+      const pc = await ensurePeerConnection(id);
       if (!pc || !isActiveCallSession(id)) return;
 
       // Attach local tracks once.

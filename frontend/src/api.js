@@ -150,6 +150,11 @@ export async function getMe() {
   return data.user;
 }
 
+/** ICE servers for calls; backend may inject Metered TURN. Returns `{ iceServers }` or `{ iceServers: null }`. */
+export async function getWebRtcIceServers() {
+  return apiFetch("/api/webrtc/ice-servers");
+}
+
 export async function updateMyAvatar(avatar) {
   const data = await apiFetch("/api/me/avatar", {
     method: "PUT",
