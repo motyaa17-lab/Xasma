@@ -1055,6 +1055,12 @@ body.body--mobileConversationOpen {
   padding: 14px 16px 8px;
 }
 
+@media (min-width: 420px) {
+  .tgProfileActions {
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+  }
+}
+
 .tgProfileActionBtn {
   border: 1px solid rgba(255, 255, 255, 0.10);
   background: rgba(255, 255, 255, 0.06);
@@ -1171,6 +1177,101 @@ body.body--mobileConversationOpen {
     opacity: 1;
     transform: translate3d(-50%, 0, 0) scale(1);
   }
+}
+
+/* Message selection (Telegram-like) */
+.tgSelectBar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 150;
+  height: 54px;
+  display: grid;
+  grid-template-columns: 54px 1fr auto;
+  align-items: center;
+  padding: 0 10px;
+  background: rgba(6, 10, 20, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.tgSelectBtn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: none;
+  background: transparent;
+  color: rgba(226, 232, 240, 0.92);
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.tgSelectTitle {
+  font-weight: 800;
+  text-align: center;
+  font-size: 16px;
+}
+
+.tgSelectActions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.tgSelectAction {
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(226, 232, 240, 0.92);
+  border-radius: 12px;
+  padding: 8px 10px;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tgSelectAction:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.tgSelectAction:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.tgSelectAction.danger {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.10);
+}
+
+.tgSelectCheck {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 2px solid rgba(226, 232, 240, 0.35);
+  background: rgba(0, 0, 0, 0.10);
+}
+
+.tgSelectCheck--on {
+  border-color: rgba(59, 130, 246, 0.85);
+  background: rgba(59, 130, 246, 0.35);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.10);
+}
+
+.msgMention {
+  border: none;
+  background: transparent;
+  color: rgba(96, 165, 250, 0.95);
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+
+.msgMention:hover {
+  text-decoration: underline;
 }
 
 @keyframes userProfileAvatarIn {

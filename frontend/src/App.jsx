@@ -2532,6 +2532,7 @@ export default function App() {
     realtimeSendNotice,
     meAuraColor: me?.auraColor,
     onSetChatPin: handleSetChatPin,
+    onChatListPinToggle: handleChatListPinToggle,
     onStartCall: beginOutgoingCall,
     callUiBlocked: call.phase !== "idle",
   };

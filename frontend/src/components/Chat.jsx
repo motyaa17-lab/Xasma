@@ -7,6 +7,7 @@ import {
   getApiBase,
   reportMessage,
   searchChatMessages,
+  searchUsers,
 } from "../api.js";
 import AvatarAura from "./AvatarAura.jsx";
 import GroupInfoModal from "./GroupInfoModal.jsx";
@@ -16,7 +17,7 @@ import UserProfileScreen from "./UserProfileScreen.jsx";
 import ActivityBadge from "./ActivityBadge.jsx";
 import UserTagBadge from "./UserTagBadge.jsx";
 import { isPremiumActive } from "../premium.js";
-import { IconEllipsis, IconPhone, IconSearch } from "./Icons.jsx";
+import { IconEllipsis, IconPhone, IconSearch, IconSpeaker } from "./Icons.jsx";
 import { localeForLang } from "../i18n.js";
 import { formatUserStatusLine } from "../userStatusLine.js";
 import { XASMA_LOGO_SRC } from "../branding.js";
@@ -74,6 +75,13 @@ function renderTextWithLinks(text) {
   });
 }
 
+function isHandleToken(tok) {
+  const s = String(tok || "");
+  if (!s.startsWith("@")) return false;
+  const h = s.slice(1);
+  return /^[a-z0-9_]{3,32}$/i.test(h);
+}
+
 function dayKey(iso) {
   const d = iso ? new Date(iso) : null;
   if (!d || Number.isNaN(d.getTime())) return "";
@@ -110,6 +118,7 @@ const MessageActionMenuPanel = forwardRef(function MessageActionMenuPanel(
     canReport,
     canAdminDelete,
     canPin,
+    canSelect,
     canReply,
     className,
     style,
@@ -122,6 +131,7 @@ const MessageActionMenuPanel = forwardRef(function MessageActionMenuPanel(
     onReport,
     onAdminDelete,
     onPin,
+    onSelect,
     onReply,
     closeMenu,
   },
@@ -206,6 +216,22 @@ const MessageActionMenuPanel = forwardRef(function MessageActionMenuPanel(
           }}
         >
           {t("copy") ?? "Copy"}
+        </button>
+      ) : null}
+      {canSelect ? (
+        <button
+          type="button"
+          className="msgMenuItem"
+          role="menuitem"
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            closeMenu();
+            onSelect?.();
+          }}
+        >
+          {t("select") ?? "Select"}
         </button>
       ) : null}
       {canDeleteForAll ? (
@@ -465,6 +491,7 @@ export default function Chat({
   realtimeSendNotice = "",
   meAuraColor,
   onSetChatPin,
+  onChatListPinToggle,
 }) {
   const safeMessages = useMemo(() => {
     if (!Array.isArray(messages)) return [];
@@ -479,6 +506,8 @@ export default function Chat({
   const isMobileChat = Boolean(onMobileBack);
   const channelReadOnly = Boolean(isChannel && chat?.canPostMessage === false);
   const canShowCallButton = Boolean(chatId && !isRoom && !isOfficial && chat?.other?.id);
+  const canShowHeaderActions = Boolean(chatId && !isOfficial);
+  const chatListPinned = Boolean(chat?.listPinned);
 
   const usersMap = useMemo(() => {
     const m = new Map();
@@ -554,6 +583,8 @@ export default function Chat({
   const [menuMessageId, setMenuMessageId] = useState(null);
   const [toast, setToast] = useState("");
   const toastTimerRef = useRef(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [reportTargetMessage, setReportTargetMessage] = useState(null);
   const [reportBusy, setReportBusy] = useState(false);
   const [forwardTargetMessage, setForwardTargetMessage] = useState(null);
@@ -605,6 +636,37 @@ export default function Chat({
   const [jumpFlashId, setJumpFlashId] = useState(null);
   const lastTapRef = useRef({ id: null, at: 0 }); // { id, at }
 
+  const selectedCount = selectedIds.size;
+  const canUseSelectActions = selectMode && selectedCount > 0;
+
+  function exitSelectMode() {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  }
+
+  function toggleSelected(id) {
+    const mid = Number(id);
+    if (!mid) return;
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(mid)) next.delete(mid);
+      else next.add(mid);
+      if (next.size === 0) setSelectMode(false);
+      return next;
+    });
+  }
+
+  function enterSelectModeWith(id) {
+    const mid = Number(id);
+    if (!mid) return;
+    setSelectMode(true);
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.add(mid);
+      return next;
+    });
+  }
+
   function showToast(msg) {
     const m = String(msg || "").trim();
     if (!m) return;
@@ -621,6 +683,67 @@ export default function Chat({
       if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
     };
   }, []);
+
+  async function openProfileByHandle(atHandle) {
+    const raw = String(atHandle || "").trim();
+    const handle = raw.startsWith("@") ? raw.slice(1) : raw;
+    if (!handle) return;
+    try {
+      const list = await searchUsers(handle);
+      const exact = Array.isArray(list)
+        ? list.find((u) => String(u?.userHandle || "").toLowerCase() === handle.toLowerCase())
+        : null;
+      const uid = exact?.id != null ? Number(exact.id) : null;
+      if (uid) setProfileUserId(uid);
+      else showToast(t("userNotFound") ?? "User not found");
+    } catch {
+      showToast(t("errorGeneric") ?? "Error");
+    }
+  }
+
+  function renderTextRich(text) {
+    const s = String(text ?? "");
+    if (!s.trim()) return s;
+    const parts = s.split(/(\s+)/);
+    return parts.map((p, i) => {
+      if (!p) return p;
+      if (/^\s+$/.test(p)) return p;
+
+      const clean = String(p).replace(/[)\],.;!?]+$/g, (m) => m);
+      if (isUrlLike(clean)) {
+        // eslint-disable-next-line react/no-array-index-key
+        return (
+          <a key={i} href={clean} target="_blank" rel="noopener noreferrer" className="msgLink">
+            {p}
+          </a>
+        );
+      }
+
+      const noPunct = String(p).replace(/[)\],.;!?]+$/g, "");
+      if (isHandleToken(noPunct)) {
+        const suffix = p.slice(noPunct.length);
+        // eslint-disable-next-line react/no-array-index-key
+        return (
+          <React.Fragment key={i}>
+            <button
+              type="button"
+              className="msgMention"
+              onClick={(e) => {
+                e.stopPropagation();
+                void openProfileByHandle(noPunct);
+              }}
+              aria-label={noPunct}
+            >
+              {noPunct}
+            </button>
+            {suffix}
+          </React.Fragment>
+        );
+      }
+
+      return p;
+    });
+  }
 
   // Desktop shortcuts (Telegram-like):
   // - Ctrl/Cmd+F: open in-chat search
@@ -2476,6 +2599,7 @@ export default function Chat({
         onClose={() => setProfileUserId(null)}
         t={t}
         lang={lang}
+        onMessage={() => setProfileUserId(null)}
         onCall={() => {
           if (!chatId) return;
           if (!chat?.other) return;
@@ -2499,6 +2623,75 @@ export default function Chat({
       ) : (
         <>
           {toast ? <div className="tgToast" role="status" aria-live="polite">{toast}</div> : null}
+          {selectMode ? (
+            <div className="tgSelectBar" role="toolbar" aria-label={t("select") ?? "Select"}>
+              <button type="button" className="tgSelectBtn" onClick={exitSelectMode} aria-label={t("close")}>
+                ×
+              </button>
+              <div className="tgSelectTitle">{String(selectedCount)}</div>
+              <div className="tgSelectActions">
+                <button
+                  type="button"
+                  className="tgSelectAction"
+                  disabled={!canUseSelectActions}
+                  onClick={() => {
+                    const ids = Array.from(selectedIds);
+                    const byId = new Map(safeMessages.map((m) => [Number(m.id), m]));
+                    const text = ids
+                      .map((id) => String(byId.get(Number(id))?.text || "").trim())
+                      .filter(Boolean)
+                      .join("\n\n");
+                    if (!text) {
+                      showToast(t("copyFailed") ?? "Copy failed");
+                      return;
+                    }
+                    try {
+                      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+                        void navigator.clipboard.writeText(text);
+                      }
+                      showToast(t("copied") ?? "Copied");
+                    } catch {
+                      showToast(t("copyFailed") ?? "Copy failed");
+                    }
+                  }}
+                >
+                  {t("copy") ?? "Copy"}
+                </button>
+                <button
+                  type="button"
+                  className="tgSelectAction"
+                  disabled={!canUseSelectActions}
+                  onClick={() => {
+                    // Reuse forward modal: forward first selected (and then the rest sequentially after selection).
+                    const ids = Array.from(selectedIds);
+                    const byId = new Map(safeMessages.map((m) => [Number(m.id), m]));
+                    const first = byId.get(Number(ids[0]));
+                    if (!first) return;
+                    setForwardTargetMessage(first);
+                    showToast(t("forwardHintMulti") ?? "Choose a chat to forward");
+                  }}
+                >
+                  {t("forward") ?? "Forward"}
+                </button>
+                <button
+                  type="button"
+                  className="tgSelectAction danger"
+                  disabled={!canUseSelectActions}
+                  onClick={async () => {
+                    const ids = Array.from(selectedIds);
+                    if (!ids.length) return;
+                    for (const id of ids) {
+                      await onDeleteMessage?.(Number(id), "self");
+                    }
+                    showToast(t("deleted") ?? "Deleted");
+                    exitSelectMode();
+                  }}
+                >
+                  {t("delete") ?? "Delete"}
+                </button>
+              </div>
+            </div>
+          ) : null}
           {showVideoNoteOverlay ? (
             <div
               className="videoNoteOverlay"
@@ -2730,6 +2923,19 @@ export default function Chat({
               >
                 <span className="chatHeaderCallIcon" aria-hidden>
                   {chatMuted ? "🔇" : "🔔"}
+                </span>
+              </button>
+            ) : null}
+            {chatId && !isOfficial ? (
+              <button
+                type="button"
+                className={chatListPinned ? "chatHeaderCallBtn chatHeaderCallBtn--active" : "chatHeaderCallBtn"}
+                onClick={() => onChatListPinToggle?.(Number(chatId), !chatListPinned)}
+                aria-label={chatListPinned ? (t("unpinChat") ?? "Unpin chat") : (t("pinChat") ?? "Pin chat")}
+                title={chatListPinned ? (t("unpinChat") ?? "Unpin chat") : (t("pinChat") ?? "Pin chat")}
+              >
+                <span className="chatHeaderCallIcon" aria-hidden>
+                  📌
                 </span>
               </button>
             ) : null}
@@ -3071,7 +3277,18 @@ export default function Chat({
                           }
                         : undefined
                     }
+                    onClick={
+                      selectMode
+                        ? (e) => {
+                            e.stopPropagation();
+                            toggleSelected(m.id);
+                          }
+                        : undefined
+                    }
                   >
+                    {selectMode ? (
+                      <span className={selectedIds.has(Number(m.id)) ? "tgSelectCheck tgSelectCheck--on" : "tgSelectCheck"} aria-hidden />
+                    ) : null}
                     {ENABLE_SWIPE_TO_REPLY && isMobileChat ? (
                       <span
                         className={
@@ -3198,7 +3415,7 @@ export default function Chat({
                     ) : null}
                     {String(m.text ?? "").trim() ? (
                       <div className="bubbleText">
-                        {renderTextWithLinks(m.text)}
+                        {renderTextRich(m.text)}
                         {m.editedAt ? (
                           <span className="bubbleEdited"> {t("edited")}</span>
                         ) : null}
@@ -3697,6 +3914,7 @@ export default function Chat({
                     canReport={mobileMenuFlags.canReport}
                     canAdminDelete={mobileMenuFlags.canAdminDelete}
                     canPin={mobileMenuFlags.canPin}
+                    canSelect={Boolean(mobileMenuTarget?.id)}
                     className={`msgMenuDropdown${
                       isMobileChat ? " msgMenuDropdown--mobileFixed" : " msgMenuDropdown--desktopFixed"
                     }${(isMobileChat ? mobileMenuPlacement : desktopMenuPlacement)?.openUp ? " msgMenuDropdown--openUp" : ""}`}
@@ -3763,6 +3981,7 @@ export default function Chat({
                         setReportFeedback(t("copyFailed") ?? "Copy failed");
                       }
                     }}
+                    onSelect={() => enterSelectModeWith(mobileMenuTarget.id)}
                     onDeleteSelf={() => onDeleteMessage?.(mobileMenuTarget.id, "self")}
                     onDeleteForAll={() => onDeleteMessage?.(mobileMenuTarget.id, "both")}
                     onReport={() => setReportTargetMessage(mobileMenuTarget)}

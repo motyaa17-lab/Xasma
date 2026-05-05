@@ -8,7 +8,7 @@ import { localeForLang } from "../i18n.js";
 import { isPremiumActive } from "../premium.js";
 import { avatarRingWrapClass, usernameDisplayClass } from "../userPersonalization.js";
 import { formatAtUserHandle } from "../userHandleDisplay.js";
-import { IconPhone, IconSearch, IconSpeaker } from "./Icons.jsx";
+import { IconPhone, IconSearch, IconSpeaker, IconChats } from "./Icons.jsx";
 
 function initials(name) {
   const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
@@ -39,6 +39,7 @@ export default function UserProfileScreen({
   t,
   lang = "en",
   onClose,
+  onMessage,
   onCall,
   onSearchInChat,
   isMuted = false,
@@ -107,6 +108,8 @@ export default function UserProfileScreen({
 
   if (!open) return null;
 
+  const canCopy = Boolean(user?.userHandle || user?.username);
+
   return (
     <div
       className={`tgProfileScreen${phase === "out" ? " tgProfileScreen--out" : ""}${
@@ -169,6 +172,19 @@ export default function UserProfileScreen({
         </div>
 
         <div className="tgProfileActions">
+          <button
+            type="button"
+            className="tgProfileActionBtn"
+            onClick={onMessage}
+            disabled={!user}
+            aria-label={t("message") ?? "Message"}
+            title={t("message") ?? "Message"}
+          >
+            <span className="tgProfileActionIcon">
+              <IconChats size={18} />
+            </span>
+            <span className="tgProfileActionLabel">{t("message") ?? "Message"}</span>
+          </button>
           <button type="button" className="tgProfileActionBtn" onClick={onCall} disabled={!user} aria-label={t("callAudio")} title={t("callAudio")}>
             <span className="tgProfileActionIcon">
               <IconPhone size={18} />
@@ -186,6 +202,29 @@ export default function UserProfileScreen({
               <IconSpeaker size={18} />
             </span>
             <span className="tgProfileActionLabel">{isMuted ? t("unmute") ?? "Unmute" : t("mute") ?? "Mute"}</span>
+          </button>
+          <button
+            type="button"
+            className="tgProfileActionBtn"
+            disabled={!canCopy}
+            onClick={() => {
+              const v = user?.userHandle ? formatAtUserHandle(user.userHandle) : String(user?.username || "").trim();
+              if (!v) return;
+              try {
+                if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+                  void navigator.clipboard.writeText(v);
+                }
+              } catch {
+                // ignore
+              }
+            }}
+            aria-label={t("copy") ?? "Copy"}
+            title={t("copy") ?? "Copy"}
+          >
+            <span className="tgProfileActionIcon" aria-hidden>
+              ⧉
+            </span>
+            <span className="tgProfileActionLabel">{t("copy") ?? "Copy"}</span>
           </button>
         </div>
 
