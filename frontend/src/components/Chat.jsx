@@ -49,6 +49,11 @@ function isUrlLike(s) {
   return /^https?:\/\/\S+$/i.test(String(s || ""));
 }
 
+function isMacLikePlatform() {
+  if (typeof navigator === "undefined") return false;
+  return /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent || "");
+}
+
 function renderTextWithLinks(text) {
   const t = String(text ?? "");
   if (!t.trim()) return t;
@@ -547,6 +552,8 @@ export default function Chat({
   }, [text, chatId, editingMessageId]);
 
   const [menuMessageId, setMenuMessageId] = useState(null);
+  const [toast, setToast] = useState("");
+  const toastTimerRef = useRef(null);
   const [reportTargetMessage, setReportTargetMessage] = useState(null);
   const [reportBusy, setReportBusy] = useState(false);
   const [forwardTargetMessage, setForwardTargetMessage] = useState(null);
@@ -596,6 +603,48 @@ export default function Chat({
   const [scrollDownUnread, setScrollDownUnread] = useState(0);
   const [firstNewIncomingId, setFirstNewIncomingId] = useState(null);
   const [jumpFlashId, setJumpFlashId] = useState(null);
+  const lastTapRef = useRef({ id: null, at: 0 }); // { id, at }
+
+  function showToast(msg) {
+    const m = String(msg || "").trim();
+    if (!m) return;
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+    setToast(m);
+    toastTimerRef.current = window.setTimeout(() => {
+      setToast("");
+      toastTimerRef.current = null;
+    }, 1800);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
+  // Desktop shortcuts (Telegram-like):
+  // - Ctrl/Cmd+F: open in-chat search
+  // - Esc: close overlays/menus
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (!chatId) return;
+      const key = String(e.key || "");
+      const isMac = isMacLikePlatform();
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+      if (mod && (key === "f" || key === "F")) {
+        e.preventDefault();
+        setSearchOpen(true);
+        return;
+      }
+      if (key === "Escape") {
+        if (profileUserId) setProfileUserId(null);
+        if (searchOpen) setSearchOpen(false);
+        if (menuMessageId) setMenuMessageId(null);
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [chatId, profileUserId, searchOpen, menuMessageId]);
   const jumpFlashTimerRef = useRef(null);
   const scrollToMessageById = useCallback((mid) => {
     const id = Number(mid);
@@ -2449,6 +2498,7 @@ export default function Chat({
         </div>
       ) : (
         <>
+          {toast ? <div className="tgToast" role="status" aria-live="polite">{toast}</div> : null}
           {showVideoNoteOverlay ? (
             <div
               className="videoNoteOverlay"
@@ -2968,6 +3018,23 @@ export default function Chat({
                         ? () => {
                             onMobileBubbleTouchEnd();
                             if (ENABLE_SWIPE_TO_REPLY) onMobileBubbleSwipeTouchEnd();
+
+                            // Double-tap quick reaction (Telegram-like).
+                            // Keep it simple: only when menu isn't open and message isn't deleted.
+                            const now = Date.now();
+                            const prev = lastTapRef.current;
+                            const same = prev && String(prev.id) === String(m.id) && now - Number(prev.at || 0) < 320;
+                            lastTapRef.current = { id: m.id, at: now };
+                            if (
+                              same &&
+                              !menuMessageId &&
+                              !m.deletedForAll &&
+                              typeof onToggleReaction === "function" &&
+                              !isBanned
+                            ) {
+                              onToggleReaction(m.id, "❤️");
+                              showToast(t("reactionAdded") ?? "Reaction added");
+                            }
                           }
                         : undefined
                     }
@@ -2994,6 +3061,15 @@ export default function Chat({
                     }
                     onContextMenu={
                       isMobileChat && showBubbleInteractionMenu ? (e) => e.preventDefault() : undefined
+                    }
+                    onDoubleClick={
+                      !isMobileChat && typeof onToggleReaction === "function" && !isBanned
+                        ? () => {
+                            if (m.deletedForAll) return;
+                            onToggleReaction(m.id, "❤️");
+                            showToast(t("reactionAdded") ?? "Reaction added");
+                          }
+                        : undefined
                     }
                   >
                     {ENABLE_SWIPE_TO_REPLY && isMobileChat ? (

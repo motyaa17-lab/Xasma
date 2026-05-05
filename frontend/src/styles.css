@@ -1139,6 +1139,40 @@ body.body--mobileConversationOpen {
   padding: 8px 0;
 }
 
+/* Toast (Telegram-like, bottom-center). */
+.tgToast {
+  position: fixed;
+  left: 50%;
+  bottom: 86px; /* above composer / mobile nav */
+  transform: translate3d(-50%, 0, 0);
+  z-index: 140;
+  max-width: min(420px, calc(100vw - 24px));
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  color: rgba(226, 232, 240, 0.96);
+  font-weight: 650;
+  font-size: 13px;
+  text-align: center;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: tgToastIn 0.18s var(--ease-tg-out) both;
+  pointer-events: none;
+}
+
+@keyframes tgToastIn {
+  from {
+    opacity: 0;
+    transform: translate3d(-50%, 10px, 0) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(-50%, 0, 0) scale(1);
+  }
+}
+
 @keyframes userProfileAvatarIn {
   from {
     opacity: 0;
