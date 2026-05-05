@@ -862,6 +862,283 @@ body.body--mobileConversationOpen {
   animation-delay: 0.08s;
 }
 
+/* =========================
+   Telegram-like profile screen
+   ========================= */
+
+.tgProfileScreen {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: linear-gradient(180deg, rgba(11, 18, 32, 0.98), rgba(6, 10, 20, 0.98));
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  animation: tgProfileIn 0.22s var(--ease-tg-out) both;
+}
+
+.tgProfileScreen--out {
+  animation: tgProfileOut 0.18s ease both;
+}
+
+@keyframes tgProfileIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes tgProfileOut {
+  to {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+}
+
+.tgProfileTopbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 54px;
+  display: grid;
+  grid-template-columns: 54px 1fr 54px;
+  align-items: center;
+  padding: 0 8px;
+  background: rgba(6, 10, 20, 0.52);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tgProfileTopbarTitle {
+  text-align: center;
+  font-weight: 700;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tgProfileTopbarRight {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.tgProfileTopbarBtn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  color: rgba(226, 232, 240, 0.92);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.tgProfileTopbarBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.tgProfileScroll {
+  flex: 1;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tgProfileHero {
+  position: relative;
+  min-height: 280px;
+  display: flex;
+  align-items: flex-end;
+  padding: 16px 16px 18px;
+}
+
+.tgProfileBg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  filter: saturate(1.05) contrast(1.02);
+  transform: scale(1.02);
+}
+
+.tgProfileBgOverlay {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(900px 320px at 50% 0%, rgba(122, 162, 255, 0.14), rgba(0, 0, 0, 0) 60%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.05) 0%, rgba(11, 18, 32, 0.62) 62%, rgba(6, 10, 20, 0.96) 100%);
+}
+
+.tgProfilePremiumGlow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(520px 220px at 20% 0%, rgba(122, 162, 255, 0.22), rgba(0, 0, 0, 0) 62%),
+    radial-gradient(520px 220px at 80% 0%, rgba(192, 132, 252, 0.18), rgba(0, 0, 0, 0) 62%);
+  opacity: 0.9;
+}
+
+.tgProfileHeroInner {
+  position: relative;
+  display: flex;
+  gap: 14px;
+  align-items: flex-end;
+  width: 100%;
+}
+
+.tgProfileAvatar {
+  width: 88px;
+  height: 88px;
+  border-radius: 999px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
+  flex: 0 0 auto;
+}
+
+.tgProfileAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tgProfileAvatar span {
+  font-weight: 800;
+  font-size: 28px;
+  color: rgba(226, 232, 240, 0.92);
+}
+
+.tgProfileHeroText {
+  min-width: 0;
+  padding-bottom: 6px;
+}
+
+.tgProfileNameRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tgProfileName {
+  font-weight: 800;
+  font-size: 20px;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tgProfileHandle {
+  margin-top: 4px;
+}
+
+.tgProfileStatus {
+  margin-top: 6px;
+}
+
+.tgProfileActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 14px 16px 8px;
+}
+
+.tgProfileActionBtn {
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 12px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  color: rgba(226, 232, 240, 0.95);
+}
+
+.tgProfileActionBtn:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.tgProfileActionBtn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.tgProfileActionBtn--on {
+  border-color: rgba(59, 130, 246, 0.45);
+  background: rgba(59, 130, 246, 0.14);
+}
+
+.tgProfileActionIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.tgProfileActionLabel {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.tgProfileCard {
+  margin: 10px 12px 18px;
+  padding: 14px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.tgProfileBadges {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.tgProfileSection {
+  padding: 10px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tgProfileSection:first-of-type {
+  border-top: none;
+}
+
+.tgProfileSectionLabel {
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: rgba(226, 232, 240, 0.60);
+  margin-bottom: 6px;
+}
+
+.tgProfileSectionValue {
+  font-size: 14px;
+  line-height: 1.4;
+  color: rgba(226, 232, 240, 0.92);
+  word-break: break-word;
+}
+
+.tgProfileLoading {
+  padding: 8px 0;
+}
+
 @keyframes userProfileAvatarIn {
   from {
     opacity: 0;

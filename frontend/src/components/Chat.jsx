@@ -12,7 +12,7 @@ import AvatarAura from "./AvatarAura.jsx";
 import GroupInfoModal from "./GroupInfoModal.jsx";
 import VoiceMessagePlayer from "./VoiceMessagePlayer.jsx";
 import CircleVideoMessage from "./CircleVideoMessage.jsx";
-import UserProfileModal from "./UserProfileModal.jsx";
+import UserProfileScreen from "./UserProfileScreen.jsx";
 import ActivityBadge from "./ActivityBadge.jsx";
 import UserTagBadge from "./UserTagBadge.jsx";
 import { isPremiumActive } from "../premium.js";
@@ -2421,12 +2421,26 @@ export default function Chat({
       onTouchCancel={onChatTouchEnd}
     >
       <div className="chatBgParallax" ref={chatBgParallaxRef} aria-hidden />
-      <UserProfileModal
+      <UserProfileScreen
         open={Boolean(profileUserId)}
         userId={profileUserId}
         onClose={() => setProfileUserId(null)}
         t={t}
         lang={lang}
+        onCall={() => {
+          if (!chatId) return;
+          if (!chat?.other) return;
+          onStartCall?.({ chatId: Number(chatId), other: chat.other });
+        }}
+        onSearchInChat={() => setSearchOpen(true)}
+        isMuted={Boolean(chatMuted)}
+        onToggleMute={() => {
+          if (!chatId) return;
+          const cid = Number(chatId);
+          const next = !isChatMuted(cid);
+          setChatMuted(cid, next);
+          setChatMutedUi(next);
+        }}
       />
       {!chatId ? (
         <div className="emptyState">
