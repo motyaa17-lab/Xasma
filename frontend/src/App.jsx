@@ -1117,6 +1117,68 @@ export default function App() {
     };
   }, [me]);
 
+  // Warm up message cache in the background so opening a chat feels instant (Telegram-like).
+  const prefetchSeqRef = useRef(0);
+  useEffect(() => {
+    if (!me) return;
+    const list = Array.isArray(chats) ? chats : [];
+    if (!list.length) return;
+
+    // Only warm-up a small batch to avoid hammering the backend on startup.
+    const MAX_CHATS_TO_PREFETCH = 14;
+    const MESSAGES_PER_CHAT = 35;
+    const CONCURRENCY = 2;
+
+    const ids = list
+      .map((c) => Number(c?.id || 0))
+      .filter(Boolean)
+      .slice(0, MAX_CHATS_TO_PREFETCH)
+      .filter((cid) => {
+        const cached = messagesCacheRef.current.get(cid);
+        return !(Array.isArray(cached) && cached.length);
+      });
+
+    if (!ids.length) return;
+
+    const seq = ++prefetchSeqRef.current;
+    let cancelled = false;
+
+    const runOne = async (chatId) => {
+      try {
+        const list = await getMessages(chatId, MESSAGES_PER_CHAT);
+        if (cancelled) return;
+        if (prefetchSeqRef.current !== seq) return;
+        if (Array.isArray(list) && list.length) {
+          messagesCacheRef.current.set(Number(chatId), list.slice());
+        }
+      } catch {
+        // ignore warm-up errors; on-demand load still works
+      }
+    };
+
+    (async () => {
+      // Simple worker pool.
+      const queue = ids.slice();
+      const workers = Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
+        while (!cancelled && queue.length) {
+          const cid = queue.shift();
+          if (!cid) continue;
+          // Skip if it was cached while waiting in the queue.
+          const cached = messagesCacheRef.current.get(cid);
+          if (Array.isArray(cached) && cached.length) continue;
+          await runOne(cid);
+        }
+      });
+      await Promise.all(workers);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // Intentionally depend on `chats` so we warm-up when chat list is freshly fetched/refreshed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me, chats]);
+
   useEffect(() => {
     selectedChatIdRef.current = selectedChatId;
   }, [selectedChatId]);
