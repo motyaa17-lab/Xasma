@@ -2513,6 +2513,17 @@ body.body--mobileConversationOpen {
   box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.18);
 }
 
+.themePreview.theme-telegramLight {
+  background: linear-gradient(135deg, #f5b2da 0%, #f3cf8b 40%, #8fe7d4 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.themePreview.theme-telegramDark {
+  background: radial-gradient(120% 80% at 50% 0%, rgba(46, 86, 150, 0.25), transparent 55%),
+    linear-gradient(180deg, #0b1323, #070c16);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.10);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .themePreview.theme-darkGradient.theme-dark-animated,
   .themePreview.theme-softBlur.theme-soft-animated,
@@ -4464,6 +4475,62 @@ body.body--mobileConversationOpen {
 .chatTheme-telegramLight .messages .bubble.me .bubbleMeta,
 .chatTheme-telegramLight .messages .bubble.me .bubbleTime {
   color: rgba(15, 23, 42, 0.52);
+}
+
+/* Telegram iOS dark doodles (screenshot-like) */
+.chatTheme-telegramDark.chatMain > .chatBgParallax {
+  background: radial-gradient(110% 75% at 50% 0%, rgba(39, 78, 140, 0.30), transparent 60%),
+    linear-gradient(180deg, #0b1323 0%, #070c16 100%);
+}
+
+.chatTheme-telegramDark.chatMain > .chatBgParallax::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    /* line doodles + subtle grid-ish noise */
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.03) 0 1px, transparent 1px 46px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.02) 0 1px, transparent 1px 52px),
+    radial-gradient(circle at 12% 22%, rgba(255, 255, 255, 0.10) 0 1px, transparent 2px),
+    radial-gradient(circle at 68% 36%, rgba(255, 255, 255, 0.10) 0 1px, transparent 2px),
+    radial-gradient(circle at 84% 74%, rgba(255, 255, 255, 0.10) 0 1px, transparent 2px);
+  opacity: 0.45;
+  mix-blend-mode: screen;
+}
+
+.chatTheme-telegramDark .messages .bubble {
+  background: linear-gradient(180deg, rgba(53, 58, 68, 0.92), rgba(37, 41, 50, 0.92));
+  border-color: rgba(255, 255, 255, 0.06);
+  color: rgba(241, 245, 249, 0.92);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.18);
+}
+
+.chatTheme-telegramDark .messages .bubble.me {
+  background: linear-gradient(160deg, rgba(112, 82, 230, 0.92), rgba(78, 140, 255, 0.78));
+  border-color: rgba(147, 197, 253, 0.18);
+  color: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 12px 28px rgba(79, 70, 229, 0.20);
+}
+
+.chatTheme-telegramDark .messages .bubbleMeta,
+.chatTheme-telegramDark .messages .bubbleTime {
+  color: rgba(226, 232, 240, 0.62);
+}
+
+.chatTheme-telegramDark .messages .bubble.me .bubbleMeta,
+.chatTheme-telegramDark .messages .bubble.me .bubbleTime {
+  color: rgba(226, 232, 240, 0.75);
+}
+
+.chatTheme-telegramDark .chatHeader {
+  background: rgba(10, 16, 30, 0.65);
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+.chatTheme-telegramDark .composer {
+  background: linear-gradient(180deg, rgba(10, 16, 30, 0.55) 0%, rgba(7, 12, 22, 0.82) 100%);
+  border-top-color: rgba(255, 255, 255, 0.05);
 }
 
 .chatMain.chatTheme-night.theme-night-animated > .chatBgParallax {

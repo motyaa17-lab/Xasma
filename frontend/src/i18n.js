@@ -466,6 +466,8 @@ export const translations = {
     themeDarkGradient: "Dark gradient",
     themeSoftBlur: "Soft blur",
     themeNight: "Night (blue / purple)",
+    themeTelegramLight: "Telegram (light)",
+    themeTelegramDark: "Telegram (dark doodles)",
 
     maxAvatarHint: "Max 3MB. (Stored in SQLite as base64 for now.)",
 
@@ -1073,6 +1075,8 @@ export const translations = {
     themeDarkGradient: "Тёмный градиент",
     themeSoftBlur: "Мягкое размытие",
     themeNight: "Ночь (синий / фиолетовый)",
+    themeTelegramLight: "Telegram (светлая)",
+    themeTelegramDark: "Telegram (тёмная с дудлами)",
 
     maxAvatarHint: "До 3MB. (Сохраняется в SQLite в base64.)",
 
@@ -1681,6 +1685,8 @@ export const translations = {
     themeDarkGradient: "Темний градієнт",
     themeSoftBlur: "М'яке розмиття",
     themeNight: "Ніч (синій / фіолетовий)",
+    themeTelegramLight: "Telegram (світла)",
+    themeTelegramDark: "Telegram (темна з дудлами)",
 
     maxAvatarHint: "До 3 МБ. (Зберігається в SQLite як base64.)",
 

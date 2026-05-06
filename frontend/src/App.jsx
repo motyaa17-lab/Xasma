@@ -67,7 +67,7 @@ export default function App() {
     try {
       const raw = localStorage.getItem("settings");
       const parsed = raw ? JSON.parse(raw) : {};
-      const allowed = new Set(["darkGradient", "softBlur", "night", "telegramLight"]);
+      const allowed = new Set(["darkGradient", "softBlur", "night", "telegramLight", "telegramDark"]);
       const legacy = {
         ocean: "darkGradient",
         midnight: "night",

@@ -264,6 +264,8 @@ function chatThemeLabel(t, id) {
       darkGradient: "themeDarkGradient",
       softBlur: "themeSoftBlur",
       night: "themeNight",
+      telegramLight: "themeTelegramLight",
+      telegramDark: "themeTelegramDark",
       dark: "themeDarkGradient",
       glass: "themeSoftBlur",
       noise: "themeDarkGradient",
@@ -1681,6 +1683,8 @@ const UserMenu = forwardRef(function UserMenu(
                     { id: "darkGradient", label: t("themeDarkGradient") },
                     { id: "softBlur", label: t("themeSoftBlur") },
                     { id: "night", label: t("themeNight") },
+                    { id: "telegramLight", label: t("themeTelegramLight") },
+                    { id: "telegramDark", label: t("themeTelegramDark") },
                   ].map((theme) => (
                     <SettingsChoiceRow
                       key={theme.id}
@@ -2452,6 +2456,8 @@ const UserMenu = forwardRef(function UserMenu(
                     { id: "darkGradient", label: t("themeDarkGradient") },
                     { id: "softBlur", label: t("themeSoftBlur") },
                     { id: "night", label: t("themeNight") },
+                    { id: "telegramLight", label: t("themeTelegramLight") },
+                    { id: "telegramDark", label: t("themeTelegramDark") },
                   ].map((theme) => (
                     <button
                       key={theme.id}
