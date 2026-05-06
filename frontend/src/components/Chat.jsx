@@ -2602,7 +2602,6 @@ export default function Chat({
         onClose={() => setProfileUserId(null)}
         t={t}
         lang={lang}
-        onMessage={() => setProfileUserId(null)}
         onCall={() => {
           if (!chatId) return;
           if (!chat?.other) return;
@@ -2617,6 +2616,13 @@ export default function Chat({
           setChatMuted(cid, next);
           setChatMutedUi(next);
         }}
+        onChangeWallpaper={() => {
+          // Use the existing background picker from settings logic? For now just hint.
+          showToast(t("comingSoon") ?? "Coming soon");
+        }}
+        onClearHistory={() => showToast(t("comingSoon") ?? "Coming soon")}
+        onBlock={() => showToast(t("comingSoon") ?? "Coming soon")}
+        onDeleteChat={() => showToast(t("comingSoon") ?? "Coming soon")}
       />
       {!chatId ? (
         <div className="emptyState">

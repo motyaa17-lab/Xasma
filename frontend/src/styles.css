@@ -1031,6 +1031,183 @@ body.body--mobileConversationOpen {
   padding: 16px 16px 18px;
 }
 
+/* Telegram iOS-like profile header + action row + sheet */
+.tgProfileHero--ios {
+  min-height: 330px;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 18px 16px 18px;
+}
+
+.tgIosProfileHeader {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding-top: 12px;
+}
+
+.tgIosAvatar {
+  width: 104px;
+  height: 104px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tgIosAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tgIosAvatar span {
+  font-weight: 900;
+  font-size: 34px;
+  color: rgba(226, 232, 240, 0.92);
+}
+
+.tgIosName {
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  text-align: center;
+  max-width: min(92vw, 560px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tgIosSubtitle {
+  font-size: 14px;
+  font-weight: 650;
+  color: rgba(148, 163, 184, 0.92);
+  text-align: center;
+  max-width: min(92vw, 560px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tgIosActionsRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 16px 4px;
+}
+
+.tgIosAction {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: rgba(226, 232, 240, 0.96);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.tgIosActionIcon {
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 14px 46px rgba(0, 0, 0, 0.30);
+}
+
+.tgIosAction--on .tgIosActionIcon {
+  background: rgba(47, 107, 255, 0.18);
+  border-color: rgba(96, 165, 250, 0.30);
+}
+
+.tgIosActionLabel {
+  font-size: 12px;
+  font-weight: 750;
+  color: rgba(148, 163, 184, 0.95);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.tgSheetBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 12px 12px max(12px, env(safe-area-inset-bottom));
+}
+
+.tgSheet {
+  width: min(520px, 100%);
+  border-radius: 18px;
+  background: rgba(20, 20, 22, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  animation: tgSheetIn 0.18s var(--ease-tg-out) both;
+}
+
+@keyframes tgSheetIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.tgSheetItem {
+  width: 100%;
+  text-align: left;
+  padding: 14px 14px;
+  background: transparent;
+  border: none;
+  color: rgba(226, 232, 240, 0.96);
+  font-weight: 750;
+  font-size: 15px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tgSheetItem--danger {
+  color: rgba(255, 105, 97, 0.98);
+}
+
+.tgSheetCancel {
+  width: 100%;
+  padding: 14px 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border: none;
+  color: rgba(226, 232, 240, 0.96);
+  font-weight: 800;
+  font-size: 15px;
+  cursor: pointer;
+}
+
 .tgProfileBg {
   position: absolute;
   inset: 0;

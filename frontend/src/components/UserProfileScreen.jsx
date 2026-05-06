@@ -8,7 +8,7 @@ import { localeForLang } from "../i18n.js";
 import { isPremiumActive } from "../premium.js";
 import { avatarRingWrapClass, usernameDisplayClass } from "../userPersonalization.js";
 import { formatAtUserHandle } from "../userHandleDisplay.js";
-import { IconPhone, IconSearch, IconSpeaker, IconChats } from "./Icons.jsx";
+import { IconPhone, IconSearch, IconSpeaker, IconEllipsis } from "./Icons.jsx";
 
 function initials(name) {
   const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
@@ -39,16 +39,20 @@ export default function UserProfileScreen({
   t,
   lang = "en",
   onClose,
-  onMessage,
   onCall,
   onSearchInChat,
   isMuted = false,
   onToggleMute,
+  onChangeWallpaper,
+  onClearHistory,
+  onBlock,
+  onDeleteChat,
 }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [phase, setPhase] = useState("in"); // in | out
+  const [moreOpen, setMoreOpen] = useState(false);
   const closeTimerRef = useRef(null);
 
   useEffect(() => {
@@ -109,6 +113,7 @@ export default function UserProfileScreen({
   if (!open) return null;
 
   const canCopy = Boolean(user?.userHandle || user?.username);
+  const at = user?.userHandle ? formatAtUserHandle(user.userHandle) : "";
 
   return (
     <div
@@ -123,36 +128,36 @@ export default function UserProfileScreen({
         <button type="button" className="tgProfileTopbarBtn" onClick={onClose} aria-label={t("back") ?? t("close")}>
           ←
         </button>
-        <div className="tgProfileTopbarTitle" title={title}>
-          {title}
+        <div className="tgProfileTopbarTitle" title={t("profile")}>
+          {t("profile")}
         </div>
         <div className="tgProfileTopbarRight">
           <button
             type="button"
             className="tgProfileTopbarBtn"
-            onClick={onSearchInChat}
-            aria-label={t("search")}
-            title={t("search")}
+            onClick={() => setMoreOpen(true)}
+            aria-label={t("more") ?? "More"}
+            title={t("more") ?? "More"}
           >
-            <IconSearch size={18} />
+            <IconEllipsis size={18} />
           </button>
         </div>
       </div>
 
       <div className="tgProfileScroll">
-        <div className={`tgProfileHero${hasBgImage ? " tgProfileHero--hasBg" : ""}${premiumMode ? " tgProfileHero--premium" : ""}`}>
+        <div className={`tgProfileHero tgProfileHero--ios${hasBgImage ? " tgProfileHero--hasBg" : ""}${premiumMode ? " tgProfileHero--premium" : ""}`}>
           {premiumMode ? <div className="tgProfilePremiumGlow" aria-hidden /> : null}
           {hasBgImage ? (
             <div className="tgProfileBg" style={{ backgroundImage: `url(${profileBg})` }} aria-hidden />
           ) : null}
           <div className="tgProfileBgOverlay" aria-hidden />
 
-          <div className="tgProfileHeroInner">
+          <div className="tgIosProfileHeader">
             <AvatarAura auraColor={user?.auraColor}>
               {(() => {
                 const ringC = avatarRingWrapClass(premiumMode ? user?.avatarRing : "");
                 const inner = (
-                  <div className={`tgProfileAvatar${premiumMode ? " tgProfileAvatar--premium" : ""}`}>
+                  <div className={`tgIosAvatar${premiumMode ? " tgIosAvatar--premium" : ""}`}>
                     {user?.avatar ? <img src={user.avatar} alt="" /> : <span>{initials(user?.username || "")}</span>}
                   </div>
                 );
@@ -160,71 +165,47 @@ export default function UserProfileScreen({
               })()}
             </AvatarAura>
 
-            <div className="tgProfileHeroText">
-              <div className="tgProfileNameRow">
-                <div className={`tgProfileName ${usernameDisplayClass(user) || ""}`.trim()}>{user?.username || ""}</div>
-                {user?.isPremium ? <span className="premiumBadge">💎</span> : null}
-              </div>
-              {user?.userHandle ? <div className="tgProfileHandle muted small">{formatAtUserHandle(user.userHandle)}</div> : null}
-              <div className="tgProfileStatus muted small">{user ? formatUserStatusLine(user, t, lang) : ""}</div>
+            <div className="tgIosName">
+              <span className={usernameDisplayClass(user) || undefined}>{user?.username || ""}</span>
+              {user?.isPremium ? <span className="premiumBadge">💎</span> : null}
+            </div>
+            <div className="tgIosSubtitle">
+              {at ? `${at} · ` : ""}
+              {user ? formatUserStatusLine(user, t, lang) : ""}
             </div>
           </div>
         </div>
 
-        <div className="tgProfileActions">
-          <button
-            type="button"
-            className="tgProfileActionBtn"
-            onClick={onMessage}
-            disabled={!user}
-            aria-label={t("message") ?? "Message"}
-            title={t("message") ?? "Message"}
-          >
-            <span className="tgProfileActionIcon">
-              <IconChats size={18} />
-            </span>
-            <span className="tgProfileActionLabel">{t("message") ?? "Message"}</span>
-          </button>
-          <button type="button" className="tgProfileActionBtn" onClick={onCall} disabled={!user} aria-label={t("callAudio")} title={t("callAudio")}>
-            <span className="tgProfileActionIcon">
+        <div className="tgIosActionsRow" role="group" aria-label={t("actions") ?? "Actions"}>
+          <button type="button" className="tgIosAction" onClick={onCall} disabled={!user} aria-label={t("callAudio")} title={t("callAudio")}>
+            <span className="tgIosActionIcon">
               <IconPhone size={18} />
             </span>
-            <span className="tgProfileActionLabel">{t("callAudio")}</span>
+            <span className="tgIosActionLabel">{t("callAudio")}</span>
+          </button>
+          <button type="button" className="tgIosAction" onClick={onSearchInChat} aria-label={t("searchInChat")} title={t("searchInChat")}>
+            <span className="tgIosActionIcon">
+              <IconSearch size={18} />
+            </span>
+            <span className="tgIosActionLabel">{t("search") ?? "Search"}</span>
           </button>
           <button
             type="button"
-            className={`tgProfileActionBtn${isMuted ? " tgProfileActionBtn--on" : ""}`}
+            className={`tgIosAction${isMuted ? " tgIosAction--on" : ""}`}
             onClick={onToggleMute}
-            aria-label={t("mute") ?? "Mute"}
-            title={t("mute") ?? "Mute"}
+            aria-label={isMuted ? (t("unmuteChat") ?? "Unmute") : (t("muteChat") ?? "Mute")}
+            title={isMuted ? (t("unmuteChat") ?? "Unmute") : (t("muteChat") ?? "Mute")}
           >
-            <span className="tgProfileActionIcon">
+            <span className="tgIosActionIcon">
               <IconSpeaker size={18} />
             </span>
-            <span className="tgProfileActionLabel">{isMuted ? t("unmute") ?? "Unmute" : t("mute") ?? "Mute"}</span>
+            <span className="tgIosActionLabel">{isMuted ? (t("unmute") ?? "Unmute") : (t("mute") ?? "Mute")}</span>
           </button>
-          <button
-            type="button"
-            className="tgProfileActionBtn"
-            disabled={!canCopy}
-            onClick={() => {
-              const v = user?.userHandle ? formatAtUserHandle(user.userHandle) : String(user?.username || "").trim();
-              if (!v) return;
-              try {
-                if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-                  void navigator.clipboard.writeText(v);
-                }
-              } catch {
-                // ignore
-              }
-            }}
-            aria-label={t("copy") ?? "Copy"}
-            title={t("copy") ?? "Copy"}
-          >
-            <span className="tgProfileActionIcon" aria-hidden>
-              ⧉
+          <button type="button" className="tgIosAction" onClick={() => setMoreOpen(true)} aria-label={t("more") ?? "More"} title={t("more") ?? "More"}>
+            <span className="tgIosActionIcon">
+              <IconEllipsis size={18} />
             </span>
-            <span className="tgProfileActionLabel">{t("copy") ?? "Copy"}</span>
+            <span className="tgIosActionLabel">{t("more") ?? "More"}</span>
           </button>
         </div>
 
@@ -261,6 +242,56 @@ export default function UserProfileScreen({
           ) : null}
         </div>
       </div>
+
+      {moreOpen ? (
+        <div className="tgSheetBackdrop" role="presentation" onClick={() => setMoreOpen(false)}>
+          <div className="tgSheet" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="tgSheetItem"
+              onClick={() => {
+                setMoreOpen(false);
+                onChangeWallpaper?.();
+              }}
+            >
+              {t("changeWallpaper") ?? "Change wallpaper"}
+            </button>
+            <button
+              type="button"
+              className="tgSheetItem"
+              onClick={() => {
+                setMoreOpen(false);
+                onClearHistory?.();
+              }}
+            >
+              {t("clearHistory") ?? "Clear history"}
+            </button>
+            <button
+              type="button"
+              className="tgSheetItem tgSheetItem--danger"
+              onClick={() => {
+                setMoreOpen(false);
+                onBlock?.();
+              }}
+            >
+              {t("blockUser") ?? "Block user"}
+            </button>
+            <button
+              type="button"
+              className="tgSheetItem tgSheetItem--danger"
+              onClick={() => {
+                setMoreOpen(false);
+                onDeleteChat?.();
+              }}
+            >
+              {t("deleteChat") ?? "Delete chat"}
+            </button>
+            <button type="button" className="tgSheetCancel" onClick={() => setMoreOpen(false)}>
+              {t("cancel") ?? "Cancel"}
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
