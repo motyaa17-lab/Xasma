@@ -464,6 +464,7 @@ export default function Chat({
   chats = [],
   otherTyping,
   messages,
+  messagesLoading = false,
   meId,
   meAvatar,
   meUsername,
@@ -497,6 +498,8 @@ export default function Chat({
     if (!Array.isArray(messages)) return [];
     return messages.filter((m) => m && typeof m === "object");
   }, [messages]);
+
+  const showMessageSkeleton = Boolean(chatId && messagesLoading && safeMessages.length === 0);
 
   // NOTE: Must be declared before any hooks that reference it in deps to avoid TDZ crashes in production builds.
   const isGroup = chat?.type === "group";
@@ -3069,6 +3072,19 @@ export default function Chat({
           ) : null}
 
           <div className="messages" ref={listRef}>
+            {showMessageSkeleton ? (
+              <div className="msgSkeleton" aria-hidden>
+                {Array.from({ length: 10 }).map((_, i) => (
+                  // eslint-disable-next-line react/no-array-index-key
+                  <div key={i} className={i % 3 === 0 ? "msgSkRow msgSkRow--own" : "msgSkRow"}>
+                    <div className="msgSkBubble">
+                      <div className="msgSkLine msgSkLine--a" />
+                      <div className="msgSkLine msgSkLine--b" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             {safeMessages.map((m, idx) => {
               const prev = safeMessages[idx - 1];
               const curDay = dayKey(m?.createdAt);

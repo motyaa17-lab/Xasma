@@ -60,6 +60,8 @@ export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem("token") || "");
   const [me, setMe] = useState(null);
   const [authError, setAuthError] = useState("");
+  const [chatsLoading, setChatsLoading] = useState(false);
+  const [messagesLoading, setMessagesLoading] = useState(false);
 
   const [settings, setSettings] = useState(() => {
     try {
@@ -1105,11 +1107,14 @@ export default function App() {
     let cancelled = false;
     (async () => {
       try {
+        setChatsLoading(true);
         const list = await getChats();
         if (cancelled) return;
         setChats(applyLocalStoriesToChats(list));
       } catch (e) {
         // Ignore at first; user can reload or interact.
+      } finally {
+        if (!cancelled) setChatsLoading(false);
       }
     })();
     return () => {
@@ -1950,6 +1955,7 @@ export default function App() {
   async function refreshMessages(chatId) {
     const loadSeq = ++messagesLoadSeqRef.current;
     try {
+      setMessagesLoading(true);
       const list = await getMessages(chatId, 50);
       setMessages((prev) => {
         if (Number(selectedChatIdRef.current || 0) !== Number(chatId)) return prev;
@@ -1960,6 +1966,9 @@ export default function App() {
       });
     } catch (e) {
       debugLog("refreshMessages failed", e?.message || e);
+    } finally {
+      // Only clear if this is still the latest load.
+      if (messagesLoadSeqRef.current === loadSeq) setMessagesLoading(false);
     }
   }
 
@@ -1993,6 +2002,7 @@ export default function App() {
     // Same chat: soft refresh only (sidebar may call select again).
     if (prevCid === nextCid && nextCid) {
       try {
+        setMessagesLoading(true);
         const list = await getMessages(nextCid, 50);
         setMessages((prev) => {
           if (Number(selectedChatIdRef.current || 0) !== nextCid) return prev;
@@ -2007,6 +2017,8 @@ export default function App() {
         }
       } catch (e) {
         debugLog("selectChat same-chat refresh failed", e?.message || e);
+      } finally {
+        if (messagesLoadSeqRef.current === loadSeq) setMessagesLoading(false);
       }
       return;
     }
@@ -2024,6 +2036,7 @@ export default function App() {
     setMessages(cached.length ? cached : []);
 
     try {
+      setMessagesLoading(true);
       const list = await getMessages(chatId, 50);
       setMessages((prev) => {
         if (Number(selectedChatIdRef.current || 0) !== Number(chatId)) return prev;
@@ -2038,6 +2051,8 @@ export default function App() {
       }
     } catch (e) {
       debugLog("selectChat getMessages failed", e?.message || e);
+    } finally {
+      if (messagesLoadSeqRef.current === loadSeq) setMessagesLoading(false);
     }
   }
 
@@ -2552,6 +2567,7 @@ export default function App() {
 
   const sidebarProps = {
     chats,
+    loading: chatsLoading,
     me,
     onSelectChat: selectChat,
     onStartChat: startChat,
@@ -2570,6 +2586,7 @@ export default function App() {
     chats,
     otherTyping: Boolean(selectedChatId && typingUntil[selectedChatId] > Date.now()),
     messages,
+    messagesLoading,
     meId: me.id,
     meAvatar: me.avatar,
     meUsername: me.username,

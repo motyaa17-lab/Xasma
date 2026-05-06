@@ -87,6 +87,18 @@ body {
   box-shadow: var(--glow-focus);
 }
 
+/* Ensure focus is visible even when components clear outline */
+.appRoot button:focus-visible,
+.appRoot a:focus-visible,
+.appRoot input:focus-visible,
+.appRoot textarea:focus-visible,
+.appRoot [role="button"]:focus-visible,
+.appRoot [role="menuitem"]:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: var(--glow-focus);
+}
+
 /* Reduce motion */
 @media (prefers-reduced-motion: reduce) {
   * {
@@ -968,10 +980,10 @@ body.body--mobileConversationOpen {
   grid-template-columns: 54px 1fr 54px;
   align-items: center;
   padding: 0 8px;
-  background: rgba(6, 10, 20, 0.52);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(6, 10, 20, 0.48);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
 }
 
 .tgProfileTopbarTitle {
@@ -1165,9 +1177,10 @@ body.body--mobileConversationOpen {
 .tgProfileCard {
   margin: 10px 12px 18px;
   padding: 14px 14px;
-  border-radius: 18px;
+  border-radius: var(--radius-xl);
   border: 1px solid rgba(255, 255, 255, 0.10);
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .tgProfileBadges {
@@ -1332,6 +1345,110 @@ body.body--mobileConversationOpen {
 
 .msgMention:hover {
   text-decoration: underline;
+}
+
+/* =========================
+   Skeletons (Telegram-like)
+   ========================= */
+
+@keyframes skShimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
+}
+
+.chatListSkeleton {
+  padding: 10px 10px 14px;
+}
+
+.chatSkRow {
+  display: grid;
+  grid-template-columns: 44px 1fr 56px;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 10px;
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 8px;
+}
+
+.chatSkAvatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.06));
+  background-size: 200% 200%;
+  animation: skShimmer 1.2s ease-in-out infinite;
+}
+
+.chatSkLine {
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.06));
+  background-size: 200% 200%;
+  animation: skShimmer 1.2s ease-in-out infinite;
+}
+
+.chatSkLine--title {
+  width: 70%;
+  margin-bottom: 8px;
+}
+
+.chatSkLine--sub {
+  width: 92%;
+  opacity: 0.9;
+}
+
+.chatSkPill {
+  width: 44px;
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.06));
+  background-size: 200% 200%;
+  animation: skShimmer 1.2s ease-in-out infinite;
+}
+
+.msgSkeleton {
+  padding: 14px 10px 6px;
+}
+
+.msgSkRow {
+  display: flex;
+  justify-content: flex-start;
+  margin: 10px 0;
+}
+
+.msgSkRow--own {
+  justify-content: flex-end;
+}
+
+.msgSkBubble {
+  width: min(320px, 72vw);
+  padding: 12px 12px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.msgSkLine {
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.06));
+  background-size: 200% 200%;
+  animation: skShimmer 1.2s ease-in-out infinite;
+}
+
+.msgSkLine--a {
+  width: 88%;
+  margin-bottom: 8px;
+}
+
+.msgSkLine--b {
+  width: 62%;
 }
 
 @keyframes userProfileAvatarIn {
@@ -2535,6 +2652,27 @@ body.body--mobileConversationOpen {
   max-height: 360px;
   overflow: auto;
   padding-right: 4px;
+  contain: layout paint;
+}
+
+/* iOS-like list item card feel */
+.chatListItemRow {
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.18);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  overflow: hidden;
+}
+
+.chatListItemRow:hover {
+  background: rgba(255, 255, 255, 0.055);
+  border-color: rgba(255, 255, 255, 0.10);
+}
+
+.chatListItemRow--menuOpen {
+  border-color: rgba(47, 107, 255, 0.22);
 }
 
 /* Desktop: sidebar list should use full height, not a boxed mini-card. */
@@ -2574,6 +2712,12 @@ body.body--mobileConversationOpen {
   padding: 0;
   cursor: pointer;
   color: inherit;
+}
+
+.chatUnreadBadge,
+.tgRowBadge {
+  background: rgba(47, 107, 255, 0.95);
+  box-shadow: 0 10px 30px rgba(47, 107, 255, 0.20);
 }
 
 .chatListItemRow {
@@ -3270,10 +3414,12 @@ body.body--mobileConversationOpen {
 .callDockBtn--glass {
   width: 58px;
   height: 58px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
   color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
 }
 
 .callDockBtn--glass:hover {
@@ -3294,9 +3440,9 @@ body.body--mobileConversationOpen {
 .callDockBtn--accept {
   width: 76px;
   height: 76px;
-  background: linear-gradient(145deg, #22c55e, #16a34a);
+  background: linear-gradient(145deg, rgba(52, 211, 153, 0.98), rgba(16, 185, 129, 0.92));
   box-shadow:
-    0 14px 40px rgba(22, 163, 74, 0.45),
+    0 18px 54px rgba(16, 185, 129, 0.34),
     0 0 0 1px rgba(255, 255, 255, 0.12) inset;
 }
 
@@ -3307,9 +3453,9 @@ body.body--mobileConversationOpen {
 .callDockBtn--decline {
   width: 76px;
   height: 76px;
-  background: linear-gradient(145deg, #f87171, #dc2626);
+  background: linear-gradient(145deg, rgba(255, 77, 94, 0.98), rgba(220, 38, 38, 0.90));
   box-shadow:
-    0 14px 40px rgba(220, 38, 38, 0.4),
+    0 18px 54px rgba(220, 38, 38, 0.34),
     0 0 0 1px rgba(255, 255, 255, 0.1) inset;
 }
 
@@ -3320,9 +3466,9 @@ body.body--mobileConversationOpen {
 .callDockBtn--hangup {
   width: 72px;
   height: 72px;
-  background: linear-gradient(145deg, #fb7185, #dc2626);
+  background: linear-gradient(145deg, rgba(255, 77, 94, 0.98), rgba(220, 38, 38, 0.90));
   box-shadow:
-    0 16px 44px rgba(220, 38, 38, 0.48),
+    0 18px 56px rgba(220, 38, 38, 0.36),
     0 0 0 1px rgba(255, 255, 255, 0.1) inset;
 }
 
@@ -4480,6 +4626,7 @@ body.body--mobileConversationOpen {
   display: flex;
   flex-direction: column;
   position: relative;
+  contain: layout paint;
 }
 
 .dateDivider {
@@ -4644,8 +4791,9 @@ body.body--mobileConversationOpen {
   max-width: 72%;
   padding: 10px 12px;
   border-radius: 14px;
-  background: #1f2937;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
   transition:
     transform 0.1s var(--ease-tg-snappy, cubic-bezier(0.2, 0.88, 0.28, 1)),
     background 0.1s ease,
@@ -4689,18 +4837,19 @@ body.body--mobileConversationOpen {
 }
 
 .bubble:not(.me).bubble--pressed {
-  background: #283548;
-  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .bubble.me.bubble--pressed {
-  background: rgba(37, 99, 235, 0.34);
-  border-color: rgba(96, 165, 250, 0.42);
+  background: rgba(47, 107, 255, 0.28);
+  border-color: rgba(96, 165, 250, 0.40);
 }
 
 .bubble.me {
-  background: rgba(37, 99, 235, 0.25);
-  border-color: rgba(37, 99, 235, 0.35);
+  background: rgba(47, 107, 255, 0.22);
+  border-color: rgba(47, 107, 255, 0.34);
+  box-shadow: 0 12px 34px rgba(47, 107, 255, 0.10), 0 10px 30px rgba(0, 0, 0, 0.14);
 }
 
 /* Voice-only / circle-video-only: no second frame around the media chrome */

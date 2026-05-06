@@ -62,6 +62,7 @@ function MobileChatListScroll({ className, onScroll, onDoublePullDown, children 
 const Sidebar = forwardRef(function Sidebar(
   {
     chats,
+    loading = false,
     me,
     onSelectChat,
     onStartChat,
@@ -82,6 +83,8 @@ const Sidebar = forwardRef(function Sidebar(
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
+
+  const showSkeleton = Boolean(loading && !query.trim() && (!Array.isArray(chats) || chats.length === 0));
 
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [groupTitle, setGroupTitle] = useState("");
@@ -1475,7 +1478,25 @@ const Sidebar = forwardRef(function Sidebar(
           </div>
         </div>
 
-        {chats.length === 0 ? <div className="muted">{t("noChatsYet")}</div> : null}
+        {showSkeleton ? (
+          <div className="chatListSkeleton" aria-hidden>
+            {Array.from({ length: 10 }).map((_, i) => (
+              // eslint-disable-next-line react/no-array-index-key
+              <div key={i} className="chatSkRow">
+                <div className="chatSkAvatar" />
+                <div className="chatSkMain">
+                  <div className="chatSkLine chatSkLine--title" />
+                  <div className="chatSkLine chatSkLine--sub" />
+                </div>
+                <div className="chatSkMeta">
+                  <div className="chatSkPill" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : chats.length === 0 ? (
+          <div className="muted">{t("noChatsYet")}</div>
+        ) : null}
 
         <div className="chatList">
           {chats.map((c) => {
