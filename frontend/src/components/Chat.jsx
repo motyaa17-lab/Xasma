@@ -2886,79 +2886,81 @@ export default function Chat({
                 </div>
               )}
             </div>
-            {canShowCallButton ? (
-              <button
-                type="button"
-                className="chatHeaderCallBtn"
-                onClick={() => onStartCall?.({ chatId: Number(chatId), other: chat?.other || null })}
-                aria-label={t("callAudio")}
-                title={t("callAudio")}
-                disabled={callUiBlocked}
-              >
-                <span className="chatHeaderCallIcon" aria-hidden>
-                  <IconPhone size={18} />
-                </span>
-              </button>
-            ) : null}
-            {chatId ? (
-              <button
-                type="button"
-                className="chatHeaderCallBtn"
-                onClick={() => {
-                  setSearchError("");
-                  setSearchQ("");
-                  setSearchResults([]);
-                  setSearchOpen(true);
-                }}
-                aria-label={t("searchInChat")}
-                title={t("searchInChat")}
-              >
-                <span className="chatHeaderCallIcon" aria-hidden>
-                  <IconSearch size={18} />
-                </span>
-              </button>
-            ) : null}
-            {chatId && !isOfficial ? (
-              <button
-                type="button"
-                className={chatMuted ? "chatHeaderCallBtn chatHeaderCallBtn--active" : "chatHeaderCallBtn"}
-                onClick={() => {
-                  const next = !chatMuted;
-                  setChatMuted(chatId, next);
-                  setChatMutedUi(next);
-                }}
-                aria-label={chatMuted ? t("unmuteChat") : t("muteChat")}
-                title={chatMuted ? t("unmuteChat") : t("muteChat")}
-              >
-                <span className="chatHeaderCallIcon" aria-hidden>
-                  {chatMuted ? "🔇" : "🔔"}
-                </span>
-              </button>
-            ) : null}
-            {chatId && !isOfficial ? (
-              <button
-                type="button"
-                className={chatListPinned ? "chatHeaderCallBtn chatHeaderCallBtn--active" : "chatHeaderCallBtn"}
-                onClick={() => onChatListPinToggle?.(Number(chatId), !chatListPinned)}
-                aria-label={chatListPinned ? (t("unpinChat") ?? "Unpin chat") : (t("pinChat") ?? "Pin chat")}
-                title={chatListPinned ? (t("unpinChat") ?? "Unpin chat") : (t("pinChat") ?? "Pin chat")}
-              >
-                <span className="chatHeaderCallIcon" aria-hidden>
-                  📌
-                </span>
-              </button>
-            ) : null}
-            {isRoom ? (
-              <button
-                type="button"
-                className="chatHeaderInfoBtn"
-                title={isChannel ? t("channelInfo") : t("groupInfo")}
-                aria-label={isChannel ? t("channelInfo") : t("groupInfo")}
-                onClick={() => setGroupInfoOpen(true)}
-              >
-                ⓘ
-              </button>
-            ) : null}
+            <div className="chatHeaderActions" aria-label={t("actions") ?? "Actions"}>
+              {canShowCallButton ? (
+                <button
+                  type="button"
+                  className="chatHeaderCallBtn"
+                  onClick={() => onStartCall?.({ chatId: Number(chatId), other: chat?.other || null })}
+                  aria-label={t("callAudio")}
+                  title={t("callAudio")}
+                  disabled={callUiBlocked}
+                >
+                  <span className="chatHeaderCallIcon" aria-hidden>
+                    <IconPhone size={18} />
+                  </span>
+                </button>
+              ) : null}
+              {chatId ? (
+                <button
+                  type="button"
+                  className="chatHeaderCallBtn"
+                  onClick={() => {
+                    setSearchError("");
+                    setSearchQ("");
+                    setSearchResults([]);
+                    setSearchOpen(true);
+                  }}
+                  aria-label={t("searchInChat")}
+                  title={t("searchInChat")}
+                >
+                  <span className="chatHeaderCallIcon" aria-hidden>
+                    <IconSearch size={18} />
+                  </span>
+                </button>
+              ) : null}
+              {chatId && !isOfficial ? (
+                <button
+                  type="button"
+                  className={chatMuted ? "chatHeaderCallBtn chatHeaderCallBtn--active" : "chatHeaderCallBtn"}
+                  onClick={() => {
+                    const next = !chatMuted;
+                    setChatMuted(chatId, next);
+                    setChatMutedUi(next);
+                  }}
+                  aria-label={chatMuted ? t("unmuteChat") : t("muteChat")}
+                  title={chatMuted ? t("unmuteChat") : t("muteChat")}
+                >
+                  <span className="chatHeaderCallIcon" aria-hidden>
+                    {chatMuted ? "🔇" : "🔔"}
+                  </span>
+                </button>
+              ) : null}
+              {chatId && !isOfficial ? (
+                <button
+                  type="button"
+                  className={chatListPinned ? "chatHeaderCallBtn chatHeaderCallBtn--active" : "chatHeaderCallBtn"}
+                  onClick={() => onChatListPinToggle?.(Number(chatId), !chatListPinned)}
+                  aria-label={chatListPinned ? (t("unpinChat") ?? "Unpin chat") : (t("pinChat") ?? "Pin chat")}
+                  title={chatListPinned ? (t("unpinChat") ?? "Unpin chat") : (t("pinChat") ?? "Pin chat")}
+                >
+                  <span className="chatHeaderCallIcon" aria-hidden>
+                    📌
+                  </span>
+                </button>
+              ) : null}
+              {isRoom ? (
+                <button
+                  type="button"
+                  className="chatHeaderInfoBtn"
+                  title={isChannel ? t("channelInfo") : t("groupInfo")}
+                  aria-label={isChannel ? t("channelInfo") : t("groupInfo")}
+                  onClick={() => setGroupInfoOpen(true)}
+                >
+                  ⓘ
+                </button>
+              ) : null}
+            </div>
           </div>
 
           {searchOpen && typeof document !== "undefined"

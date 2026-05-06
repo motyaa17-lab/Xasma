@@ -3102,13 +3102,25 @@ body.body--mobileConversationOpen {
 }
 
 .chatHeader {
-  padding: 12px 18px;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 10px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  background: rgba(17, 27, 46, 0.35);
+  background: rgba(6, 10, 20, 0.62);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+}
+
+.chatHeaderActions {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .chatPinnedBar {
@@ -4281,6 +4293,20 @@ body.body--mobileConversationOpen {
   background: linear-gradient(165deg, #0c1222 0%, #0f172a 40%, #020617 100%);
 }
 
+/* Telegram-like subtle grain + vignette for depth */
+.chatMain:not(.chatTheme-custom) > .chatBgParallax::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 120% 80% at 50% 10%, rgba(255, 255, 255, 0.06), transparent 52%),
+    radial-gradient(ellipse 120% 90% at 50% 100%, rgba(0, 0, 0, 0.35), transparent 55%),
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.012) 0 2px, rgba(0, 0, 0, 0.012) 2px 4px);
+  opacity: 0.55;
+  mix-blend-mode: overlay;
+}
+
 /* Chat column only — backgrounds are decorative; message bubbles keep their own contrast */
 @keyframes chatThemeDarkGradientMove {
   0% {
@@ -4945,8 +4971,8 @@ body.body--mobileConversationOpen {
 
 .bubbleRow {
   display: flex;
-  margin-bottom: 12px;
-  gap: 10px;
+  margin-bottom: 10px;
+  gap: 8px;
   align-items: flex-end;
 }
 
@@ -4987,12 +5013,13 @@ body.body--mobileConversationOpen {
 }
 
 .bubble {
-  max-width: 72%;
+  max-width: 76%;
   padding: 10px 12px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
+  /* Telegram-like: round, with a slightly sharper "tail" corner */
+  border-radius: 18px 18px 18px 8px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.12);
   transition:
     transform 0.1s var(--ease-tg-snappy, cubic-bezier(0.2, 0.88, 0.28, 1)),
     background 0.1s ease,
@@ -5046,9 +5073,10 @@ body.body--mobileConversationOpen {
 }
 
 .bubble.me {
-  background: rgba(47, 107, 255, 0.22);
-  border-color: rgba(47, 107, 255, 0.34);
-  box-shadow: 0 12px 34px rgba(47, 107, 255, 0.10), 0 10px 30px rgba(0, 0, 0, 0.14);
+  border-radius: 18px 18px 8px 18px;
+  background: linear-gradient(155deg, rgba(47, 107, 255, 0.34), rgba(35, 87, 214, 0.22));
+  border-color: rgba(96, 165, 250, 0.30);
+  box-shadow: 0 12px 30px rgba(47, 107, 255, 0.10), 0 10px 26px rgba(0, 0, 0, 0.12);
 }
 
 /* Voice-only / circle-video-only: no second frame around the media chrome */
@@ -5602,6 +5630,10 @@ body.body--mobileConversationOpen {
   gap: 6px;
   align-items: center;
   justify-content: flex-end;
+}
+
+.bubble.me .bubbleMeta {
+  color: rgba(239, 246, 255, 0.75);
 }
 
 .bubbleChecks {
