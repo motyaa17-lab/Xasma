@@ -128,16 +128,16 @@ export default function UserProfileScreen({
         <button type="button" className="tgProfileTopbarBtn" onClick={onClose} aria-label={t("back") ?? t("close")}>
           ←
         </button>
-        <div className="tgProfileTopbarTitle" title={t("profile")}>
-          {t("profile")}
+        <div className="tgProfileTopbarTitle" title={user?.username || t("profile")}>
+          {user?.username || t("profile")}
         </div>
         <div className="tgProfileTopbarRight">
           <button
             type="button"
             className="tgProfileTopbarBtn"
             onClick={() => setMoreOpen(true)}
-            aria-label={t("more") ?? "More"}
-            title={t("more") ?? "More"}
+            aria-label={t("more")}
+            title={t("more")}
           >
             <IconEllipsis size={18} />
           </button>
@@ -176,7 +176,7 @@ export default function UserProfileScreen({
           </div>
         </div>
 
-        <div className="tgIosActionsRow" role="group" aria-label={t("actions") ?? "Actions"}>
+        <div className="tgIosActionsRow" role="group" aria-label={t("actions")}>
           <button type="button" className="tgIosAction" onClick={onCall} disabled={!user} aria-label={t("callAudio")} title={t("callAudio")}>
             <span className="tgIosActionIcon">
               <IconPhone size={18} />
@@ -187,25 +187,25 @@ export default function UserProfileScreen({
             <span className="tgIosActionIcon">
               <IconSearch size={18} />
             </span>
-            <span className="tgIosActionLabel">{t("search") ?? "Search"}</span>
+            <span className="tgIosActionLabel">{t("search")}</span>
           </button>
           <button
             type="button"
             className={`tgIosAction${isMuted ? " tgIosAction--on" : ""}`}
             onClick={onToggleMute}
-            aria-label={isMuted ? (t("unmuteChat") ?? "Unmute") : (t("muteChat") ?? "Mute")}
-            title={isMuted ? (t("unmuteChat") ?? "Unmute") : (t("muteChat") ?? "Mute")}
+            aria-label={isMuted ? t("unmuteChat") : t("muteChat")}
+            title={isMuted ? t("unmuteChat") : t("muteChat")}
           >
             <span className="tgIosActionIcon">
               <IconSpeaker size={18} />
             </span>
-            <span className="tgIosActionLabel">{isMuted ? (t("unmute") ?? "Unmute") : (t("mute") ?? "Mute")}</span>
+            <span className="tgIosActionLabel">{isMuted ? t("unmute") : t("mute")}</span>
           </button>
-          <button type="button" className="tgIosAction" onClick={() => setMoreOpen(true)} aria-label={t("more") ?? "More"} title={t("more") ?? "More"}>
+          <button type="button" className="tgIosAction" onClick={() => setMoreOpen(true)} aria-label={t("more")} title={t("more")}>
             <span className="tgIosActionIcon">
               <IconEllipsis size={18} />
             </span>
-            <span className="tgIosActionLabel">{t("more") ?? "More"}</span>
+            <span className="tgIosActionLabel">{t("more")}</span>
           </button>
         </div>
 
@@ -254,7 +254,7 @@ export default function UserProfileScreen({
                 onChangeWallpaper?.();
               }}
             >
-              {t("changeWallpaper") ?? "Change wallpaper"}
+              {t("changeWallpaper")}
             </button>
             <button
               type="button"
@@ -264,7 +264,7 @@ export default function UserProfileScreen({
                 onClearHistory?.();
               }}
             >
-              {t("clearHistory") ?? "Clear history"}
+              {t("clearHistory")}
             </button>
             <button
               type="button"
@@ -274,7 +274,7 @@ export default function UserProfileScreen({
                 onBlock?.();
               }}
             >
-              {t("blockUser") ?? "Block user"}
+              {t("blockUser")}
             </button>
             <button
               type="button"
@@ -284,7 +284,7 @@ export default function UserProfileScreen({
                 onDeleteChat?.();
               }}
             >
-              {t("deleteChat") ?? "Delete chat"}
+              {t("deleteChat")}
             </button>
             <button type="button" className="tgSheetCancel" onClick={() => setMoreOpen(false)}>
               {t("cancel") ?? "Cancel"}
