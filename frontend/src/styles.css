@@ -8927,13 +8927,22 @@ body.body--mobileConversationOpen {
 }
 
 .appShell--mobile .composer {
-  padding: 10px 10px max(12px, env(safe-area-inset-bottom, 0px));
+  /* Telegram iOS-like: floating bar, single pill */
+  padding: 10px 10px max(14px, env(safe-area-inset-bottom, 0px));
   gap: 8px;
+  background: transparent;
+  border-top: none;
 }
 
 .appShell--mobile .composerMain {
-  gap: 8px;
+  gap: 6px;
   align-items: center;
+  padding: 6px 6px;
+  border-radius: 22px;
+  background: rgba(28, 28, 30, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
 }
 
 /* Same vertical center line as attach / video / send; desktop uses flex-end for multi-line baseline. */
@@ -8943,14 +8952,17 @@ body.body--mobileConversationOpen {
 }
 
 .appShell--mobile .composerInputShell {
-  border-radius: var(--composer-radius);
+  border-radius: 18px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .appShell--mobile .composerInputShell .composerInput,
 .appShell--mobile .composerInputShell .composerInputGhost {
-  padding: 11px 14px;
+  padding: 10px 10px;
   font-size: 16px;
-  line-height: 1.45;
+  line-height: 1.35;
 }
 
 .appShell--mobile .composerInputShell .composerInput {
@@ -8966,12 +8978,27 @@ body.body--mobileConversationOpen {
   min-width: var(--composer-control-size);
   min-height: var(--composer-control-size);
   box-sizing: border-box;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
 }
 
 .appShell--mobile .composerActionSlot {
   width: var(--composer-control-size);
   height: var(--composer-control-size);
   flex-shrink: 0;
+}
+
+.appShell--mobile .sendBtn {
+  background: rgba(99, 102, 241, 0.20);
+  border: 1px solid rgba(129, 140, 248, 0.26);
+  color: rgba(239, 246, 255, 0.98);
+}
+
+.appShell--mobile .sendBtn:disabled {
+  background: transparent;
+  border-color: transparent;
+  opacity: 0.42;
 }
 
 .appShell--mobile .voiceMsgPill {
