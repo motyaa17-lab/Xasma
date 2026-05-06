@@ -2886,6 +2886,14 @@ export default function Chat({
                 </div>
               )}
             </div>
+            {!isRoom && !isOfficial && chat?.other ? (
+              <div className="chatHeaderPill" aria-hidden="true">
+                <div className="chatHeaderPillTitle">{chat?.other?.username || ""}</div>
+                <div className="chatHeaderPillSub">
+                  {otherTyping ? t("typing") : formatUserStatusLine(chat?.other, t, lang)}
+                </div>
+              </div>
+            ) : null}
             <div className="chatHeaderActions" aria-label={t("actions") ?? "Actions"}>
               {canShowCallButton ? (
                 <button

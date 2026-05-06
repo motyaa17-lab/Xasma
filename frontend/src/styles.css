@@ -8798,6 +8798,58 @@ body.body--mobileConversationOpen {
 .appShell--mobile .chatHeader {
   padding: 8px 10px;
   gap: 8px;
+  position: sticky;
+  top: var(--vv-offset-top, 0px);
+  z-index: 40;
+}
+
+.appShell--mobile .chatHeaderPill {
+  position: absolute;
+  left: 50%;
+  top: calc(8px + (38px - 34px) / 2);
+  transform: translateX(-50%);
+  width: min(240px, calc(100% - 210px));
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(28, 28, 30, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  pointer-events: none;
+}
+
+.appShell--mobile .chatHeaderPillTitle {
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: rgba(248, 250, 252, 0.92);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.appShell--mobile .chatHeaderPillSub {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: rgba(148, 163, 184, 0.9);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Hide the left stacked name/status on mobile direct chats (pill replaces it). */
+.appShell--mobile .mobilePane--conversation .chatHeaderAtHandle,
+.appShell--mobile .mobilePane--conversation .chatHeaderInfo .chatHeaderStatus,
+.appShell--mobile .mobilePane--conversation .chatHeaderInfo .chatHeaderName {
+  display: none;
 }
 
 .appShell--mobile .chatHeaderLeft {
