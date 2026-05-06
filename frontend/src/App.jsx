@@ -67,7 +67,7 @@ export default function App() {
     try {
       const raw = localStorage.getItem("settings");
       const parsed = raw ? JSON.parse(raw) : {};
-      const allowed = new Set(["darkGradient", "softBlur", "night"]);
+      const allowed = new Set(["darkGradient", "softBlur", "night", "telegramLight"]);
       const legacy = {
         ocean: "darkGradient",
         midnight: "night",
@@ -77,8 +77,8 @@ export default function App() {
         noise: "darkGradient",
         night: "night",
       };
-      const rawTheme = typeof parsed.chatTheme === "string" ? parsed.chatTheme : "darkGradient";
-      const chatTheme = allowed.has(rawTheme) ? rawTheme : legacy[rawTheme] || "darkGradient";
+      const rawTheme = typeof parsed.chatTheme === "string" ? parsed.chatTheme : "telegramLight";
+      const chatTheme = allowed.has(rawTheme) ? rawTheme : legacy[rawTheme] || "telegramLight";
       const rawBg = typeof parsed.chatBackgroundImageUrl === "string" ? parsed.chatBackgroundImageUrl : "";
       const chatBackgroundImageUrl =
         rawBg.startsWith("data:image/") && rawBg.length <= 2_200_000 ? rawBg : null;
@@ -96,7 +96,7 @@ export default function App() {
     } catch {
       return {
         lang: "en",
-        chatTheme: "darkGradient",
+        chatTheme: "telegramLight",
         chatBackgroundImageUrl: null,
         messageNotificationsEnabled: false,
         powerSavingEnabled: false,
