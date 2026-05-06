@@ -3517,6 +3517,7 @@ body.body--mobileConversationOpen {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
 }
 
 .callsSeg {
@@ -3529,6 +3530,7 @@ body.body--mobileConversationOpen {
   background: rgba(255, 255, 255, 0.04);
   position: relative;
   isolation: isolate;
+  flex-shrink: 0;
 }
 
 .callsSegBtn {
@@ -3565,6 +3567,8 @@ body.body--mobileConversationOpen {
 .callsList {
   overflow: auto;
   padding: 6px 10px 14px;
+  flex: 1;
+  min-height: 0;
 }
 
 .callsRow {
