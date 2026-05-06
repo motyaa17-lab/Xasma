@@ -2851,15 +2851,9 @@ export default function App() {
         {mobileTab === "settings" ? (
           <div className="mobilePane mobilePane--settings">
             <header className="tgSettingsTopBar">
-              <button type="button" className="tgTopIconBtn" aria-label={t("qr") ?? "QR"} onClick={() => {}}>
-                <span aria-hidden>⌁</span>
-              </button>
-              <div className="tgTopTitle">
-                {(me?.displayName || me?.username || t("navSettings")) + " "}
-                <span className="tgSettingsChevron" aria-hidden>
-                  ˅
-                </span>
-              </div>
+              {/* Left spacer keeps title centered (Telegram iOS-like). */}
+              <span className="tgTopIconBtn tgTopIconBtn--spacer" aria-hidden />
+              <div className="tgTopTitle">{t("navSettings")}</div>
               <button type="button" className="tgTopTextBtn" onClick={() => {}}>
                 {t("editShort") || t("edit")}
               </button>

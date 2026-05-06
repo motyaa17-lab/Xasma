@@ -3527,6 +3527,8 @@ body.body--mobileConversationOpen {
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.10);
   background: rgba(255, 255, 255, 0.04);
+  position: relative;
+  isolation: isolate;
 }
 
 .callsSegBtn {
@@ -3536,11 +3538,28 @@ body.body--mobileConversationOpen {
   font-weight: 900;
   padding: 10px 12px;
   cursor: pointer;
+  position: relative;
+  z-index: 1;
+  line-height: 1.1;
 }
 
 .callsSegBtn.active {
-  background: rgba(37, 99, 235, 0.22);
+  background: transparent;
   color: rgba(219, 234, 254, 0.98);
+}
+
+.callsSegBtn.active::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(37, 99, 235, 0.22);
+  z-index: -1;
+}
+
+.callsSegBtn:focus-visible {
+  box-shadow: none;
+  outline: 2px solid rgba(47, 107, 255, 0.35);
+  outline-offset: -2px;
 }
 
 .callsList {
@@ -8894,6 +8913,11 @@ body.body--mobileConversationOpen {
   background: rgba(0, 0, 0, 0.62);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
+}
+
+.tgTopIconBtn--spacer {
+  pointer-events: none;
+  opacity: 0;
 }
 
 .tgSettingsChevron {
