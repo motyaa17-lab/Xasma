@@ -6802,6 +6802,13 @@ body.body--mobileConversationOpen {
   transform: scale(0.94);
 }
 
+/* Prevent the "two icons at once" ghosting on some browsers while swapping mic↔send. */
+.composerActionBtn.isHidden svg,
+.composerActionBtn.isHidden span,
+.composerActionBtn.isHidden img {
+  opacity: 0 !important;
+}
+
 .sendIcon {
   width: 20px;
   height: 20px;
@@ -6810,6 +6817,15 @@ body.body--mobileConversationOpen {
 .appShell--mobile .sendBtn {
   padding: 0;
   font-size: 0;
+}
+
+.appShell--mobile .sendBtn:not(:disabled):not(.isHidden) {
+  background: rgba(99, 102, 241, 0.20);
+  border: 1px solid rgba(129, 140, 248, 0.26);
+}
+
+.appShell--mobile .sendBtn:not(:disabled):not(.isHidden) .sendIcon {
+  opacity: 1;
 }
 
 .composerActionSlot .composerActionBtn.sendBtn:not(:disabled):not(.isHidden):active {
@@ -8811,10 +8827,11 @@ body.body--mobileConversationOpen {
   width: min(240px, calc(100% - 210px));
   padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(28, 28, 30, 0.62);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(10, 10, 12, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.10);
   backdrop-filter: blur(22px);
   -webkit-backdrop-filter: blur(22px);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   display: flex;
   flex-direction: column;
   align-items: center;
