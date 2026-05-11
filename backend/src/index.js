@@ -606,7 +606,7 @@ async function backfillOfficialChatsForAllUsers() {
 
 async function getChatById(chatId) {
   const r = await query(
-    `SELECT id, type, title, created_by, user1_id, user2_id, avatar_url, official_for_user_id, pinned_message_id FROM chats WHERE id = $1`,
+    `SELECT id, type, title, description, created_by, user1_id, user2_id, avatar_url, official_for_user_id, pinned_message_id FROM chats WHERE id = $1`,
     [chatId]
   );
   return r.rows[0] || null;
@@ -2317,6 +2317,7 @@ app.get("/api/groups/:chatId", authRequired, (req, res) => {
       group: {
         id: chatId,
         title: chat.title,
+        description: chat.description != null ? String(chat.description) : "",
         createdBy,
         memberCount: members.rows.length,
         canManage,
@@ -2344,6 +2345,68 @@ app.get("/api/groups/:chatId", authRequired, (req, res) => {
           ...computePremiumInfo(u),
         };
       }),
+    });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
+app.patch("/api/groups/:chatId", authRequired, (req, res) => {
+  const chatId = Number(req.params.chatId);
+  if (!chatId) return res.status(400).json({ error: "Invalid chat id" });
+
+  (async () => {
+    const uid = Number(req.user.id);
+    const chat = await getChatById(chatId);
+    if (!chat || !isGroupLikeChat(chat)) return res.status(404).json({ error: "Group not found" });
+    if (!(await isUserChatMember(chatId, uid))) return res.status(403).json({ error: "Not a member of this group" });
+    if (!canManageGroupMembers(req, chat)) {
+      return res.status(403).json({ error: "Only the creator or an admin can update the group" });
+    }
+
+    const body = req.body || {};
+    const hasTitle = Object.prototype.hasOwnProperty.call(body, "title");
+    const hasDescription = Object.prototype.hasOwnProperty.call(body, "description");
+    if (!hasTitle && !hasDescription) return res.status(400).json({ error: "No fields to update" });
+
+    let title = String(chat.title || "").trim();
+    if (hasTitle) {
+      const nt = typeof body.title === "string" ? body.title.trim() : "";
+      if (!nt) return res.status(400).json({ error: "title is required" });
+      if (nt.length > 200) return res.status(400).json({ error: "title too long" });
+      title = nt;
+    }
+
+    let description = chat.description != null ? String(chat.description) : "";
+    if (hasDescription) {
+      const d = typeof body.description === "string" ? body.description.trim() : "";
+      if (d.length > 4000) return res.status(400).json({ error: "description too long" });
+      description = d;
+    }
+
+    await query(`UPDATE chats SET title = $1, description = $2 WHERE id = $3`, [title, description || null, chatId]);
+    const r2 = await query(
+      `SELECT id, title, description, created_by, avatar_url FROM chats WHERE id = $1`,
+      [chatId]
+    );
+    const row = r2.rows[0];
+    const cnt = await query(`SELECT COUNT(*)::int AS n FROM chat_members WHERE chat_id = $1`, [chatId]);
+
+    await emitToChatMemberSockets(chatId, "group:metaUpdated", {
+      chatId,
+      title: row.title,
+      description: row.description != null ? String(row.description) : "",
+    });
+
+    return res.json({
+      group: {
+        id: chatId,
+        title: row.title,
+        description: row.description != null ? String(row.description) : "",
+        createdBy: Number(row.created_by),
+        memberCount: Number(cnt.rows[0].n),
+        canManage: canManageGroupMembers(req, chat),
+        avatar: row.avatar_url || "",
+        channel: chat.type === "channel",
+      },
     });
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });

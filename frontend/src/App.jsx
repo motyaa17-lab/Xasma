@@ -2603,6 +2603,7 @@ export default function App() {
     isBanned: Boolean(me.banned),
     onTyping: handleTyping,
     onGroupMetaChanged: refreshChatsList,
+    onLeaveGroupChat: handleChatMembershipDelete,
     presenceTick,
     t,
     lang: settings.lang,

@@ -483,6 +483,7 @@ export default function Chat({
   isBanned,
   onTyping,
   onGroupMetaChanged,
+  onLeaveGroupChat,
   presenceTick,
   t,
   lang,
@@ -3091,6 +3092,19 @@ export default function Chat({
               presenceTick={presenceTick}
               t={t}
               lang={lang}
+              chatMuted={Boolean(chatMuted)}
+              onToggleMute={() => {
+                if (!chatId) return;
+                const cid = Number(chatId);
+                const next = !isChatMuted(cid);
+                setChatMuted(cid, next);
+                setChatMutedUi(next);
+              }}
+              onSearchInChat={() => {
+                setGroupInfoOpen(false);
+                setSearchOpen(true);
+              }}
+              onLeaveGroupChat={onLeaveGroupChat}
             />
           ) : null}
 

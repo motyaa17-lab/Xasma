@@ -148,6 +148,7 @@ async function initDb() {
   await query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS system_payload JSONB`);
 
   await query(`ALTER TABLE chats ADD COLUMN IF NOT EXISTS avatar_url TEXT`);
+  await query(`ALTER TABLE chats ADD COLUMN IF NOT EXISTS description TEXT`);
 
   await query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS image_url TEXT`);
   await query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS audio_url TEXT`);

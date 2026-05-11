@@ -310,6 +310,15 @@ export async function patchGroupAvatar(chatId, avatar) {
   return data.group;
 }
 
+/** Update group/channel title and/or description (requires manage permission). */
+export async function patchGroupMeta(chatId, body) {
+  const data = await apiFetch(`/api/groups/${chatId}`, {
+    method: "PATCH",
+    body: body || {},
+  });
+  return data.group;
+}
+
 export async function addGroupMember(chatId, userId) {
   return apiFetch(`/api/groups/${chatId}/members`, {
     method: "POST",
