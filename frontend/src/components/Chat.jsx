@@ -2602,6 +2602,11 @@ export default function Chat({
         onClose={() => setProfileUserId(null)}
         t={t}
         lang={lang}
+        isPinned={Boolean(chatListPinned)}
+        onTogglePin={(next) => {
+          if (!chatId) return;
+          onChatListPinToggle?.(Number(chatId), Boolean(next));
+        }}
         onCall={() => {
           if (!chatId) return;
           if (!chat?.other) return;
@@ -2894,7 +2899,8 @@ export default function Chat({
                 </div>
               </div>
             ) : null}
-            <div className="chatHeaderActions" aria-label={t("actions") ?? "Actions"}>
+            {!isMobileChat ? (
+              <div className="chatHeaderActions" aria-label={t("actions") ?? "Actions"}>
               {canShowCallButton ? (
                 <button
                   type="button"
@@ -2968,7 +2974,8 @@ export default function Chat({
                   ⓘ
                 </button>
               ) : null}
-            </div>
+              </div>
+            ) : null}
           </div>
 
           {searchOpen && typeof document !== "undefined"

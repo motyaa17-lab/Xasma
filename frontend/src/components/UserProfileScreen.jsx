@@ -41,6 +41,8 @@ export default function UserProfileScreen({
   onClose,
   onCall,
   onSearchInChat,
+  isPinned = false,
+  onTogglePin,
   isMuted = false,
   onToggleMute,
   onChangeWallpaper,
@@ -246,6 +248,18 @@ export default function UserProfileScreen({
       {moreOpen ? (
         <div className="tgSheetBackdrop" role="presentation" onClick={() => setMoreOpen(false)}>
           <div className="tgSheet" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            {typeof onTogglePin === "function" ? (
+              <button
+                type="button"
+                className="tgSheetItem"
+                onClick={() => {
+                  setMoreOpen(false);
+                  onTogglePin?.(!isPinned);
+                }}
+              >
+                {isPinned ? (t("unpinChat") ?? "Unpin chat") : (t("pinChat") ?? "Pin chat")}
+              </button>
+            ) : null}
             <button
               type="button"
               className="tgSheetItem"

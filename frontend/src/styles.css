@@ -940,7 +940,10 @@ body.body--mobileConversationOpen {
 
 .tgProfileScreen {
   position: fixed;
-  inset: 0;
+  left: 0;
+  right: 0;
+  top: var(--vv-offset-top, 0px);
+  height: var(--vv-height, 100dvh);
   z-index: 120;
   /* Opaque page feel (no chat bleeding through). */
   background: linear-gradient(180deg, rgb(11, 18, 32), rgb(6, 10, 20));
@@ -1147,7 +1150,10 @@ body.body--mobileConversationOpen {
 
 .tgSheetBackdrop {
   position: fixed;
-  inset: 0;
+  left: 0;
+  right: 0;
+  top: var(--vv-offset-top, 0px);
+  height: var(--vv-height, 100dvh);
   z-index: 1000;
   background: rgba(0, 0, 0, 0.55);
   display: flex;
