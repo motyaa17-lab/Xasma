@@ -3762,173 +3762,177 @@ export default function Chat({
               <div
                 className={`composerInputShell${String(text).length ? " composerInputShell--filled" : ""}`}
               >
-                <span className="composerInputGhost" aria-hidden="true">
-                  {t("typeMessagePlaceholder")}
-                </span>
-                <textarea
-                  className="composerInput"
-                  value={text}
-                  onChange={(e) => {
-                    setText(e.target.value);
-                    scheduleTyping();
-                  }}
-                  rows={1}
-                  placeholder=""
-                  aria-label={t("typeMessagePlaceholder")}
-                  autoComplete="off"
-                  autoCorrect="on"
-                  spellCheck
-                  enterKeyHint={isMobileChat ? "send" : undefined}
-                  disabled={
-                    isBanned ||
-                    sendBlockedByRealtime ||
-                    imageUploading ||
-                    voiceRecording ||
-                    voiceArming ||
-                    videoRecording ||
-                    videoArming ||
-                    videoNoteUploading
-                  }
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape" && editingMessageId) {
-                      e.preventDefault();
-                      setEditingMessageId(null);
-                      setText(readMessageDraft(chatId) || "");
-                      onTyping?.(false);
-                      return;
+                <div className="composerInputBody">
+                  <span className="composerInputGhost" aria-hidden="true">
+                    {t("typeMessagePlaceholder")}
+                  </span>
+                  <textarea
+                    className="composerInput"
+                    value={text}
+                    onChange={(e) => {
+                      setText(e.target.value);
+                      scheduleTyping();
+                    }}
+                    rows={1}
+                    placeholder=""
+                    aria-label={t("typeMessagePlaceholder")}
+                    autoComplete="off"
+                    autoCorrect="on"
+                    spellCheck
+                    enterKeyHint={isMobileChat ? "send" : undefined}
+                    disabled={
+                      isBanned ||
+                      sendBlockedByRealtime ||
+                      imageUploading ||
+                      voiceRecording ||
+                      voiceArming ||
+                      videoRecording ||
+                      videoArming ||
+                      videoNoteUploading
                     }
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handlePrimary();
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape" && editingMessageId) {
+                        e.preventDefault();
+                        setEditingMessageId(null);
+                        setText(readMessageDraft(chatId) || "");
+                        onTyping?.(false);
+                        return;
+                      }
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handlePrimary();
+                      }
+                    }}
+                  />
+                </div>
+                <div className="composerInputTrailing">
+                  <button
+                    type="button"
+                    className={`videoCamBtn${
+                      videoRecording || videoArming || videoPressing ? " videoCamBtn--active" : ""
+                    }${videoPressing ? " videoCamBtn--pressing" : ""}`}
+                    disabled={
+                      isBanned ||
+                      sendBlockedByRealtime ||
+                      Boolean(editingMessageId) ||
+                      Boolean(pendingImageUrl) ||
+                      voiceRecording ||
+                      voiceArming ||
+                      imageUploading ||
+                      voiceUploading ||
+                      videoNoteUploading
                     }
-                  }}
-                />
-              </div>
-              <button
-                type="button"
-                className={`videoCamBtn${
-                  videoRecording || videoArming || videoPressing ? " videoCamBtn--active" : ""
-                }${videoPressing ? " videoCamBtn--pressing" : ""}`}
-                disabled={
-                  isBanned ||
-                    sendBlockedByRealtime ||
-                  Boolean(editingMessageId) ||
-                  Boolean(pendingImageUrl) ||
-                  voiceRecording ||
-                  voiceArming ||
-                  imageUploading ||
-                  voiceUploading ||
-                  videoNoteUploading
-                }
-                aria-label={t("videoNoteHoldRecord")}
-                title={t("videoNoteHoldRecord")}
-                onContextMenu={(e) => e.preventDefault()}
-                onPointerDown={onVideoCamPointerDown}
-                onMouseDown={onVideoCamMouseDown}
-                onMouseUp={onVideoCamMouseUp}
-                onTouchEnd={onVideoCamTouchEnd}
-                onTouchStart={(e) => {
-                  // iOS Safari: prevent long-press callout/selection while holding record.
-                  e.preventDefault();
-                }}
-              >
-                <svg
-                  className="videoCamIcon"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.65"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <rect x="3" y="7" width="13" height="11" rx="2" />
-                  <path d="M16 10l5-3v11l-5-3" />
-                </svg>
-              </button>
-              <div className="composerActionSlot" aria-label={t("composerActions")}>
-                <button
-                  type="button"
-                  className={`voiceMicBtn composerActionBtn${
-                    voiceRecording || voiceArming ? " voiceMicBtn--recording" : ""
-                  }${voicePressing ? " voiceMicBtn--pressing" : ""}${showSendAction ? " isHidden" : ""}`}
-                  disabled={
-                    isBanned ||
-                    sendBlockedByRealtime ||
-                    Boolean(editingMessageId) ||
-                    Boolean(pendingImageUrl) ||
-                    imageUploading ||
-                    voiceUploading ||
-                    videoRecording ||
-                    videoArming ||
-                    videoNoteUploading
-                  }
-                  aria-label={voiceRecording || voiceArming ? t("voiceTapStopSend") : t("voiceHoldRecord")}
-                  title={voiceRecording || voiceArming ? t("voiceTapStopSend") : t("voiceHoldRecord")}
-                  onContextMenu={(e) => e.preventDefault()}
-                  onPointerDown={onMicPointerDown}
-                  onMouseDown={onMicMouseDown}
-                  onMouseUp={onMicMouseUp}
-                  onTouchEnd={onMicTouchEnd}
-                  onTouchStart={(e) => {
-                    // iOS Safari: prevent long-press callout/selection while holding record.
-                    e.preventDefault();
-                  }}
-                >
-                  <svg
-                    className="voiceMicIcon"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.65"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
+                    aria-label={t("videoNoteHoldRecord")}
+                    title={t("videoNoteHoldRecord")}
+                    onContextMenu={(e) => e.preventDefault()}
+                    onPointerDown={onVideoCamPointerDown}
+                    onMouseDown={onVideoCamMouseDown}
+                    onMouseUp={onVideoCamMouseUp}
+                    onTouchEnd={onVideoCamTouchEnd}
+                    onTouchStart={(e) => {
+                      // iOS Safari: prevent long-press callout/selection while holding record.
+                      e.preventDefault();
+                    }}
                   >
-                    <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3z" />
-                    <path d="M19 11a7 7 0 0 1-14 0" />
-                    <path d="M12 18v3" />
-                  </svg>
-                </button>
-                <button
-                  className={`sendBtn composerActionBtn${showSendAction ? "" : " isHidden"}`}
-                  type="button"
-                  onMouseDown={(e) => {
-                    // Keep click from being lost when the textarea blurs first (browser focus order).
-                    e.preventDefault();
-                  }}
-                  onClick={handlePrimary}
-                  disabled={
-                    isBanned ||
-                    sendBlockedByRealtime ||
-                    sendBlockedByRateLimit ||
-                    imageUploading ||
-                    voiceRecording ||
-                    voiceArming ||
-                    videoRecording ||
-                    videoArming ||
-                    videoNoteUploading ||
-                    (editingMessageId ? !composerHasText : !composerHasText && !pendingImageUrl)
-                  }
-                >
-                  {isMobileChat ? (
                     <svg
-                      className="sendIcon"
+                      className="videoCamIcon"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
-                      strokeWidth="1.8"
+                      strokeWidth="1.65"
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       aria-hidden="true"
                     >
-                      <path d="M22 2L11 13" />
-                      <path d="M22 2l-7 20-4-9-9-4 20-7z" />
+                      <rect x="3" y="7" width="13" height="11" rx="2" />
+                      <path d="M16 10l5-3v11l-5-3" />
                     </svg>
-                  ) : (
-                    (editingMessageId ? t("save") : t("send"))
-                  )}
-                </button>
+                  </button>
+                  <div className="composerActionSlot" aria-label={t("composerActions")}>
+                    <button
+                      type="button"
+                      className={`voiceMicBtn composerActionBtn${
+                        voiceRecording || voiceArming ? " voiceMicBtn--recording" : ""
+                      }${voicePressing ? " voiceMicBtn--pressing" : ""}${showSendAction ? " isHidden" : ""}`}
+                      disabled={
+                        isBanned ||
+                        sendBlockedByRealtime ||
+                        Boolean(editingMessageId) ||
+                        Boolean(pendingImageUrl) ||
+                        imageUploading ||
+                        voiceUploading ||
+                        videoRecording ||
+                        videoArming ||
+                        videoNoteUploading
+                      }
+                      aria-label={voiceRecording || voiceArming ? t("voiceTapStopSend") : t("voiceHoldRecord")}
+                      title={voiceRecording || voiceArming ? t("voiceTapStopSend") : t("voiceHoldRecord")}
+                      onContextMenu={(e) => e.preventDefault()}
+                      onPointerDown={onMicPointerDown}
+                      onMouseDown={onMicMouseDown}
+                      onMouseUp={onMicMouseUp}
+                      onTouchEnd={onMicTouchEnd}
+                      onTouchStart={(e) => {
+                        // iOS Safari: prevent long-press callout/selection while holding record.
+                        e.preventDefault();
+                      }}
+                    >
+                      <svg
+                        className="voiceMicIcon"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.65"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3z" />
+                        <path d="M19 11a7 7 0 0 1-14 0" />
+                        <path d="M12 18v3" />
+                      </svg>
+                    </button>
+                    <button
+                      className={`sendBtn composerActionBtn${showSendAction ? "" : " isHidden"}`}
+                      type="button"
+                      onMouseDown={(e) => {
+                        // Keep click from being lost when the textarea blurs first (browser focus order).
+                        e.preventDefault();
+                      }}
+                      onClick={handlePrimary}
+                      disabled={
+                        isBanned ||
+                        sendBlockedByRealtime ||
+                        sendBlockedByRateLimit ||
+                        imageUploading ||
+                        voiceRecording ||
+                        voiceArming ||
+                        videoRecording ||
+                        videoArming ||
+                        videoNoteUploading ||
+                        (editingMessageId ? !composerHasText : !composerHasText && !pendingImageUrl)
+                      }
+                    >
+                      {isMobileChat ? (
+                        <svg
+                          className="sendIcon"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M22 2L11 13" />
+                          <path d="M22 2l-7 20-4-9-9-4 20-7z" />
+                        </svg>
+                      ) : (
+                        (editingMessageId ? t("save") : t("send"))
+                      )}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
             {/* Telegram-style recording bar is shown above; keep this area clean. */}
