@@ -4483,6 +4483,63 @@ body.body--mobileConversationOpen {
   color: rgba(15, 23, 42, 0.52);
 }
 
+/* Telegram light: make the shell (header pill + composer) match screenshot */
+.chatTheme-telegramLight .chatHeader {
+  background: rgba(255, 255, 255, 0.10);
+  border-bottom-color: rgba(255, 255, 255, 0.10);
+}
+
+.chatTheme-telegramLight .chatHeaderPill {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(15, 23, 42, 0.08);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.chatTheme-telegramLight .chatHeaderPillTitle {
+  color: rgba(15, 23, 42, 0.92);
+}
+
+.chatTheme-telegramLight .chatHeaderPillSub {
+  color: rgba(100, 116, 139, 0.90);
+}
+
+.chatTheme-telegramLight .composerMain {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(15, 23, 42, 0.08);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.chatTheme-telegramLight .composerInput {
+  color: rgba(15, 23, 42, 0.92);
+  caret-color: rgba(15, 23, 42, 0.85);
+}
+
+.chatTheme-telegramLight .composerInputGhost {
+  color: rgba(71, 85, 105, 0.72);
+}
+
+.chatTheme-telegramLight .attachPhotoBtn,
+.chatTheme-telegramLight .videoCamBtn,
+.chatTheme-telegramLight .voiceMicBtn {
+  color: rgba(15, 23, 42, 0.72);
+}
+
+.chatTheme-telegramLight .appShell--mobile .sendBtn:not(:disabled):not(.isHidden) {
+  background: rgba(59, 130, 246, 0.16);
+  border-color: rgba(59, 130, 246, 0.22);
+  color: rgba(15, 23, 42, 0.88);
+}
+
+/* Telegram light: reduce heavy bubble shadow for cleaner look */
+.chatTheme-telegramLight .messages .bubble,
+.chatTheme-telegramLight .messages .bubble.me {
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+}
+
 /* Telegram iOS dark doodles (screenshot-like) */
 .chatTheme-telegramDark.chatMain > .chatBgParallax {
   background: radial-gradient(110% 75% at 50% 0%, rgba(39, 78, 140, 0.30), transparent 60%),
