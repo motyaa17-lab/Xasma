@@ -3727,7 +3727,18 @@ export default function Chat({
                 title={t("attachPhoto")}
                 onClick={() => fileInputRef.current?.click()}
               >
-                📎
+                <svg
+                  className="attachPaperclipIcon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.35"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19A4 4 0 0 1 19 4.5L9.81 13.69a2 2 0 0 1-2.83-2.83l8.49-8.49" />
+                </svg>
               </button>
               {voiceArming || voiceRecording ? (
                 <span className="recInlineIndicator" role="status" aria-live="polite">
