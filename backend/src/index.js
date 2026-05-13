@@ -14,6 +14,7 @@ const { Server } = require("socket.io");
 const { query, initDb, pool } = require("./db");
 const { scanOutgoingMessageText } = require("./messageSafety");
 const { checkSendRateLimit } = require("./sendRateLimit");
+const { normalizeStickerId } = require("./stickersAllowed");
 
 const DEFAULT_AURA_COLOR = "#0096ff";
 
@@ -493,6 +494,7 @@ function pinnedPreviewFromPinnedJoinRow(c) {
   if (c.pinned_message_id == null) return null;
   const mt = c.pinned_message_type || "text";
   if (mt === "system") return "[Event]";
+  if (mt === "sticker") return "[Sticker]";
   const text = String(c.pinned_text || "").trim();
   if (c.pinned_video_url && !text) return "[Video message]";
   if (c.pinned_audio_url && !text) return "[Voice message]";
@@ -621,7 +623,8 @@ async function emitChatPinnedUpdated(chatId) {
             pm.text AS pinned_text,
             pm.image_url AS pinned_image_url,
             pm.audio_url AS pinned_audio_url,
-            pm.video_url AS pinned_video_url
+            pm.video_url AS pinned_video_url,
+            pm.sticker_id AS pinned_sticker_id
      FROM chats c
      LEFT JOIN messages pm ON pm.id = c.pinned_message_id
      WHERE c.id = $1`,
@@ -874,6 +877,7 @@ function messageRowToApi(mr, reactions = []) {
     imageUrl: deletedForAll ? null : mr.image_url || null,
     audioUrl: deletedForAll ? null : mr.audio_url || null,
     videoUrl: deletedForAll ? null : mr.video_url || null,
+    stickerId: deletedForAll ? null : mr.sticker_id || null,
     replyTo:
       !deletedForAll && mr.reply_to_message_id != null
         ? {
@@ -884,6 +888,7 @@ function messageRowToApi(mr, reactions = []) {
             imageUrl: mr.reply_to_image_url || null,
             audioUrl: mr.reply_to_audio_url || null,
             videoUrl: mr.reply_to_video_url || null,
+            stickerId: mr.reply_to_sticker_id || null,
           }
         : null,
     forwardFrom:
@@ -896,6 +901,7 @@ function messageRowToApi(mr, reactions = []) {
             imageUrl: mr.forward_from_image_url || null,
             audioUrl: mr.forward_from_audio_url || null,
             videoUrl: mr.forward_from_video_url || null,
+            stickerId: mr.forward_from_sticker_id || null,
           }
         : null,
     reactions,
@@ -907,7 +913,7 @@ async function fetchMessageById(messageId) {
     `
       SELECT m.id, m.chat_id, m.sender_id, m.text, m.reply_to_message_id, m.forward_from_message_id, m.deleted_for_all, m.deleted_at,
              m.delivered_at, m.read_at, m.edited_at, m.created_at,
-             m.message_type, m.system_kind, m.system_payload, m.image_url, m.audio_url, m.video_url,
+             m.message_type, m.system_kind, m.system_payload, m.image_url, m.audio_url, m.video_url, m.sticker_id,
              u.username, u.avatar_url, u.aura_color, u.messages_sent_count,
              u.user_tag, u.tag_color, u.tag_style,
              u.username_style, u.avatar_ring,
@@ -919,12 +925,14 @@ async function fetchMessageById(messageId) {
              rm.image_url AS reply_to_image_url,
              rm.audio_url AS reply_to_audio_url,
              rm.video_url AS reply_to_video_url,
+             rm.sticker_id AS reply_to_sticker_id,
              fm.sender_id AS forward_from_sender_id,
              fu.username AS forward_from_sender_username,
              fm.text AS forward_from_text,
              fm.image_url AS forward_from_image_url,
              fm.audio_url AS forward_from_audio_url,
-             fm.video_url AS forward_from_video_url
+             fm.video_url AS forward_from_video_url,
+             fm.sticker_id AS forward_from_sticker_id
       FROM messages m
       JOIN users u ON u.id = m.sender_id
       LEFT JOIN messages rm ON rm.id = m.reply_to_message_id
@@ -963,7 +971,8 @@ async function insertChatMessageAndBroadcast(
   audioUrl,
   videoUrl,
   replyToMessageId,
-  clientTempId
+  clientTempId,
+  stickerIdRaw = null
 ) {
   const chat = await getChatById(chatId);
   if (chat?.type === "official") {
@@ -974,18 +983,58 @@ async function insertChatMessageAndBroadcast(
     return null;
   }
 
+  const replyTo = Number(replyToMessageId) || null;
+  if (replyTo) {
+    const ok = await query(`SELECT 1 FROM messages WHERE id = $1 AND chat_id = $2`, [replyTo, chatId]);
+    if (!ok.rows[0]) return null;
+  }
+
+  const sticker = normalizeStickerId(stickerIdRaw);
+
+  async function finalizeAfterInsert(insertedId) {
+    const inc = await query(
+      `UPDATE users SET messages_sent_count = messages_sent_count + 1 WHERE id = $1 RETURNING messages_sent_count`,
+      [senderId]
+    );
+    const newMessageCount = Math.max(0, Number(inc.rows[0]?.messages_sent_count) || 0);
+    emitToAll("user:messageCount", { userId: Number(senderId), messageCount: newMessageCount });
+
+    const message = await fetchMessageById(insertedId);
+    if (clientTempId) message.clientTempId = String(clientTempId);
+    await emitToChatMemberSockets(chatId, "chat:message", message);
+
+    const memberIds = await getChatMemberUserIds(chatId);
+    const othersOnline = memberIds.some((id) => id !== Number(senderId) && userSockets.get(id)?.size);
+    if (othersOnline) {
+      await query(`UPDATE messages SET delivered_at = now() WHERE id = $1 AND delivered_at IS NULL`, [message.id]);
+      const row = await query(`SELECT delivered_at FROM messages WHERE id = $1`, [message.id]);
+      const deliveredAt = row.rows[0]?.delivered_at || null;
+      const payload = { chatId, updates: [{ id: message.id, deliveredAt, readAt: null }] };
+      await emitToChatMemberSockets(chatId, "chat:message:status", payload);
+    }
+    return message;
+  }
+
+  if (sticker) {
+    const inserted = await query(
+      `INSERT INTO messages (
+         chat_id, sender_id, text, message_type, image_url, audio_url, video_url, sticker_id, reply_to_message_id, forward_from_message_id,
+         flagged, risk_level, flagged_reason, flagged_at
+       )
+       VALUES ($1, $2, '', 'sticker', NULL, NULL, NULL, $3, $4, NULL, FALSE, NULL, NULL, NULL)
+       RETURNING id`,
+      [chatId, senderId, sticker, replyTo]
+    );
+    const insertedId = Number(inserted.rows[0].id);
+    return finalizeAfterInsert(insertedId);
+  }
+
   const text = String(bodyText || "").trim();
   // Note: req not available here; validated at request boundary.
   const img = imageUrl;
   const aud = audioUrl;
   const vid = videoUrl;
   if (!text && !img && !aud && !vid) return null;
-
-  const replyTo = Number(replyToMessageId) || null;
-  if (replyTo) {
-    const ok = await query(`SELECT 1 FROM messages WHERE id = $1 AND chat_id = $2`, [replyTo, chatId]);
-    if (!ok.rows[0]) return null;
-  }
 
   const safety = scanOutgoingMessageText(text);
   const inserted = await query(
@@ -1010,27 +1059,7 @@ async function insertChatMessageAndBroadcast(
   );
   const insertedId = Number(inserted.rows[0].id);
 
-  const inc = await query(
-    `UPDATE users SET messages_sent_count = messages_sent_count + 1 WHERE id = $1 RETURNING messages_sent_count`,
-    [senderId]
-  );
-  const newMessageCount = Math.max(0, Number(inc.rows[0]?.messages_sent_count) || 0);
-  emitToAll("user:messageCount", { userId: Number(senderId), messageCount: newMessageCount });
-
-  const message = await fetchMessageById(insertedId);
-  if (clientTempId) message.clientTempId = String(clientTempId);
-  await emitToChatMemberSockets(chatId, "chat:message", message);
-
-  const memberIds = await getChatMemberUserIds(chatId);
-  const othersOnline = memberIds.some((id) => id !== Number(senderId) && userSockets.get(id)?.size);
-  if (othersOnline) {
-    await query(`UPDATE messages SET delivered_at = now() WHERE id = $1 AND delivered_at IS NULL`, [message.id]);
-    const row = await query(`SELECT delivered_at FROM messages WHERE id = $1`, [message.id]);
-    const deliveredAt = row.rows[0]?.delivered_at || null;
-    const payload = { chatId, updates: [{ id: message.id, deliveredAt, readAt: null }] };
-    await emitToChatMemberSockets(chatId, "chat:message:status", payload);
-  }
-  return message;
+  return finalizeAfterInsert(insertedId);
 }
 
 async function insertForwardedMessageAndBroadcast(toChatId, senderId, fromMessageId, clientTempId) {
@@ -1046,7 +1075,7 @@ async function insertForwardedMessageAndBroadcast(toChatId, senderId, fromMessag
 
   const src = await query(
     `
-    SELECT id, chat_id, sender_id, text, image_url, audio_url, video_url, message_type
+    SELECT id, chat_id, sender_id, text, image_url, audio_url, video_url, message_type, sticker_id
     FROM messages
     WHERE id = $1
   `,
@@ -1054,11 +1083,33 @@ async function insertForwardedMessageAndBroadcast(toChatId, senderId, fromMessag
   );
   const srcRow = src.rows[0];
   if (!srcRow) return null;
-  if ((srcRow.message_type || "text") !== "text") return null;
+  const mt = srcRow.message_type || "text";
+  if (mt !== "text" && mt !== "sticker") return null;
 
   // Ensure the user has access to the source message and can post to destination.
   if (!(await isUserChatMember(Number(srcRow.chat_id), Number(senderId)))) return null;
   if (!(await isUserChatMember(Number(toChatId), Number(senderId)))) return null;
+
+  const fwdId = Number(fromMessageId);
+
+  if (mt === "sticker") {
+    const sticker = normalizeStickerId(srcRow.sticker_id);
+    if (!sticker) return null;
+    const inserted = await query(
+      `INSERT INTO messages (
+         chat_id, sender_id, text, message_type, image_url, audio_url, video_url, sticker_id, reply_to_message_id, forward_from_message_id,
+         flagged, risk_level, flagged_reason, flagged_at
+       )
+       VALUES ($1, $2, '', 'sticker', NULL, NULL, NULL, $3, NULL, $4, FALSE, NULL, NULL, NULL)
+       RETURNING id`,
+      [toChatId, senderId, sticker, fwdId]
+    );
+    const insertedId = Number(inserted.rows[0].id);
+    const message = await fetchMessageById(insertedId);
+    if (clientTempId) message.clientTempId = String(clientTempId);
+    await emitToChatMemberSockets(toChatId, "chat:message", message);
+    return message;
+  }
 
   const text = String(srcRow.text || "").trim();
   const img = srcRow.image_url || null;
@@ -1081,7 +1132,7 @@ async function insertForwardedMessageAndBroadcast(toChatId, senderId, fromMessag
       img,
       aud,
       vid,
-      Number(fromMessageId),
+      fwdId,
       Boolean(safety),
       safety ? safety.riskLevel : null,
       safety ? safety.flaggedReason : null,
@@ -1936,7 +1987,7 @@ app.get("/api/chats", authRequired, (req, res) => {
           WHERE mu.chat_id = c.id
             AND mu.sender_id != $1
             AND mu.read_at IS NULL
-            AND COALESCE(mu.message_type, 'text') = 'text'
+            AND COALESCE(mu.message_type, 'text') IN ('text', 'sticker')
         ) AS unread_count
       FROM chat_members mym
       JOIN chats c ON c.id = mym.chat_id
@@ -1968,6 +2019,7 @@ app.get("/api/chats", authRequired, (req, res) => {
                   END
                 ELSE '[Event]'
               END
+            WHEN COALESCE(m.message_type, 'text') = 'sticker' THEN '[Sticker]'
             WHEN m.video_url IS NOT NULL AND TRIM(COALESCE(m.text, '')) = '' THEN '[Video message]'
             WHEN m.audio_url IS NOT NULL AND TRIM(COALESCE(m.text, '')) = '' THEN '[Voice message]'
             WHEN m.image_url IS NOT NULL AND TRIM(COALESCE(m.text, '')) = '' THEN '[Photo]'
@@ -2153,7 +2205,8 @@ app.patch("/api/chats/:chatId/pin", authRequired, (req, res) => {
               pm.text AS pinned_text,
               pm.image_url AS pinned_image_url,
               pm.audio_url AS pinned_audio_url,
-              pm.video_url AS pinned_video_url
+              pm.video_url AS pinned_video_url,
+              pm.sticker_id AS pinned_sticker_id
        FROM chats c
        LEFT JOIN messages pm ON pm.id = c.pinned_message_id
        WHERE c.id = $1`,
@@ -2572,14 +2625,15 @@ app.post("/api/chats/:chatId/messages", authRequired, (req, res) => {
   const rawAud = typeof req.body?.audioUrl === "string" ? req.body.audioUrl.trim() : "";
   const rawVid = typeof req.body?.videoUrl === "string" ? req.body.videoUrl.trim() : "";
   const replyToMessageId = req.body?.replyToMessageId;
+  const sticker = normalizeStickerId(req.body?.stickerId);
   const img = validateMessageMediaUrl(req, rawImg);
   const aud = validateMessageMediaUrl(req, rawAud);
   const vid = validateMessageMediaUrl(req, rawVid);
   if (rawImg && !img) return res.status(400).json({ error: "Invalid imageUrl" });
   if (rawAud && !aud) return res.status(400).json({ error: "Invalid audioUrl" });
   if (rawVid && !vid) return res.status(400).json({ error: "Invalid videoUrl" });
-  if (!chatId || (!bodyText && !img && !aud && !vid)) {
-    return res.status(400).json({ error: "text, imageUrl, audioUrl, or videoUrl is required" });
+  if (!chatId || (!sticker && !bodyText && !img && !aud && !vid)) {
+    return res.status(400).json({ error: "text, imageUrl, audioUrl, videoUrl, or stickerId is required" });
   }
   if (bodyText.length > 4000) return res.status(400).json({ error: "Message too long" });
 
@@ -2603,7 +2657,7 @@ app.post("/api/chats/:chatId/messages", authRequired, (req, res) => {
       });
     }
 
-    const message = await insertChatMessageAndBroadcast(chatId, uid, bodyText, img, aud, vid, replyToMessageId);
+    const message = await insertChatMessageAndBroadcast(chatId, uid, bodyText, img, aud, vid, replyToMessageId, null, sticker);
     if (!message) return res.status(400).json({ error: "Invalid message" });
     return res.json({ message });
   })().catch(() => res.status(500).json({ error: "Server error" }));
@@ -2644,6 +2698,7 @@ app.get("/api/chats/:chatId/messages", authRequired, (req, res) => {
       m.image_url,
       m.audio_url,
       m.video_url,
+      m.sticker_id,
       u.username,
       u.avatar_url,
       u.aura_color,
@@ -2663,12 +2718,14 @@ app.get("/api/chats/:chatId/messages", authRequired, (req, res) => {
       rm.image_url AS reply_to_image_url,
       rm.audio_url AS reply_to_audio_url,
       rm.video_url AS reply_to_video_url,
+      rm.sticker_id AS reply_to_sticker_id,
       fm.sender_id AS forward_from_sender_id,
       fu.username AS forward_from_sender_username,
       fm.text AS forward_from_text,
       fm.image_url AS forward_from_image_url,
       fm.audio_url AS forward_from_audio_url,
-      fm.video_url AS forward_from_video_url
+      fm.video_url AS forward_from_video_url,
+      fm.sticker_id AS forward_from_sticker_id
     FROM messages m
     JOIN users u ON u.id = m.sender_id
     LEFT JOIN messages rm ON rm.id = m.reply_to_message_id
@@ -2688,7 +2745,10 @@ app.get("/api/chats/:chatId/messages", authRequired, (req, res) => {
   const rows = messages.rows.slice().reverse();
 
   const textMessageIds = rows
-    .filter((m) => (m.message_type || "text") === "text")
+    .filter((m) => {
+      const t = m.message_type || "text";
+      return t === "text" || t === "sticker";
+    })
     .map((m) => Number(m.id));
   const reactionsByMessageId = await getGroupedReactionsForMessages(textMessageIds, uid);
 
@@ -2898,6 +2958,7 @@ app.put("/api/messages/:messageId", authRequired, (req, res) => {
     const msgRow = row.rows[0];
     if (!msgRow) return res.status(404).json({ error: "Message not found" });
     if ((msgRow.message_type || "text") === "system") return res.status(403).json({ error: "Cannot edit this message" });
+    if ((msgRow.message_type || "text") === "sticker") return res.status(403).json({ error: "Cannot edit this message" });
     if (Number(msgRow.sender_id) !== uid) return res.status(403).json({ error: "Not allowed" });
 
     const cidCheck = Number(msgRow.chat_id);
@@ -2921,7 +2982,7 @@ app.put("/api/messages/:messageId", authRequired, (req, res) => {
     const messageRow = await query(
       `
       SELECT m.id, m.chat_id, m.sender_id, m.text, m.deleted_for_all, m.deleted_at, m.delivered_at, m.read_at, m.edited_at, m.created_at,
-             m.message_type, m.system_kind, m.system_payload, m.image_url, m.audio_url, m.video_url,
+             m.message_type, m.system_kind, m.system_payload, m.image_url, m.audio_url, m.video_url, m.sticker_id,
              u.username, u.avatar_url, u.aura_color, u.messages_sent_count,
              u.user_tag, u.tag_color, u.tag_style,
              u.username_style, u.avatar_ring,
@@ -2990,6 +3051,7 @@ app.delete("/api/messages/:messageId", authRequired, (req, res) => {
           image_url = NULL,
           audio_url = NULL,
           video_url = NULL,
+          sticker_id = NULL,
           reply_to_message_id = NULL,
           forward_from_message_id = NULL,
           edited_at = NULL
@@ -3513,7 +3575,7 @@ io.on("connection", (socket) => {
 
   socket.on(
     "chat:send",
-    async ({ chatId, text, imageUrl, audioUrl, videoUrl, replyToMessageId, clientTempId } = {}) => {
+    async ({ chatId, text, imageUrl, audioUrl, videoUrl, replyToMessageId, clientTempId, stickerId } = {}) => {
     const cid = Number(chatId);
     const bodyText = String(text || "").trim();
     const rawImg = typeof imageUrl === "string" ? imageUrl.trim() : "";
@@ -3523,11 +3585,12 @@ io.on("connection", (socket) => {
     const img = validateMessageMediaUrlFromSocket(rawImg);
     const aud = validateMessageMediaUrlFromSocket(rawAud);
     const vid = validateMessageMediaUrlFromSocket(rawVid);
+    const sticker = normalizeStickerId(stickerId);
     if (rawImg && !img) return;
     if (rawAud && !aud) return;
     if (rawVid && !vid) return;
 
-    if (!cid || (!bodyText && !img && !aud && !vid)) return;
+    if (!cid || (!sticker && !bodyText && !img && !aud && !vid)) return;
     if (bodyText.length > 4000) return;
 
     const chat = await getChatById(cid);
@@ -3543,7 +3606,7 @@ io.on("connection", (socket) => {
     }
 
     try {
-      await insertChatMessageAndBroadcast(cid, Number(userId), bodyText, img, aud, vid, replyToMessageId, temp || null);
+      await insertChatMessageAndBroadcast(cid, Number(userId), bodyText, img, aud, vid, replyToMessageId, temp || null, sticker);
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error("[Xasma] chat:send failed", e);

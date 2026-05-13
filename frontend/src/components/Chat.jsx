@@ -25,6 +25,9 @@ import { readMessageDraft, writeMessageDraft, clearMessageDraft } from "../messa
 import { avatarRingWrapClass, usernameDisplayClass } from "../userPersonalization.js";
 import { formatAtUserHandle } from "../userHandleDisplay.js";
 import { isChatMuted, setChatMuted } from "../chatMute.js";
+import StickerPicker from "../stickers/StickerPicker.jsx";
+import StickerView from "../stickers/StickerView.jsx";
+import { isAllowedStickerId } from "../stickers/stickerPack.js";
 
 const MAX_VIDEO_NOTE_SEC = 60;
 const QUICK_REACTION_EMOJIS = ["❤️", "👍", "😂", "😮", "😢", "🔥"];
@@ -545,6 +548,7 @@ export default function Chat({
   }, [chat, meId, isOfficial, isAdmin, isBanned]);
 
   const [text, setText] = useState("");
+  const [stickerPickerOpen, setStickerPickerOpen] = useState(false);
   const textRef = useRef("");
   useLayoutEffect(() => {
     textRef.current = text;
@@ -836,6 +840,7 @@ export default function Chat({
       if (m.imageUrl) return t("notifyPreviewPhoto");
       if (m.audioUrl) return t("notifyPreviewVoice");
       if (m.videoUrl) return t("notifyPreviewVideo");
+      if (m.type === "sticker" || m.stickerId) return t("notifyPreviewSticker");
       const s = String(m.text ?? "").replace(/\s+/g, " ").trim();
       return s.length > 80 ? `${s.slice(0, 77)}…` : s;
     },
@@ -1002,7 +1007,12 @@ export default function Chat({
       (m.senderId === meId && (!isBanned || isAdmin)) ||
       (m.senderId !== meId && (isAdmin || !isBanned));
     if (!showMessageMenu) return null;
-    const canEditOwn = m.senderId === meId && !isBanned && !m.deletedForAll;
+    const canEditOwn =
+      m.senderId === meId &&
+      !isBanned &&
+      !m.deletedForAll &&
+      (m.type || "text") !== "sticker" &&
+      !m.stickerId;
     const canDeleteOwn = m.senderId === meId && (!isBanned || isAdmin) && !m.deletedForAll;
     const canDeleteForAll =
       m.senderId === meId &&
@@ -3165,11 +3175,17 @@ export default function Chat({
                   ) : (
                     (() => {
                   const textTrim = String(m.text ?? "").trim();
+                  const isStickerOnly =
+                    ((m.type || "text") === "sticker" || Boolean(m.stickerId)) &&
+                    !m.imageUrl &&
+                    !m.audioUrl &&
+                    !m.videoUrl &&
+                    !textTrim;
                   const isCircleVideoOnly =
                     Boolean(m.videoUrl) && !m.imageUrl && !m.audioUrl && !textTrim && !m.editedAt;
                   const isVoiceOnly =
                     Boolean(m.audioUrl) && !m.imageUrl && !m.videoUrl && !textTrim && !m.editedAt;
-                  const bubbleMediaBare = isCircleVideoOnly || isVoiceOnly ? " bubbleMediaBare" : "";
+                  const bubbleMediaBare = isCircleVideoOnly || isVoiceOnly || isStickerOnly ? " bubbleMediaBare" : "";
                   const canPinThisMessage =
                     Boolean(canPinForUser) && (m.type || "text") !== "system";
                   const showBubbleInteractionMenu =
@@ -3179,7 +3195,11 @@ export default function Chat({
                       canPinThisMessage);
                   const showMenuButton = showBubbleInteractionMenu && !isMobileChat;
                   const canQuickReact = !isBanned;
-                  const canEditOwn = m.senderId === meId && !isBanned;
+                  const canEditOwn =
+                    m.senderId === meId &&
+                    !isBanned &&
+                    (m.type || "text") !== "sticker" &&
+                    !m.stickerId;
                   const canAdminDelete = Boolean(isAdmin);
                   const canReport =
                     !isOfficial &&
@@ -3408,9 +3428,16 @@ export default function Chat({
                               ? t("notifyPreviewVoice")
                               : m.replyTo.videoUrl
                                 ? t("notifyPreviewVideo")
-                                : String(m.replyTo.text || "").replace(/\s+/g, " ").trim() || t("notifyBodyFallback")}
+                                : m.replyTo.stickerId
+                                  ? t("notifyPreviewSticker")
+                                  : String(m.replyTo.text || "").replace(/\s+/g, " ").trim() || t("notifyBodyFallback")}
                         </div>
                       </button>
+                    ) : null}
+                    {isStickerOnly && m.stickerId && isAllowedStickerId(m.stickerId) ? (
+                      <div className="msgStickerWrap">
+                        <StickerView stickerId={m.stickerId} size={168} />
+                      </div>
                     ) : null}
                     {m.imageUrl ? (
                       <a
@@ -3451,7 +3478,9 @@ export default function Chat({
                               ? t("notifyPreviewVoice")
                               : m.forwardFrom.videoUrl
                                 ? t("notifyPreviewVideo")
-                                : String(m.forwardFrom.text || "").replace(/\s+/g, " ").trim() || t("notifyBodyFallback")}
+                                : m.forwardFrom.stickerId
+                                  ? t("notifyPreviewSticker")
+                                  : String(m.forwardFrom.text || "").replace(/\s+/g, " ").trim() || t("notifyBodyFallback")}
                         </div>
                       </div>
                     ) : null}
@@ -3752,6 +3781,40 @@ export default function Chat({
                   aria-hidden="true"
                 >
                   <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19A4 4 0 0 1 19 4.5L9.81 13.69a2 2 0 0 1-2.83-2.83l8.49-8.49" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="stickerComposerBtn"
+                disabled={
+                  isBanned ||
+                  sendBlockedByRealtime ||
+                  Boolean(editingMessageId) ||
+                  imageUploading ||
+                  voiceRecording ||
+                  voiceArming ||
+                  videoRecording ||
+                  videoArming ||
+                  videoNoteUploading
+                }
+                aria-label={t("attachStickers")}
+                title={t("attachStickers")}
+                onClick={() => setStickerPickerOpen(true)}
+              >
+                <svg
+                  className="stickerComposerIcon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.35"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect x="4" y="4" width="16" height="16" rx="4" />
+                  <circle cx="9" cy="10" r="1.35" fill="currentColor" stroke="none" />
+                  <circle cx="15" cy="10" r="1.35" fill="currentColor" stroke="none" />
+                  <path d="M8.5 15.5c1.5 2 5.5 2 7 0" />
                 </svg>
               </button>
               {voiceArming || voiceRecording ? (
@@ -4205,6 +4268,22 @@ export default function Chat({
               : null}
         </>
       )}
+      <StickerPicker
+        open={stickerPickerOpen}
+        onClose={() => setStickerPickerOpen(false)}
+        onPick={(id) => {
+          if (!isAllowedStickerId(id) || !onSend) return;
+          if (isBanned || sendBlockedByRealtime || sendRateLimitNotice) return;
+          playSendAck();
+          requestScrollAfterSend();
+          onSend({
+            stickerId: id,
+            ...(replyToMessage?.id ? { replyToMessageId: replyToMessage.id } : {}),
+          });
+          setReplyToMessage(null);
+        }}
+        t={t}
+      />
     </main>
   );
 }

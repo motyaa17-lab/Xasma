@@ -153,6 +153,7 @@ async function initDb() {
   await query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS image_url TEXT`);
   await query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS audio_url TEXT`);
   await query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS video_url TEXT`);
+  await query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS sticker_id TEXT`);
 
   // One official "Xasma" system chat per user (not a shared group).
   await query(`ALTER TABLE chats ADD COLUMN IF NOT EXISTS official_for_user_id BIGINT REFERENCES users(id) ON DELETE CASCADE`);
