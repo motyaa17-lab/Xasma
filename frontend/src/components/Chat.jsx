@@ -771,11 +771,16 @@ export default function Chat({
         if (profileUserId) setProfileUserId(null);
         if (searchOpen) setSearchOpen(false);
         if (menuMessageId) setMenuMessageId(null);
+        if (stickerPickerOpen) setStickerPickerOpen(false);
       }
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [chatId, profileUserId, searchOpen, menuMessageId]);
+  }, [chatId, profileUserId, searchOpen, menuMessageId, stickerPickerOpen]);
+
+  useEffect(() => {
+    setStickerPickerOpen(false);
+  }, [chatId]);
   const jumpFlashTimerRef = useRef(null);
   const scrollToMessageById = useCallback((mid) => {
     const id = Number(mid);

@@ -332,11 +332,12 @@ export async function removeGroupMember(chatId, userId) {
   });
 }
 
-export async function postChatMessage(chatId, text, imageUrl, audioUrl, videoUrl) {
+export async function postChatMessage(chatId, text, imageUrl, audioUrl, videoUrl, stickerId) {
   const body = { text: text || "" };
   if (imageUrl) body.imageUrl = imageUrl;
   if (audioUrl) body.audioUrl = audioUrl;
   if (videoUrl) body.videoUrl = videoUrl;
+  if (stickerId) body.stickerId = stickerId;
   const data = await apiFetch(`/api/chats/${chatId}/messages`, {
     method: "POST",
     body,

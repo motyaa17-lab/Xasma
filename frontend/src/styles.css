@@ -7078,6 +7078,253 @@ body.body--mobileConversationOpen {
   cursor: not-allowed;
 }
 
+.stickerComposerBtn {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--panel2);
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    transform 0.2s ease,
+    border-color 0.14s ease,
+    background 0.14s ease;
+}
+
+.stickerComposerBtn .stickerComposerIcon {
+  display: block;
+  width: 22px;
+  height: 22px;
+}
+
+.stickerComposerBtn:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+.stickerComposerBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.attachPhotoBtn,
+.stickerComposerBtn,
+.sendBtn {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.msgStickerWrap {
+  display: flex;
+  justify-content: center;
+  padding: 2px 0 4px;
+  line-height: 0;
+}
+
+.bubble.bubbleMediaBare .msgStickerWrap + .bubbleMeta,
+.bubble.me.bubbleMediaBare .msgStickerWrap + .bubbleMeta {
+  justify-content: flex-end;
+  padding-right: 4px;
+}
+
+.tgStickerCanvas {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(15, 23, 42, 0.88);
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.12));
+}
+
+.tgStickerSvg {
+  display: block;
+}
+
+.tgStickerCanvas--anim.tgStickerCanvas--tg_wave_anim .tgStickerWaveArm {
+  transform-origin: 62px 40px;
+  animation: tgStickerWave 0.9s ease-in-out infinite;
+}
+
+.tgStickerCanvas--anim.tgStickerCanvas--tg_nod_anim .tgStickerNodHead {
+  transform-origin: 40px 30px;
+  animation: tgStickerNod 0.75s ease-in-out infinite;
+}
+
+.tgStickerCanvas--anim.tgStickerCanvas--tg_party_anim .tgStickerPartyBounce {
+  animation: tgStickerBounce 0.85s ease-in-out infinite;
+}
+
+.tgStickerCanvas--anim.tgStickerCanvas--tg_lol_anim .tgStickerLolShake {
+  transform-origin: 40px 40px;
+  animation: tgStickerShake 0.45s ease-in-out infinite;
+}
+
+@keyframes tgStickerWave {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(22deg);
+  }
+}
+
+@keyframes tgStickerNod {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  40% {
+    transform: rotate(10deg);
+  }
+  70% {
+    transform: rotate(-6deg);
+  }
+}
+
+@keyframes tgStickerBounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes tgStickerShake {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-4deg);
+  }
+  75% {
+    transform: rotate(4deg);
+  }
+}
+
+.stickerPickerRoot {
+  position: fixed;
+  inset: 0;
+  z-index: 180;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+
+.stickerPickerBackdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  background: rgba(2, 6, 23, 0.42);
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.stickerPickerSheet {
+  position: relative;
+  z-index: 1;
+  margin: 0 auto;
+  width: min(100%, 520px);
+  max-height: min(52vh, 380px);
+  border-radius: 16px 16px 0 0;
+  background: var(--panel);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: none;
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.28);
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+}
+
+.stickerPickerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.stickerPickerTitle {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.stickerPickerClose {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.stickerPickerGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.stickerPickerCell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+
+.stickerPickerCell:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.stickerPickerCell:active {
+  transform: scale(0.97);
+}
+
+.stickerPickerLabel {
+  font-size: 10px;
+  opacity: 0.72;
+  text-align: center;
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chatTheme-telegramLight .stickerComposerBtn,
+.appShell--mobile .chatTheme-telegramLight .stickerComposerBtn {
+  border-color: rgba(15, 23, 42, 0.12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tgStickerCanvas--anim .tgStickerWaveArm,
+  .tgStickerCanvas--anim .tgStickerNodHead,
+  .tgStickerCanvas--anim .tgStickerPartyBounce,
+  .tgStickerCanvas--anim .tgStickerLolShake {
+    animation: none !important;
+  }
+}
+
 .voiceMicBtn {
   flex-shrink: 0;
   width: 44px;
@@ -7164,14 +7411,6 @@ body.body--mobileConversationOpen {
     border-color 0.12s ease,
     background 0.12s ease,
     color 0.12s ease;
-}
-
-.attachPhotoBtn,
-.sendBtn {
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-touch-callout: none;
-  -webkit-tap-highlight-color: transparent;
 }
 
 .videoCamBtn:hover:not(:disabled) {

@@ -1015,6 +1015,7 @@ export default function App() {
     if (msg?.videoUrl) return t("notifyPreviewVideo");
     if (msg?.audioUrl) return t("notifyPreviewVoice");
     if (msg?.imageUrl) return t("notifyPreviewPhoto");
+    if (msg?.type === "sticker" || msg?.stickerId) return t("notifyPreviewSticker");
     if (msg?.type === "system") {
       const sk = String(msg?.systemKind || "");
       const p = msg?.systemPayload && typeof msg.systemPayload === "object" ? msg.systemPayload : {};
@@ -1697,7 +1698,24 @@ export default function App() {
       const openChatId = selectedChatIdRef.current;
       if (openChatId && cid === openChatId) {
         setMessages((prev) =>
-          prev.map((m) => (Number(m?.id) === mid ? { ...m, deletedForAll: true, deletedAt: deletedAt || null, text: "", imageUrl: null, audioUrl: null, videoUrl: null, replyTo: null, forwardFrom: null, editedAt: null } : m))
+          prev.map((m) =>
+            Number(m?.id) === mid
+              ? {
+                  ...m,
+                  deletedForAll: true,
+                  deletedAt: deletedAt || null,
+                  text: "",
+                  imageUrl: null,
+                  audioUrl: null,
+                  videoUrl: null,
+                  stickerId: null,
+                  type: "text",
+                  replyTo: null,
+                  forwardFrom: null,
+                  editedAt: null,
+                }
+              : m
+          )
         );
       }
       setChats((prev) =>
@@ -2111,8 +2129,9 @@ export default function App() {
     const imageUrl = isObj && payload.imageUrl ? String(payload.imageUrl).trim() : "";
     const audioUrl = isObj && payload.audioUrl ? String(payload.audioUrl).trim() : "";
     const videoUrl = isObj && payload.videoUrl ? String(payload.videoUrl).trim() : "";
+    const stickerId = isObj && payload.stickerId ? String(payload.stickerId).trim() : "";
     const replyToMessageId = isObj && payload.replyToMessageId ? Number(payload.replyToMessageId) : 0;
-    if (!text && !imageUrl && !audioUrl && !videoUrl) return;
+    if (!text && !imageUrl && !audioUrl && !videoUrl && !stickerId) return;
     if (!selectedChatId) return;
     if (me?.banned) return;
     const activeChat = chats.find((c) => Number(c.id) === Number(selectedChatId));
@@ -2138,11 +2157,12 @@ export default function App() {
         tagColor: me?.tagColor || "",
         tagStyle: me?.tagStyle || "solid",
       },
-      type: "text",
+      type: stickerId ? "sticker" : "text",
       text,
       imageUrl: imageUrl || null,
       audioUrl: audioUrl || null,
       videoUrl: videoUrl || null,
+      stickerId: stickerId || null,
       replyTo: replyToMessageId
         ? (() => {
             const r = messages.find((m) => Number(m?.id) === Number(replyToMessageId));
@@ -2155,6 +2175,7 @@ export default function App() {
               imageUrl: r.imageUrl || null,
               audioUrl: r.audioUrl || null,
               videoUrl: r.videoUrl || null,
+              stickerId: r.stickerId || null,
             };
           })()
         : null,
@@ -2166,7 +2187,7 @@ export default function App() {
       clientTempId,
       localStatus: "sending",
       _optimistic: true,
-      _optimisticPayload: { text, imageUrl, audioUrl, videoUrl, replyToMessageId },
+      _optimisticPayload: { text, imageUrl, audioUrl, videoUrl, stickerId, replyToMessageId },
     };
 
     // Optimistically render immediately in the open chat.
@@ -2224,6 +2245,7 @@ export default function App() {
       ...(imageUrl ? { imageUrl } : {}),
       ...(audioUrl ? { audioUrl } : {}),
       ...(videoUrl ? { videoUrl } : {}),
+      ...(stickerId ? { stickerId } : {}),
       ...(replyToMessageId ? { replyToMessageId } : {}),
     });
   }
@@ -2237,8 +2259,9 @@ export default function App() {
     const imageUrl = payload.imageUrl ? String(payload.imageUrl).trim() : "";
     const audioUrl = payload.audioUrl ? String(payload.audioUrl).trim() : "";
     const videoUrl = payload.videoUrl ? String(payload.videoUrl).trim() : "";
+    const stickerId = payload.stickerId ? String(payload.stickerId).trim() : "";
     const replyToMessageId = payload.replyToMessageId ? Number(payload.replyToMessageId) : 0;
-    if (!text && !imageUrl && !audioUrl && !videoUrl) return;
+    if (!text && !imageUrl && !audioUrl && !videoUrl && !stickerId) return;
 
     const newClientTempId = makeClientTempId();
     setMessages((prev) =>
@@ -2282,6 +2305,7 @@ export default function App() {
       ...(imageUrl ? { imageUrl } : {}),
       ...(audioUrl ? { audioUrl } : {}),
       ...(videoUrl ? { videoUrl } : {}),
+      ...(stickerId ? { stickerId } : {}),
       ...(replyToMessageId ? { replyToMessageId } : {}),
     });
   }

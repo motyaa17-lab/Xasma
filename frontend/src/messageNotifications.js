@@ -34,6 +34,7 @@ export function buildMessageNotificationBody(msg, t) {
   if (msg.imageUrl) parts.push(t("notifyPreviewPhoto"));
   if (msg.audioUrl) parts.push(t("notifyPreviewVoice"));
   if (msg.videoUrl) parts.push(t("notifyPreviewVideo"));
+  if (msg.type === "sticker" || msg.stickerId) parts.push(t("notifyPreviewSticker"));
   const text = String(msg.text ?? "").trim();
   if (text) parts.push(text);
   const s = parts.join(" · ");
