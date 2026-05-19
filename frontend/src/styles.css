@@ -7137,31 +7137,41 @@ body.body--mobileConversationOpen {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: rgba(15, 23, 42, 0.88);
-  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.12));
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.18));
 }
 
 .tgStickerSvg {
   display: block;
+  overflow: visible;
 }
 
-.tgStickerCanvas--anim.tgStickerCanvas--tg_wave_anim .tgStickerWaveArm {
-  transform-origin: 62px 40px;
-  animation: tgStickerWave 0.9s ease-in-out infinite;
+.tgStickerCanvas--anim.tgStickerCanvas--tg_wave_anim .tgStickerCatPaw {
+  transform-origin: 58px 42px;
+  animation: tgStickerWave 0.7s ease-in-out infinite;
 }
 
-.tgStickerCanvas--anim.tgStickerCanvas--tg_nod_anim .tgStickerNodHead {
-  transform-origin: 40px 30px;
-  animation: tgStickerNod 0.75s ease-in-out infinite;
+.tgStickerCanvas--anim.tgStickerCanvas--tg_nod_anim .tgStickerBunnyHead {
+  transform-origin: 40px 32px;
+  animation: tgStickerNod 0.65s ease-in-out infinite;
 }
 
-.tgStickerCanvas--anim.tgStickerCanvas--tg_party_anim .tgStickerPartyBounce {
-  animation: tgStickerBounce 0.85s ease-in-out infinite;
+.tgStickerCanvas--anim.tgStickerCanvas--tg_party_anim .tgStickerPenguin {
+  animation: tgStickerBounce 0.75s ease-in-out infinite;
 }
 
-.tgStickerCanvas--anim.tgStickerCanvas--tg_lol_anim .tgStickerLolShake {
-  transform-origin: 40px 40px;
-  animation: tgStickerShake 0.45s ease-in-out infinite;
+.tgStickerCanvas--anim.tgStickerCanvas--tg_lol_anim .tgStickerSeal {
+  transform-origin: 40px 44px;
+  animation: tgStickerShake 0.5s ease-in-out infinite;
+}
+
+.tgStickerCanvas--tg_hi_static .tgStickerBearPawL {
+  transform-origin: 14px 36px;
+  animation: tgStickerWave 1.1s ease-in-out infinite;
+}
+
+.tgStickerCanvas--tg_hi_static .tgStickerBearPawR {
+  transform-origin: 66px 36px;
+  animation: tgStickerWave 1.1s ease-in-out infinite reverse;
 }
 
 @keyframes tgStickerWave {
@@ -7282,29 +7292,35 @@ body.body--mobileConversationOpen {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 8px 4px;
+  justify-content: center;
+  gap: 2px;
+  min-height: 88px;
+  padding: 6px 4px 4px;
   border: none;
-  border-radius: 12px;
-  background: transparent;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
   color: var(--text);
   cursor: pointer;
-  transition: background 0.14s ease;
+  transition:
+    background 0.14s ease,
+    transform 0.12s ease;
 }
 
 .stickerPickerCell:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-1px);
 }
 
 .stickerPickerCell:active {
-  transform: scale(0.97);
+  transform: scale(0.96);
 }
 
 .stickerPickerLabel {
   font-size: 10px;
-  opacity: 0.72;
+  font-weight: 500;
+  opacity: 0.85;
   text-align: center;
-  line-height: 1.2;
+  line-height: 1.15;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -7317,10 +7333,12 @@ body.body--mobileConversationOpen {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tgStickerCanvas--anim .tgStickerWaveArm,
-  .tgStickerCanvas--anim .tgStickerNodHead,
-  .tgStickerCanvas--anim .tgStickerPartyBounce,
-  .tgStickerCanvas--anim .tgStickerLolShake {
+  .tgStickerCanvas--anim .tgStickerCatPaw,
+  .tgStickerCanvas--anim .tgStickerBunnyHead,
+  .tgStickerCanvas--anim .tgStickerPenguin,
+  .tgStickerCanvas--anim .tgStickerSeal,
+  .tgStickerCanvas .tgStickerBearPawL,
+  .tgStickerCanvas .tgStickerBearPawR {
     animation: none !important;
   }
 }

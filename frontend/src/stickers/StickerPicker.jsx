@@ -37,7 +37,7 @@ export default function StickerPicker({ open, onClose, onPick, t }) {
               }}
               title={t(s.labelKey)}
             >
-              <StickerView stickerId={s.id} size={72} />
+              <StickerView stickerId={s.id} size={76} />
               <span className="stickerPickerLabel">{t(s.labelKey)}</span>
             </button>
           ))}
