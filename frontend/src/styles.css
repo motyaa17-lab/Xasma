@@ -8585,26 +8585,59 @@ body.body--mobileConversationOpen {
   color: rgba(52, 211, 153, 0.95);
 }
 
+/* ─── Stories strip — always mounted, toggled via CSS class ─── */
 .tgStoriesStrip {
   flex-shrink: 0;
-  padding: 6px 0 2px;
+  padding: 0;
   transform-origin: top center;
-  transition: max-height 260ms var(--ease-ui), opacity 220ms ease, transform 260ms var(--ease-ui);
+  overflow: hidden;
+  pointer-events: none;
+  /* Collapse state: zero height, faded out, slightly above */
   max-height: 0;
   opacity: 0;
-  transform: translate3d(0, -8px, 0);
+  transform: translate3d(0, -12px, 0) scaleY(0.92);
+  /* Telegram-like spring easing on collapse */
+  transition:
+    max-height 320ms cubic-bezier(0.2, 0.88, 0.28, 1),
+    opacity 260ms ease,
+    transform 320ms cubic-bezier(0.2, 0.88, 0.28, 1),
+    padding 320ms cubic-bezier(0.2, 0.88, 0.28, 1);
+  will-change: max-height, opacity, transform;
 }
 
 .tgStoriesStrip--expanded {
-  max-height: 96px;
+  max-height: 110px;
   opacity: 1;
-  transform: translate3d(0, 0, 0);
+  padding: 10px 0 6px;
+  pointer-events: auto;
+  transform: translate3d(0, 0, 0) scaleY(1);
+  /* Slightly bouncier on expand (Telegram feel) */
+  transition:
+    max-height 380ms cubic-bezier(0.34, 1.12, 0.42, 1),
+    opacity 300ms cubic-bezier(0.0, 0.0, 0.2, 1),
+    transform 380ms cubic-bezier(0.34, 1.12, 0.42, 1),
+    padding 380ms cubic-bezier(0.34, 1.12, 0.42, 1);
 }
 
-.tgStoriesStrip--expanded {
-  padding-top: 10px;
-  padding-bottom: 6px;
+.tgStoriesStrip .tgStoryItem {
+  opacity: 0;
+  transform: translate3d(0, 10px, 0) scale(0.88);
+  transition: opacity 220ms ease, transform 280ms cubic-bezier(0.2, 0.88, 0.28, 1);
 }
+
+.tgStoriesStrip--expanded .tgStoryItem {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+/* Stagger items for a cascading reveal (offset +1 for hidden file input sibling) */
+.tgStoriesStrip--expanded .tgStoryItem:nth-child(2) { transition-delay: 0ms; }
+.tgStoriesStrip--expanded .tgStoryItem:nth-child(3) { transition-delay: 30ms; }
+.tgStoriesStrip--expanded .tgStoryItem:nth-child(4) { transition-delay: 55ms; }
+.tgStoriesStrip--expanded .tgStoryItem:nth-child(5) { transition-delay: 75ms; }
+.tgStoriesStrip--expanded .tgStoryItem:nth-child(6) { transition-delay: 90ms; }
+.tgStoriesStrip--expanded .tgStoryItem:nth-child(7) { transition-delay: 105ms; }
+.tgStoriesStrip--expanded .tgStoryItem:nth-child(n+8) { transition-delay: 115ms; }
 
 .tgStoriesScroll {
   display: flex;
@@ -8622,6 +8655,7 @@ body.body--mobileConversationOpen {
 
 .tgStoryItem {
   width: 70px;
+  flex-shrink: 0;
   border: none;
   background: transparent;
   padding: 0;
@@ -8640,6 +8674,11 @@ body.body--mobileConversationOpen {
   border: 2px solid rgba(16, 185, 129, 0.65);
   overflow: hidden;
   margin: 0 auto;
+  transition: transform 200ms cubic-bezier(0.2, 0.88, 0.28, 1), border-color 200ms ease;
+}
+
+.tgStoryItem:active .tgStoryAvatar {
+  transform: scale(0.92);
 }
 
 .tgStoryItem--me .tgStoryAvatar {
@@ -8681,6 +8720,32 @@ body.body--mobileConversationOpen {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ─── Pull-to-reveal indicator ─── */
+.storiesPullIndicator {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  transition: height 100ms ease;
+}
+
+.storiesPullDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.45);
+  margin-bottom: 6px;
+  transition: transform 180ms cubic-bezier(0.2, 0.88, 0.28, 1), background 180ms ease, opacity 180ms ease;
+  transform: scale(0.7);
+  opacity: 0.6;
+}
+
+.storiesPullIndicator--ready .storiesPullDot {
+  background: rgba(59, 130, 246, 0.85);
+  transform: scale(1.15);
+  opacity: 1;
 }
 
 /* Stories viewer (Telegram-like) */

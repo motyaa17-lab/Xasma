@@ -13,9 +13,28 @@ import { XASMA_LOGO_SRC } from "../branding.js";
 import { readMessageDraft } from "../messageDrafts.js";
 import { compressImageFileToJpegDataUrl } from "../chatBackgroundImage.js";
 
-function MobileChatListScroll({ className, onScroll, onDoublePullDown, children }) {
+/**
+ * Telegram-like pull-to-reveal stories scroll container.
+ *
+ * When the list is scrolled to the top and the user pulls down:
+ *   – A visual pull indicator grows as the finger moves.
+ *   – If the pull exceeds the threshold, `onDoublePullDown` fires and stories expand.
+ *   – The pull indicator uses a rubber-band damping curve for a native feel.
+ *
+ * "Double pull" legacy mode is kept: two quick pull-down gestures within 900 ms
+ * still toggle stories (for fast flick users). A single slow pull beyond the
+ * threshold also triggers the reveal.
+ */
+const PULL_THRESHOLD = 70; // px of pull required to reveal
+const PULL_MAX_VIS = 110; // max visual pull displacement (rubber-band clamp)
+const RUBBER_BAND = 0.45; // damping factor past threshold
+
+function MobileChatListScroll({ className, onScroll, onDoublePullDown, storiesExpanded, children }) {
   const rootRef = useRef(null);
   const pullRef = useRef({ y0: 0, t0: 0, lastPullAt: 0, pullCount: 0, armed: false });
+  const [pullProgress, setPullProgress] = useState(0); // 0..1+ during pull gesture
+  const [pulling, setPulling] = useState(false);
+  const rafRef = useRef(null);
 
   const onTouchStart = useCallback((e) => {
     const el = rootRef.current;
@@ -23,11 +42,56 @@ function MobileChatListScroll({ className, onScroll, onDoublePullDown, children 
     if (el.scrollTop > 0) return;
     const t = e.touches?.[0];
     if (!t) return;
-    pullRef.current = { y0: t.clientY, t0: Date.now(), lastPullAt: pullRef.current.lastPullAt, pullCount: pullRef.current.pullCount, armed: true };
+    pullRef.current = {
+      y0: t.clientY,
+      t0: Date.now(),
+      lastPullAt: pullRef.current.lastPullAt,
+      pullCount: pullRef.current.pullCount,
+      armed: true,
+    };
   }, []);
+
+  const onTouchMove = useCallback(
+    (e) => {
+      const cur = pullRef.current;
+      if (!cur.armed) return;
+      const el = rootRef.current;
+      if (!el || el.scrollTop > 0) {
+        cur.armed = false;
+        setPulling(false);
+        setPullProgress(0);
+        return;
+      }
+      if (storiesExpanded) return;
+      const t = e.touches?.[0];
+      if (!t) return;
+      const dy = t.clientY - cur.y0;
+      if (dy <= 0) {
+        setPulling(false);
+        setPullProgress(0);
+        return;
+      }
+      setPulling(true);
+      // Rubber-band: linear up to threshold, then damped past it
+      const raw = dy / PULL_THRESHOLD; // 0..1..beyond
+      const clamped = raw <= 1 ? raw : 1 + (raw - 1) * RUBBER_BAND;
+      const vis = Math.min(clamped, PULL_MAX_VIS / PULL_THRESHOLD);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => {
+        setPullProgress(vis);
+      });
+    },
+    [storiesExpanded]
+  );
 
   const onTouchEnd = useCallback(
     (e) => {
+      setPulling(false);
+      setPullProgress(0);
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
       const el = rootRef.current;
       const st = el ? el.scrollTop : 0;
       const t = e.changedTouches?.[0];
@@ -36,8 +100,15 @@ function MobileChatListScroll({ className, onScroll, onDoublePullDown, children 
       cur.armed = false;
       if (st > 0) return;
       const dy = t.clientY - cur.y0;
+
+      // Single pull beyond threshold → expand stories
+      if (dy >= PULL_THRESHOLD && !storiesExpanded) {
+        cur.pullCount = 0;
+        onDoublePullDown?.();
+        return;
+      }
+
       if (dy < 54) return;
-      // Prevent "double scroll" feeling: only count quick pulls (not slow drags / momentum).
       const dt = Date.now() - (cur.t0 || 0);
       if (dt > 420) return;
       const now = Date.now();
@@ -49,11 +120,31 @@ function MobileChatListScroll({ className, onScroll, onDoublePullDown, children 
         onDoublePullDown?.();
       }
     },
-    [onDoublePullDown]
+    [onDoublePullDown, storiesExpanded]
   );
 
+  // Pull indicator visual height (0 when stories are already expanded)
+  const indicatorH = pulling && !storiesExpanded ? Math.max(0, pullProgress * PULL_THRESHOLD) : 0;
+  const indicatorReady = pullProgress >= 1;
+
   return (
-    <div ref={rootRef} className={className} onScroll={onScroll} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+    <div
+      ref={rootRef}
+      className={className}
+      onScroll={onScroll}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
+      {indicatorH > 0 ? (
+        <div
+          className={`storiesPullIndicator${indicatorReady ? " storiesPullIndicator--ready" : ""}`}
+          style={{ height: indicatorH }}
+          aria-hidden
+        >
+          <div className="storiesPullDot" />
+        </div>
+      ) : null}
       {children}
     </div>
   );
@@ -922,70 +1013,68 @@ const Sidebar = forwardRef(function Sidebar(
       ...mobileFolders.map((f) => ({ id: f.id, label: f.name })),
     ];
 
-    const storyStrip = mobileStoriesExpanded ? (
-      <div className="tgStoriesStrip tgStoriesStrip--expanded" aria-label={t("stories") ?? "Stories"}>
-        <div className="tgStoriesScroll">
-          <input
-            ref={storyFileRef}
-            type="file"
-            accept="image/*"
-            className="fileInput"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              e.target.value = "";
-              if (!f) return;
-              void addMyStoryFromFile(f);
-            }}
-          />
-          <button
-            type="button"
-            className="tgStoryItem tgStoryItem--me"
-            aria-label={t("myStory") ?? "My story"}
-            onClick={() => {
-              // If I have stories, open viewer; else open picker.
-              if (myStories.length) {
-                setStoryViewerLabel(t("myStory") ?? "Моя история");
-                setStoryViewerIndex(0);
-                setStoryViewerOpen(true);
-              } else {
-                setStoryComposerError("");
-                setStoryComposerOpen(true);
-                storyFileRef.current?.click();
-              }
-            }}
-          >
-            <span className="tgStoryAvatar">
-              <span className="tgStoryPlus" aria-hidden>
-                +
-              </span>
-            </span>
-            <span className="tgStoryLabel">{t("myStory") ?? "Моя история"}</span>
-          </button>
-          {storyUsers.map((u, idx) => (
-            <button
-              key={`story-u-${u.userId}`}
-              type="button"
-              className="tgStoryItem"
-              onClick={() => {
-                setStoryViewerLabel(u.username || "");
-                setStoryViewerIndex(idx);
-                setStoryViewerOpen(true);
-              }}
-              aria-label={u.username}
-            >
-              <span className="tgStoryAvatar">
-                {u.avatar ? <img src={u.avatar} alt="" /> : <span className="tgStoryInitials">{initials(u.username)}</span>}
-              </span>
-              <span className="tgStoryLabel">{u.username}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-    ) : null;
+    const storyStripCls =
+      "tgStoriesStrip" + (mobileStoriesExpanded ? " tgStoriesStrip--expanded" : "");
 
     return (
       <>
-        {storyStrip}
+        <div className={storyStripCls} aria-label={t("stories") ?? "Stories"}>
+          <div className="tgStoriesScroll">
+            <input
+              ref={storyFileRef}
+              type="file"
+              accept="image/*"
+              className="fileInput"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (!f) return;
+                void addMyStoryFromFile(f);
+              }}
+            />
+            <button
+              type="button"
+              className="tgStoryItem tgStoryItem--me"
+              aria-label={t("myStory") ?? "My story"}
+              onClick={() => {
+                if (myStories.length) {
+                  setStoryViewerLabel(t("myStory") ?? "Моя история");
+                  setStoryViewerIndex(0);
+                  setStoryViewerOpen(true);
+                } else {
+                  setStoryComposerError("");
+                  setStoryComposerOpen(true);
+                  storyFileRef.current?.click();
+                }
+              }}
+            >
+              <span className="tgStoryAvatar">
+                <span className="tgStoryPlus" aria-hidden>
+                  +
+                </span>
+              </span>
+              <span className="tgStoryLabel">{t("myStory") ?? "Моя история"}</span>
+            </button>
+            {storyUsers.map((u, idx) => (
+              <button
+                key={`story-u-${u.userId}`}
+                type="button"
+                className="tgStoryItem"
+                onClick={() => {
+                  setStoryViewerLabel(u.username || "");
+                  setStoryViewerIndex(idx);
+                  setStoryViewerOpen(true);
+                }}
+                aria-label={u.username}
+              >
+                <span className="tgStoryAvatar">
+                  {u.avatar ? <img src={u.avatar} alt="" /> : <span className="tgStoryInitials">{initials(u.username)}</span>}
+                </span>
+                <span className="tgStoryLabel">{u.username}</span>
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div className="tgSearchWrap">
           <div className="tgSearchField">
@@ -1037,6 +1126,7 @@ const Sidebar = forwardRef(function Sidebar(
           className="mobileChatListScroll"
           onScroll={onMobileChatListScroll}
           onDoublePullDown={() => onMobileStoriesExpandedChange?.(!mobileStoriesExpanded)}
+          storiesExpanded={mobileStoriesExpanded}
         >
           {canSearch && searching ? (
             <div className="mobileSearchStatus muted" role="status">
