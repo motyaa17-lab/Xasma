@@ -8438,7 +8438,7 @@ body.body--mobileConversationOpen {
   border-radius: 999px;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.06);
-  border: 2px solid rgba(16, 185, 129, 0.60);
+  border: 2px solid #3390ec;
   display: grid;
   place-items: center;
   font-size: 12px;
@@ -8608,7 +8608,7 @@ body.body--mobileConversationOpen {
 .tgStoriesStrip--expanded {
   max-height: 110px;
   opacity: 1;
-  padding: 10px 0 6px;
+  padding: 8px 0 2px;
   pointer-events: auto;
   transform: translate3d(0, 0, 0) scaleY(1);
   /* Slightly bouncier on expand (Telegram feel) */
@@ -8641,8 +8641,8 @@ body.body--mobileConversationOpen {
 
 .tgStoriesScroll {
   display: flex;
-  gap: 12px;
-  padding: 0 14px;
+  gap: 2px;
+  padding: 0 8px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
@@ -8654,7 +8654,7 @@ body.body--mobileConversationOpen {
 }
 
 .tgStoryItem {
-  width: 70px;
+  width: 72px;
   flex-shrink: 0;
   border: none;
   background: transparent;
@@ -8665,16 +8665,18 @@ body.body--mobileConversationOpen {
 }
 
 .tgStoryAvatar {
-  width: 62px;
-  height: 62px;
+  position: relative;
+  width: 54px;
+  height: 54px;
   border-radius: 999px;
   display: grid;
   place-items: center;
   background: rgba(255, 255, 255, 0.06);
-  border: 2px solid rgba(16, 185, 129, 0.65);
+  border: 2px solid #000;
+  box-shadow: 0 0 0 2px #3390ec;
   overflow: hidden;
   margin: 0 auto;
-  transition: transform 200ms cubic-bezier(0.2, 0.88, 0.28, 1), border-color 200ms ease;
+  transition: transform 200ms cubic-bezier(0.2, 0.88, 0.28, 1), box-shadow 200ms ease, border-color 200ms ease;
 }
 
 .tgStoryItem:active .tgStoryAvatar {
@@ -8682,41 +8684,51 @@ body.body--mobileConversationOpen {
 }
 
 .tgStoryItem--me .tgStoryAvatar {
-  border-color: rgba(255, 255, 255, 0.18);
+  border-color: #000;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.04);
+  overflow: visible;
 }
 
 .tgStoryAvatar img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border-radius: 999px;
 }
 
 .tgStoryInitials {
   font-weight: 800;
-  font-size: 18px;
+  font-size: 16px;
   color: rgba(226, 232, 240, 0.95);
 }
 
 .tgStoryPlus {
-  width: 22px;
-  height: 22px;
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 20px;
+  height: 20px;
   border-radius: 999px;
   display: grid;
   place-items: center;
-  background: rgba(59, 130, 246, 0.95);
+  background: #3390ec;
   color: white;
-  font-weight: 900;
+  font-size: 14px;
+  font-weight: 800;
   line-height: 1;
+  border: 2px solid #000;
+  z-index: 2;
+  pointer-events: none;
 }
 
 .tgStoryLabel {
   display: block;
-  margin-top: 6px;
+  margin-top: 4px;
   font-size: 11px;
-  line-height: 1.1;
+  line-height: 1.15;
   text-align: center;
-  color: rgba(226, 232, 240, 0.88);
+  color: rgba(226, 232, 240, 0.72);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

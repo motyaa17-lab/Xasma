@@ -1049,9 +1049,12 @@ const Sidebar = forwardRef(function Sidebar(
               }}
             >
               <span className="tgStoryAvatar">
-                <span className="tgStoryPlus" aria-hidden>
-                  +
-                </span>
+                {me?.avatar ? (
+                  <img src={me.avatar} alt="" />
+                ) : (
+                  <span className="tgStoryInitials">{initials(me?.username || "")}</span>
+                )}
+                <span className="tgStoryPlus" aria-hidden>+</span>
               </span>
               <span className="tgStoryLabel">{t("myStory") ?? "Моя история"}</span>
             </button>
