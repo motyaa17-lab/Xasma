@@ -9971,10 +9971,10 @@ body.body--mobileConversationOpen {
   white-space: nowrap;
 }
 
-/* Hide the left stacked name/status on mobile direct chats (pill replaces it). */
-.appShell--mobile .mobilePane--conversation .chatHeaderAtHandle,
-.appShell--mobile .mobilePane--conversation .chatHeaderInfo .chatHeaderStatus,
-.appShell--mobile .mobilePane--conversation .chatHeaderInfo .chatHeaderName {
+/* Hide the left stacked name/status on mobile direct chats only (pill replaces it). */
+.appShell--mobile .mobilePane--conversation .chatHeader--direct .chatHeaderAtHandle,
+.appShell--mobile .mobilePane--conversation .chatHeader--direct .chatHeaderInfo .chatHeaderStatus,
+.appShell--mobile .mobilePane--conversation .chatHeader--direct .chatHeaderInfo .chatHeaderName {
   display: none;
 }
 

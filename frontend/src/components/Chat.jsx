@@ -2793,7 +2793,7 @@ export default function Chat({
               </div>
             </div>
           ) : null}
-          <div className="chatHeader" ref={chatHeaderRef}>
+          <div className={`chatHeader${!isRoom && !isOfficial ? " chatHeader--direct" : ""}`} ref={chatHeaderRef}>
             <div className="chatHeaderLead">
               {onMobileBack ? (
                 <button
