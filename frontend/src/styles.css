@@ -3370,6 +3370,10 @@ body.body--mobileConversationOpen {
   border-color: rgba(47, 107, 255, 0.22);
 }
 
+.chatListItemRow--pinned {
+  background: rgba(255, 255, 255, 0.025);
+}
+
 /* Desktop: sidebar list should use full height, not a boxed mini-card. */
 .appShell--desktop .sidebarSection:not(.sidebarNewChat) {
   border: none;
@@ -8762,16 +8766,17 @@ body.body--mobileConversationOpen {
 
 /* Stories viewer (Telegram-like) */
 .tgStoryViewer {
-  width: min(520px, 100vw);
-  height: min(940px, 100vh);
+  width: 100vw;
+  height: 100vh;
   max-height: 100vh;
   max-width: 100vw;
   margin: 0 auto;
   position: relative;
-  border-radius: 18px;
+  border-radius: 0;
   overflow: hidden;
   background: #000;
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
 }
 
 .tgStoryViewerTop {
@@ -8857,6 +8862,28 @@ body.body--mobileConversationOpen {
   color: rgba(203, 213, 225, 0.75);
 }
 
+.tgStoryViewerHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tgStoryViewerMore {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.10);
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.tgStoryViewerMore:active {
+  transform: scale(0.95);
+}
+
 .tgStoryViewerClose {
   width: 36px;
   height: 36px;
@@ -8879,9 +8906,7 @@ body.body--mobileConversationOpen {
   display: grid;
   place-items: center;
   z-index: 1;
-  background: radial-gradient(circle at 35% 20%, rgba(139, 92, 246, 0.32), transparent 55%),
-    radial-gradient(circle at 70% 60%, rgba(59, 130, 246, 0.22), transparent 60%),
-    radial-gradient(circle at 40% 90%, rgba(16, 185, 129, 0.18), transparent 60%);
+  background: #000;
 }
 
 .tgStoryViewerCard {
@@ -8916,10 +8941,74 @@ body.body--mobileConversationOpen {
 .tgStoryViewerMedia {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
-  border-radius: 16px;
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  border-radius: 0;
+}
+
+/* --- Story viewer bottom bar (Telegram-style) --- */
+.tgStoryViewerBottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px calc(env(safe-area-inset-bottom, 8px) + 10px);
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.6), transparent);
+}
+
+.tgStoryViewerReplyField {
+  flex: 1;
+  min-width: 0;
+}
+
+.tgStoryViewerReplyInput {
+  width: 100%;
+  height: 38px;
+  border-radius: 19px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 14px;
+  padding: 0 16px;
+  outline: none;
+  font-family: inherit;
+}
+
+.tgStoryViewerReplyInput::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.tgStoryViewerReplyInput:focus {
+  border-color: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.tgStoryViewerShareBtn,
+.tgStoryViewerHeartBtn {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: transform 0.16s var(--ease-smooth, ease), color 0.2s;
+}
+
+.tgStoryViewerShareBtn:active,
+.tgStoryViewerHeartBtn:active {
+  transform: scale(0.88);
+}
+
+.tgStoryViewerHeartBtn:active {
+  color: #ef4444;
 }
 
 .tgStoryViewerBigAvatar {
@@ -9474,6 +9563,11 @@ body.body--mobileConversationOpen {
 
 .tgChatRow::after {
   left: 78px; /* aligns with iOS list: separator starts after avatar */
+}
+
+/* Pinned chats — gray/muted background like Telegram iOS */
+.tgChatRow--pinned {
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .tgRowAvatar {
@@ -10209,30 +10303,40 @@ body.body--mobileConversationOpen {
 
 .mobileChatBackBtn {
   flex-shrink: 0;
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(15, 23, 42, 0.6);
-  color: var(--text);
+  min-width: 38px;
+  height: 34px;
+  border-radius: 17px;
+  border: none;
+  background: rgba(255, 255, 255, 0.10);
+  color: var(--accent, #3b82f6);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  gap: 2px;
+  font-size: 15px;
+  font-weight: 600;
   line-height: 1;
-  transition: var(--transition-ui-standard), background 0.14s ease, border-color 0.14s ease;
+  padding: 0 10px 0 6px;
+  transition: var(--transition-ui-standard), background 0.14s ease;
   -webkit-tap-highlight-color: transparent;
 }
 
 .mobileChatBackBtn:active {
-  transform: scale(0.98);
-  background: rgba(37, 99, 235, 0.22);
+  transform: scale(0.97);
+  background: rgba(59, 130, 246, 0.18);
 }
 
 .mobileChatBackGlyph {
-  position: relative;
-  left: -1px;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.mobileChatBackBadge {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent, #3b82f6);
+  letter-spacing: -0.01em;
 }
 
 .mobileBottomNav {

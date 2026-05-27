@@ -1176,7 +1176,7 @@ const Sidebar = forwardRef(function Sidebar(
             const unreadLabel = unreadN > 0 ? (unreadN > 99 ? "99+" : String(unreadN)) : null;
             const statusSubtitle =
               !isRoom && !isOfficial && other ? formatUserStatusLine(other, t, lang) : "";
-            const rowClass = isOfficial ? "tgListRow tgChatRow tgChatRow--official" : "tgListRow tgChatRow";
+            const rowClass = `tgListRow tgChatRow${isOfficial ? " tgChatRow--official" : ""}${c.listPinned ? " tgChatRow--pinned" : ""}`;
             const rowBody = (
               <>
                 <span className="tgRowAvatar">
@@ -1460,9 +1460,18 @@ const Sidebar = forwardRef(function Sidebar(
                       </div>
                     </div>
                   </div>
-                  <button type="button" className="tgStoryViewerClose" onClick={() => setStoryViewerOpen(false)} aria-label={t("close")}>
-                    ×
-                  </button>
+                  <div className="tgStoryViewerHeaderRight">
+                    <button type="button" className="tgStoryViewerMore" aria-label={t("more") ?? "More"}>
+                      <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                        <circle cx="4" cy="10" r="1.8" />
+                        <circle cx="10" cy="10" r="1.8" />
+                        <circle cx="16" cy="10" r="1.8" />
+                      </svg>
+                    </button>
+                    <button type="button" className="tgStoryViewerClose" onClick={() => setStoryViewerOpen(false)} aria-label={t("close")}>
+                      ×
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -1470,20 +1479,43 @@ const Sidebar = forwardRef(function Sidebar(
               <button type="button" className="tgStoryViewerTap tgStoryViewerTap--next" aria-label={t("next")} onClick={goStoryNext} />
 
               <div className="tgStoryViewerStage" aria-hidden>
-                <div className="tgStoryViewerCard">
-                  <div className="tgStoryViewerCardGlow" />
-                  <div className="tgStoryViewerCardBody">
-                    {storyViewerStories.length ? (
-                      <img
-                        src={storyViewerStories[storyViewerItemIndex]?.mediaUrl}
-                        alt=""
-                        className="tgStoryViewerMedia"
-                      />
-                    ) : (
+                {storyViewerStories.length ? (
+                  <img
+                    src={storyViewerStories[storyViewerItemIndex]?.mediaUrl}
+                    alt=""
+                    className="tgStoryViewerMedia"
+                  />
+                ) : (
+                  <div className="tgStoryViewerCard">
+                    <div className="tgStoryViewerCardGlow" />
+                    <div className="tgStoryViewerCardBody">
                       <div className="tgStoryViewerHint">{t("storiesComingSoon") ?? t("comingSoon")}</div>
-                    )}
+                    </div>
                   </div>
+                )}
+              </div>
+
+              <div className="tgStoryViewerBottom">
+                <div className="tgStoryViewerReplyField">
+                  <input
+                    type="text"
+                    className="tgStoryViewerReplyInput"
+                    placeholder={t("storyReplyPlaceholder") ?? "Ответить сообщением..."}
+                    readOnly
+                  />
                 </div>
+                <button type="button" className="tgStoryViewerShareBtn" aria-label={t("share") ?? "Share"}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                    <polyline points="16 6 12 2 8 6" />
+                    <line x1="12" y1="2" x2="12" y2="15" />
+                  </svg>
+                </button>
+                <button type="button" className="tgStoryViewerHeartBtn" aria-label={t("like") ?? "Like"}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                  </svg>
+                </button>
               </div>
             </div>
           </div>
@@ -1621,8 +1653,8 @@ const Sidebar = forwardRef(function Sidebar(
               <div
                 key={c.id}
                 className={`chatListItemRow${isOfficial ? " chatListItemRow--official" : ""}${
-                  desktopChatMenuId === c.id ? " chatListItemRow--menuOpen" : ""
-                }`}
+                  c.listPinned ? " chatListItemRow--pinned" : ""
+                }${desktopChatMenuId === c.id ? " chatListItemRow--menuOpen" : ""}`}
                 style={{ '--row-i': Math.min(rowIdx, 15) }}
               >
                 <button

@@ -2642,7 +2642,8 @@ export default function App() {
   };
 
   const chatPropsDesktop = { ...chatPropsBase, onMobileBack: undefined };
-  const chatPropsMobile = { ...chatPropsBase, onMobileBack: handleMobileBackFromChat };
+  const mobileTotalUnread = chats.reduce((acc, c) => acc + Math.max(0, Number(c?.unreadCount) || 0), 0);
+  const chatPropsMobile = { ...chatPropsBase, onMobileBack: handleMobileBackFromChat, totalUnread: mobileTotalUnread };
 
   if (import.meta.env.DEV) {
     // eslint-disable-next-line no-console

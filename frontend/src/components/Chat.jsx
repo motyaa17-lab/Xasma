@@ -491,6 +491,7 @@ export default function Chat({
   t,
   lang,
   onMobileBack,
+  totalUnread = 0,
   sendRateLimitNotice = "",
   realtimeReady = true,
   realtimeSendNotice = "",
@@ -2802,8 +2803,13 @@ export default function Chat({
                   aria-label={t("back")}
                 >
                   <span className="mobileChatBackGlyph" aria-hidden>
-                    ←
+                    ‹
                   </span>
+                  {totalUnread > 0 ? (
+                    <span className="mobileChatBackBadge">
+                      {totalUnread > 999 ? Math.floor(totalUnread / 1000) + "K" : String(totalUnread)}
+                    </span>
+                  ) : null}
                 </button>
               ) : null}
               {isRoom ? (
