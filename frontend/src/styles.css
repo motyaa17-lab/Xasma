@@ -11552,6 +11552,298 @@ html.cap-android .avatarPremium::after {
   opacity: 0.42;
 }
 
+/* ===================================================================
+   JUICY ANIMATIONS — wow-factor micro-interactions everywhere
+   GPU-friendly: transform + opacity only where possible
+   =================================================================== */
+
+/* 1. Chat row staggered entrance cascade */
+@keyframes tgRowSlideIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+/* 2. Unread badge pop-in bounce */
+@keyframes badgePopIn {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  55% {
+    transform: scale(1.22);
+  }
+  78% {
+    transform: scale(0.94);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* 3. Scroll-down FAB slide entrance */
+@keyframes fabSlideIn {
+  from {
+    transform: translateY(20px) scale(0.8);
+    opacity: 0;
+  }
+  60% {
+    transform: translateY(-3px) scale(1.03);
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* 4. Enhanced sheet spring (replaces tgSheetIn when motion OK) */
+@keyframes tgSheetSpring {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 32px, 0) scale(0.94);
+  }
+  55% {
+    opacity: 1;
+    transform: translate3d(0, -4px, 0) scale(1.006);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+/* 5. Enhanced toast spring (replaces tgToastIn when motion OK) */
+@keyframes tgToastSpring {
+  from {
+    opacity: 0;
+    transform: translate3d(-50%, 18px, 0) scale(0.92);
+  }
+  55% {
+    opacity: 1;
+    transform: translate3d(-50%, -3px, 0) scale(1.01);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0) scale(1);
+  }
+}
+
+/* 6. Nav icon bounce on tab switch */
+@keyframes navIconBounce {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.4;
+  }
+  50% {
+    transform: scale(1.14);
+  }
+  75% {
+    transform: scale(0.96);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* 7. Send button pop micro-animation */
+@keyframes sendPop {
+  0% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(0.84) rotate(-6deg);
+  }
+  60% {
+    transform: scale(1.12) rotate(2deg);
+  }
+  85% {
+    transform: scale(0.97);
+  }
+  100% {
+    transform: scale(1) rotate(0);
+  }
+}
+
+/* 8. Auth card entrance with spring */
+@keyframes authCardSpring {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 32px, 0) scale(0.95);
+  }
+  55% {
+    opacity: 1;
+    transform: translate3d(0, -5px, 0) scale(1.008);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+/* 9. Sticker picker cell pop-in */
+@keyframes stickerCellPop {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* 10. Story avatar ring breathing pulse (unwatched stories) */
+@keyframes storyRingPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px #3390ec;
+  }
+  50% {
+    box-shadow: 0 0 0 2px #3390ec, 0 0 10px rgba(51, 144, 236, 0.35);
+  }
+}
+
+/* 11. Chat row shimmer highlight on tap */
+@keyframes rowTapShimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(200%);
+  }
+}
+
+/* 12. Desktop chat item entrance */
+@keyframes chatItemSlideIn {
+  from {
+    opacity: 0;
+    transform: translate3d(-8px, 0, 0) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+/* 13. Folder pill slide-up pop */
+@keyframes folderPillPop {
+  0% {
+    transform: scale(0.92);
+    opacity: 0.6;
+  }
+  55% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* 14. Composer send acknowledgment ring (enhanced) */
+@keyframes composerSendRing {
+  0% {
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
+  }
+  35% {
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.22), 0 0 16px rgba(99, 102, 241, 0.1);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
+  }
+}
+
+/* 15. Search field focus ring glow */
+@keyframes searchFocusGlow {
+  0% {
+    box-shadow: none;
+  }
+  100% {
+    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.3), 0 0 14px rgba(59, 130, 246, 0.08);
+  }
+}
+
+/* 16. Typing dot enhanced bounce with glow */
+@keyframes typingDotBounceGlow {
+  0%,
+  70%,
+  100% {
+    opacity: 0.35;
+    transform: translate3d(0, 0, 0) scale(1);
+    box-shadow: 0 0 0 rgba(96, 165, 250, 0);
+  }
+  35% {
+    opacity: 1;
+    transform: translate3d(0, -4px, 0) scale(1.2);
+    box-shadow: 0 0 6px rgba(96, 165, 250, 0.4);
+  }
+}
+
+/* 17. Mobile pane entrance (enhanced) */
+@keyframes mobilePaneSpringIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 22px, 0) scale(0.98);
+  }
+  55% {
+    opacity: 1;
+    transform: translate3d(0, -3px, 0) scale(1.003);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+/* 18. Profile modal enhanced entrance */
+@keyframes profileSpringIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 20px, 0) scale(0.95);
+  }
+  50% {
+    transform: translate3d(0, -4px, 0) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+/* 19. Context menu spring pop (enhanced) */
+@keyframes menuSpringPop {
+  from {
+    opacity: 0;
+    transform: scale(0.82) translate3d(6px, -8px, 0);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.03) translate3d(0, 1px, 0);
+  }
+  100% {
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+}
+
+/* 20. Button press ripple ring */
+@keyframes btnPressRipple {
+  0% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(59, 130, 246, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+  }
+}
+
 /* ----- Extra motion polish (non-reduced only; tokens from :root) ----- */
 @media (prefers-reduced-motion: no-preference) {
   .appRoot a[href] {
@@ -11568,6 +11860,272 @@ html.cap-android .avatarPremium::after {
   .tgGroupActionPill,
   .tgGroupSettingsRow {
     transition: var(--transition-surface), transform var(--dur-tap) var(--ease-smooth);
+  }
+
+  /* ---- 1. Staggered chat row entrance (mobile) ---- */
+  .tgChatRow {
+    animation: tgRowSlideIn 0.44s var(--ease-tg-out) both;
+    animation-delay: calc(var(--row-i, 0) * 35ms);
+  }
+
+  /* ---- 1b. Staggered chat row entrance (desktop) ---- */
+  .chatListItemRow {
+    animation: chatItemSlideIn 0.38s var(--ease-tg-out) both;
+    animation-delay: calc(var(--row-i, 0) * 30ms);
+  }
+
+  /* ---- 2. Unread badge pop-in ---- */
+  .tgRowBadge {
+    animation: badgePopIn 0.4s var(--ease-tg-pop) both;
+  }
+
+  .mobileNavBadge {
+    animation: badgePopIn 0.38s var(--ease-tg-pop) both;
+  }
+
+  .scrollDownFabBadge {
+    animation: badgePopIn 0.32s var(--ease-tg-pop) both;
+  }
+
+  /* ---- 3. Scroll FAB entrance ---- */
+  .scrollDownFab {
+    animation: fabSlideIn 0.34s var(--ease-tg-out) both;
+  }
+
+  .scrollDownFab:active {
+    transform: scale(0.9);
+    transition: transform 0.12s var(--ease-smooth);
+  }
+
+  /* ---- 4. Enhanced sheet spring ---- */
+  .tgSheet {
+    animation: tgSheetSpring 0.44s var(--ease-smooth) both;
+  }
+
+  /* ---- 5. Enhanced toast spring ---- */
+  .tgToast {
+    animation: tgToastSpring 0.44s var(--ease-smooth) both;
+  }
+
+  /* ---- 6. Nav icon bounce on active ---- */
+  .mobileNavItem--active .mobileNavIcon {
+    animation: navIconBounce 0.38s var(--ease-tg-pop) both;
+  }
+
+  /* ---- 7. Send button pop ---- */
+  .composerActionSlot .composerActionBtn.sendBtn:not(:disabled):not(.isHidden):active {
+    animation: sendPop 0.42s var(--ease-tg-pop);
+  }
+
+  .sendBtn:not(:disabled):active {
+    animation: sendPop 0.42s var(--ease-tg-pop);
+  }
+
+  /* ---- 8. Auth card spring entrance ---- */
+  .authCard {
+    animation: authCardSpring 0.52s var(--ease-smooth) both;
+  }
+
+  /* ---- 9. Search field focus glow ---- */
+  .tgSearchField {
+    transition: box-shadow 0.3s var(--ease-smooth), background 0.3s var(--ease-smooth),
+      border-color 0.3s var(--ease-smooth);
+  }
+
+  .tgSearchField:focus-within {
+    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.3), 0 0 14px rgba(59, 130, 246, 0.08);
+    background: rgba(28, 28, 30, 0.98);
+  }
+
+  /* ---- 10. Composer focus glow ---- */
+  .composerMain .composerInputShell {
+    transition: border-color 0.3s var(--ease-smooth), box-shadow 0.3s var(--ease-smooth);
+  }
+
+  .composerMain .composerInputShell:focus-within {
+    border-color: rgba(99, 102, 241, 0.3);
+    box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.16), 0 0 18px rgba(99, 102, 241, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  }
+
+  /* ---- 11. Folder pill transitions + active glow ---- */
+  .tgFolderPill {
+    transition: background 0.28s var(--ease-smooth), color 0.28s var(--ease-smooth),
+      transform 0.16s var(--ease-smooth), box-shadow 0.28s var(--ease-smooth);
+  }
+
+  .tgFolderPill:active {
+    transform: scale(0.93);
+  }
+
+  .tgFolderPill--active {
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.12);
+  }
+
+  .tgFolderAddBtn {
+    transition: transform 0.16s var(--ease-smooth), background 0.28s var(--ease-smooth),
+      color 0.28s var(--ease-smooth);
+  }
+
+  .tgFolderAddBtn:active {
+    transform: scale(0.88) rotate(90deg);
+  }
+
+  /* ---- 12. Enhanced typing indicator with glow ---- */
+  .typingIndicatorDot {
+    animation: typingDotBounceGlow 1.15s ease-in-out infinite;
+  }
+
+  /* ---- 13. Chat row tap shimmer ---- */
+  .tgChatRow {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .tgChatRow::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.04) 45%,
+      rgba(255, 255, 255, 0.06) 50%,
+      rgba(255, 255, 255, 0.04) 55%,
+      transparent 100%
+    );
+    transform: translateX(-100%);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .tgChatRow:active::before {
+    animation: rowTapShimmer 0.55s var(--ease-smooth) forwards;
+  }
+
+  /* ---- 14. Sticker picker cell cascade ---- */
+  .stickerPickerCell {
+    animation: stickerCellPop 0.32s var(--ease-tg-pop) both;
+  }
+
+  .stickerPickerCell:nth-child(1) { animation-delay: 0ms; }
+  .stickerPickerCell:nth-child(2) { animation-delay: 20ms; }
+  .stickerPickerCell:nth-child(3) { animation-delay: 40ms; }
+  .stickerPickerCell:nth-child(4) { animation-delay: 60ms; }
+  .stickerPickerCell:nth-child(5) { animation-delay: 80ms; }
+  .stickerPickerCell:nth-child(6) { animation-delay: 100ms; }
+  .stickerPickerCell:nth-child(7) { animation-delay: 120ms; }
+  .stickerPickerCell:nth-child(8) { animation-delay: 140ms; }
+
+  /* ---- 15. Story avatar ring pulse (unwatched) ---- */
+  .tgStoryItem:not(.tgStoryItem--me) .tgStoryAvatar {
+    animation: storyRingPulse 3s ease-in-out infinite;
+  }
+
+  /* ---- 16. Enhanced mobile pane entrance ---- */
+  .appShell--mobile .mobilePane:not(.mobilePane--conversation) {
+    animation: mobilePaneSpringIn calc(var(--dur-chat-shell) * 0.9) var(--ease-smooth) both;
+  }
+
+  /* ---- 17. Enhanced context menu spring ---- */
+  .msgMenuDropdown {
+    animation: menuSpringPop var(--dur-menu) var(--ease-smooth) both;
+  }
+
+  /* ---- 18. Sticker picker sheet spring ---- */
+  .stickerPickerSheet {
+    animation: tgSheetSpring 0.44s var(--ease-smooth) both;
+  }
+
+  /* ---- 19. Enhanced profile modal ---- */
+  .tgProfileCard {
+    animation: profileSpringIn 0.42s var(--ease-smooth) both;
+  }
+
+  /* ---- 20. Button tap ripple for primary actions ---- */
+  .tgFolderPill:active,
+  .tgSheetItem:active,
+  .recBottomBtn:active {
+    animation: btnPressRipple 0.35s var(--ease-smooth);
+  }
+
+  /* ---- 21. Voice message play button tap ---- */
+  .voiceMsgPlayBtn:active {
+    transform: scale(0.88);
+    transition: transform 0.1s var(--ease-smooth);
+  }
+
+  /* ---- 22. Premium badge shimmer ---- */
+  .premiumBadge {
+    transition: transform 0.2s var(--ease-smooth);
+  }
+
+  .premiumBadge:hover {
+    transform: scale(1.2) rotate(12deg);
+  }
+
+  /* ---- 23. Chat skeleton shimmer enhancement ---- */
+  .chatSkRow {
+    animation: tgRowSlideIn 0.5s var(--ease-smooth) both;
+  }
+
+  .chatSkRow:nth-child(1) { animation-delay: 0ms; }
+  .chatSkRow:nth-child(2) { animation-delay: 40ms; }
+  .chatSkRow:nth-child(3) { animation-delay: 80ms; }
+  .chatSkRow:nth-child(4) { animation-delay: 120ms; }
+  .chatSkRow:nth-child(5) { animation-delay: 160ms; }
+  .chatSkRow:nth-child(6) { animation-delay: 200ms; }
+  .chatSkRow:nth-child(7) { animation-delay: 240ms; }
+  .chatSkRow:nth-child(8) { animation-delay: 280ms; }
+  .chatSkRow:nth-child(9) { animation-delay: 320ms; }
+  .chatSkRow:nth-child(10) { animation-delay: 360ms; }
+
+  /* ---- 24. Chat list row subtle hover lift ---- */
+  .tgListRow {
+    transition: background 0.24s var(--ease-smooth), transform 0.2s var(--ease-smooth);
+  }
+
+  /* ---- 25. Message bubble enhanced entrance (more spring) ---- */
+  .bubbleRow--enter .bubble {
+    animation: bubblePop calc(var(--dur-msg-in) * 0.8) var(--ease-tg-pop) both;
+  }
+
+  .bubbleRow.me.bubbleRow--enterOwn .bubble {
+    animation: bubblePop calc(var(--dur-msg-own) * 0.8) var(--ease-tg-pop) both;
+  }
+
+  /* ---- 26. Composer send acknowledgment ring ---- */
+  .composerMain.composerSendAck {
+    animation: composerSendRing 0.48s var(--ease-tg-out);
+    border-radius: 16px;
+  }
+
+  /* ---- 27. Reaction pill enhanced pop ---- */
+  .reactionPill:not(:disabled):active {
+    animation: reactionPillPop 0.25s var(--ease-tg-pop);
+  }
+
+  /* ---- 28. Enhanced chat open slide (mobile) ---- */
+  .appShell--mobile .mobileChatShell {
+    animation: mobileChatShellIn var(--dur-chat-shell) var(--ease-tg-snappy) both;
+  }
+
+  /* ---- 29. Emoji reaction pick enhanced ---- */
+  .msgMenuReactionBtn:active {
+    animation: msgReactionPick 0.28s var(--ease-tg-pop);
+  }
+
+  /* ---- 30. Avatar hover glow (desktop) ---- */
+  .chatAvatarWrap:hover .avatarSm {
+    filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.15));
+    transition: filter 0.3s var(--ease-smooth);
+  }
+
+  /* ---- 31. Scroll-down FAB hover lift ---- */
+  .scrollDownFab:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 18px 36px rgba(0, 0, 0, 0.4);
+    transition: transform 0.2s var(--ease-smooth), box-shadow 0.2s var(--ease-smooth);
   }
 }
 

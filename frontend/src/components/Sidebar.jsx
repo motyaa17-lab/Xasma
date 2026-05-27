@@ -1146,7 +1146,7 @@ const Sidebar = forwardRef(function Sidebar(
             <div className="mobileChatListEmpty muted">{t("noChatsYet")}</div>
           ) : null}
 
-          {mobileChatsToShow.map((c) => {
+          {mobileChatsToShow.map((c, rowIdx) => {
             const isGroup = c.type === "group";
             const isChannel = c.type === "channel";
             const isRoom = isGroup || isChannel;
@@ -1249,6 +1249,7 @@ const Sidebar = forwardRef(function Sidebar(
                   <button
                     type="button"
                     className={rowClass}
+                    style={{ '--row-i': Math.min(rowIdx, 15) }}
                     onClick={() => onSelectChat(c.id)}
                     onContextMenu={(e) => {
                       e.preventDefault();
@@ -1267,6 +1268,7 @@ const Sidebar = forwardRef(function Sidebar(
                 key={c.id}
                 type="button"
                 className={rowClass}
+                style={{ '--row-i': Math.min(rowIdx, 15) }}
                 onClick={() => onSelectChat(c.id)}
                 onContextMenu={(e) => {
                   e.preventDefault();
@@ -1592,7 +1594,7 @@ const Sidebar = forwardRef(function Sidebar(
         ) : null}
 
         <div className="chatList">
-          {chats.map((c) => {
+          {chats.map((c, rowIdx) => {
             const isGroup = c.type === "group";
             const isChannel = c.type === "channel";
             const isRoom = isGroup || isChannel;
@@ -1621,6 +1623,7 @@ const Sidebar = forwardRef(function Sidebar(
                 className={`chatListItemRow${isOfficial ? " chatListItemRow--official" : ""}${
                   desktopChatMenuId === c.id ? " chatListItemRow--menuOpen" : ""
                 }`}
+                style={{ '--row-i': Math.min(rowIdx, 15) }}
               >
                 <button
                   type="button"
