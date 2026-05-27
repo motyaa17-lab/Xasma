@@ -9931,9 +9931,9 @@ body.body--mobileConversationOpen {
 .appShell--mobile .chatHeaderPill {
   position: absolute;
   left: 50%;
-  top: calc(8px + (38px - 34px) / 2);
-  transform: translateX(-50%);
-  width: min(240px, calc(100% - 210px));
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(240px, calc(100% - 180px));
   padding: 6px 12px;
   border-radius: 999px;
   background: rgba(10, 10, 12, 0.72);
@@ -9947,6 +9947,7 @@ body.body--mobileConversationOpen {
   justify-content: center;
   gap: 1px;
   pointer-events: none;
+  z-index: 2;
 }
 
 .appShell--mobile .chatHeaderPillTitle {
@@ -9973,9 +9974,15 @@ body.body--mobileConversationOpen {
 
 /* Hide the left stacked name/status on mobile direct chats only (pill replaces it). */
 .appShell--mobile .mobilePane--conversation .chatHeader--direct .chatHeaderAtHandle,
-.appShell--mobile .mobilePane--conversation .chatHeader--direct .chatHeaderInfo .chatHeaderStatus,
-.appShell--mobile .mobilePane--conversation .chatHeader--direct .chatHeaderInfo .chatHeaderName {
+.appShell--mobile .mobilePane--conversation .chatHeader--direct .chatHeaderLeft .chatHeaderInfo .chatHeaderStatus,
+.appShell--mobile .mobilePane--conversation .chatHeader--direct .chatHeaderLeft .chatHeaderInfo .chatHeaderName {
   display: none;
+}
+
+/* Ensure group/channel header names are always visible on mobile */
+.appShell--mobile .mobilePane--conversation .chatHeaderGroupTap .chatHeaderInfo .chatHeaderName,
+.appShell--mobile .mobilePane--conversation .chatHeaderGroupTap .chatHeaderInfo .chatHeaderStatus {
+  display: flex;
 }
 
 .appShell--mobile .chatHeaderLeft {
