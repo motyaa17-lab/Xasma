@@ -468,6 +468,40 @@ function canManageGroupMembers(req, chat) {
   return Number(chat.created_by) === Number(req.user.id) || req.user.role === "admin";
 }
 
+/** True if `blockerId` has blocked `blockedId`. */
+async function isBlocked(blockerId, blockedId) {
+  const a = Number(blockerId);
+  const b = Number(blockedId);
+  if (!a || !b) return false;
+  const r = await query(`SELECT 1 FROM blocked_users WHERE blocker_id = $1 AND blocked_id = $2`, [a, b]);
+  return Boolean(r.rows[0]);
+}
+
+/** True if either user has blocked the other. */
+async function isBlockedEitherWay(userA, userB) {
+  const a = Number(userA);
+  const b = Number(userB);
+  if (!a || !b) return false;
+  const r = await query(
+    `SELECT 1 FROM blocked_users
+     WHERE (blocker_id = $1 AND blocked_id = $2) OR (blocker_id = $2 AND blocked_id = $1)
+     LIMIT 1`,
+    [a, b]
+  );
+  return Boolean(r.rows[0]);
+}
+
+/** The other participant of a direct chat, or null for non-direct chats. */
+function otherDirectUserId(chat, meId) {
+  if (!chat || chat.type !== "direct") return null;
+  const me = Number(meId);
+  const u1 = chat.user1_id != null ? Number(chat.user1_id) : null;
+  const u2 = chat.user2_id != null ? Number(chat.user2_id) : null;
+  if (u1 === me) return u2;
+  if (u2 === me) return u1;
+  return null;
+}
+
 /** Direct: both participants. Group: creator or app admin only. Official: none. */
 function canPinMessage(req, chat) {
   if (!chat) return false;
@@ -981,6 +1015,10 @@ async function insertChatMessageAndBroadcast(
   }
   if (chat?.type === "channel" && !(await canSenderPostToChannel(chat, senderId))) {
     return null;
+  }
+  if (chat?.type === "direct") {
+    const other = otherDirectUserId(chat, senderId);
+    if (other && (await isBlockedEitherWay(senderId, other))) return null;
   }
 
   const replyTo = Number(replyToMessageId) || null;
@@ -1903,6 +1941,9 @@ app.get("/api/users/:userId", authRequired, (req, res) => {
     if (!u) return res.status(404).json({ error: "User not found" });
     const tg = buildSenderTagsFromRow(u, false);
     const persU = senderPersonalizationFromRow(u, false);
+    const meId = Number(req.user.id);
+    const blockedByMe = await isBlocked(meId, uid);
+    const blockedMe = await isBlocked(uid, meId);
     return res.json({
       user: {
         id: Number(u.id),
@@ -1925,6 +1966,8 @@ app.get("/api/users/:userId", authRequired, (req, res) => {
         isEarlyTester: isEarlyTesterUser(Number(u.id), u.created_at),
         ...computePremiumInfo(u),
         profileBackground: u.profile_bg_url || "",
+        blockedByMe,
+        blockedMe,
       },
     });
   })().catch(() => res.status(500).json({ error: "Server error" }));
@@ -2163,6 +2206,50 @@ app.delete("/api/chats/:chatId/membership", authRequired, (req, res) => {
     if (!(await isUserChatMember(chatId, uid))) return res.status(403).json({ error: "Not a member of this chat" });
     await query(`DELETE FROM chat_members WHERE chat_id = $1 AND user_id = $2`, [chatId, uid]);
     return res.json({ ok: true });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
+/** Clear chat history for the current user only (Telegram "Clear history for me"). */
+app.post("/api/chats/:chatId/clear-history", authRequired, (req, res) => {
+  const chatId = Number(req.params.chatId);
+  if (!chatId) return res.status(400).json({ error: "Invalid chat id" });
+
+  (async () => {
+    const uid = Number(req.user.id);
+    const chat = await getChatById(chatId);
+    if (!chat) return res.status(404).json({ error: "Chat not found" });
+    if (!(await isUserChatMember(chatId, uid))) return res.status(403).json({ error: "Not a member of this chat" });
+    await query(
+      `INSERT INTO message_hidden (user_id, message_id)
+       SELECT $1, m.id FROM messages m WHERE m.chat_id = $2
+       ON CONFLICT DO NOTHING`,
+      [uid, chatId]
+    );
+    return res.json({ ok: true });
+  })().catch(() => res.status(500).json({ error: "Server error" }));
+});
+
+/** Block / unblock another user (affects 1:1 messaging both ways). */
+app.post("/api/users/:userId/block", authRequired, (req, res) => {
+  const targetId = Number(req.params.userId);
+  const block = req.body?.block === undefined ? true : Boolean(req.body.block);
+  if (!targetId) return res.status(400).json({ error: "Invalid user id" });
+
+  (async () => {
+    const uid = Number(req.user.id);
+    if (targetId === uid) return res.status(400).json({ error: "Cannot block yourself" });
+    const target = await query(`SELECT id FROM users WHERE id = $1`, [targetId]);
+    if (!target.rows[0]) return res.status(404).json({ error: "User not found" });
+
+    if (block) {
+      await query(
+        `INSERT INTO blocked_users (blocker_id, blocked_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+        [uid, targetId]
+      );
+    } else {
+      await query(`DELETE FROM blocked_users WHERE blocker_id = $1 AND blocked_id = $2`, [uid, targetId]);
+    }
+    return res.json({ ok: true, blocked: block });
   })().catch(() => res.status(500).json({ error: "Server error" }));
 });
 
@@ -2645,6 +2732,13 @@ app.post("/api/chats/:chatId/messages", authRequired, (req, res) => {
     if (!(await isUserChatMember(chatId, uid))) return res.status(403).json({ error: "Not a member of this chat" });
     if (chat.type === "channel" && !(await canSenderPostToChannel(chat, uid))) {
       return res.status(403).json({ error: "Only the channel owner or an admin can post messages" });
+    }
+    if (chat.type === "direct") {
+      const other = otherDirectUserId(chat, uid);
+      if (other) {
+        if (await isBlocked(uid, other)) return res.status(403).json({ error: "You have blocked this user" });
+        if (await isBlocked(other, uid)) return res.status(403).json({ error: "You can't message this user" });
+      }
     }
 
     const rate = checkSendRateLimit(uid);

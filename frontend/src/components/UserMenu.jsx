@@ -531,6 +531,11 @@ const UserMenu = forwardRef(function UserMenu(
     menuClusterRef = null,
     /** Fires when dropdown open state changes (for external trigger aria-expanded). */
     onDropdownOpenChange,
+    /** Request to jump to a settings sub-panel (used by mobilePage variant). */
+    requestPanel = null,
+    requestPanelNonce = 0,
+    /** Fires after a requested panel has been opened, so the parent can reset its request. */
+    onPanelConsumed,
   },
   ref
 ) {
@@ -544,6 +549,11 @@ const UserMenu = forwardRef(function UserMenu(
       toggleDropdown: () => setOpen((v) => !v),
       openDropdown: () => setOpen(true),
       closeDropdown: () => setOpen(false),
+      /** Open the menu (dropdown variant) and jump straight to a settings panel. */
+      openPanel: (name) => {
+        setOpen(true);
+        setPanel(name || null);
+      },
     }),
     []
   );
@@ -551,6 +561,16 @@ const UserMenu = forwardRef(function UserMenu(
   useEffect(() => {
     onDropdownOpenChange?.(open);
   }, [open, onDropdownOpenChange]);
+
+  // Respond to an external request to open a specific settings panel (mobilePage variant).
+  useEffect(() => {
+    if (!requestPanelNonce || !requestPanel) return;
+    setOpen(true);
+    setPanel(requestPanel);
+    onPanelConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestPanelNonce]);
+
   const fileInputRef = useRef(null);
   const [avatarPreview, setAvatarPreview] = useState("");
   const [avatarBusy, setAvatarBusy] = useState(false);

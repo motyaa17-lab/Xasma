@@ -491,12 +491,16 @@ export default function Chat({
   t,
   lang,
   onMobileBack,
+  totalUnread = 0,
   sendRateLimitNotice = "",
   realtimeReady = true,
   realtimeSendNotice = "",
   meAuraColor,
   onSetChatPin,
   onChatListPinToggle,
+  onClearHistory,
+  onDeleteChat,
+  onChangeWallpaper,
 }) {
   const safeMessages = useMemo(() => {
     if (!Array.isArray(messages)) return [];
@@ -2638,12 +2642,33 @@ export default function Chat({
           setChatMutedUi(next);
         }}
         onChangeWallpaper={() => {
-          // Use the existing background picker from settings logic? For now just hint.
-          showToast(t("comingSoon") ?? "Coming soon");
+          if (typeof onChangeWallpaper === "function") onChangeWallpaper();
+          else showToast(t("comingSoon") ?? "Coming soon");
         }}
-        onClearHistory={() => showToast(t("comingSoon") ?? "Coming soon")}
-        onBlock={() => showToast(t("comingSoon") ?? "Coming soon")}
-        onDeleteChat={() => showToast(t("comingSoon") ?? "Coming soon")}
+        onClearHistory={async () => {
+          if (!chatId || typeof onClearHistory !== "function") return;
+          if (!window.confirm(t("clearHistoryConfirm") ?? "Clear all messages in this chat?")) return;
+          try {
+            await onClearHistory(Number(chatId));
+            showToast(t("historyCleared") ?? "History cleared");
+          } catch (e) {
+            showToast(e?.message ?? (t("errorGeneric") ?? "Error"));
+          }
+        }}
+        onBlocked={(blocked) => {
+          showToast(blocked ? (t("userBlocked") ?? "User blocked") : (t("userUnblocked") ?? "User unblocked"));
+        }}
+        onDeleteChat={async () => {
+          if (!chatId || typeof onDeleteChat !== "function") return;
+          if (!window.confirm(t("deleteChatConfirm") ?? "Delete this chat?")) return;
+          try {
+            await onDeleteChat(Number(chatId));
+            setProfileUserId(null);
+            if (typeof onMobileBack === "function") onMobileBack();
+          } catch (e) {
+            showToast(e?.message ?? (t("errorGeneric") ?? "Error"));
+          }
+        }}
       />
       {!chatId ? (
         <div className="emptyState">
@@ -2792,7 +2817,7 @@ export default function Chat({
               </div>
             </div>
           ) : null}
-          <div className="chatHeader" ref={chatHeaderRef}>
+          <div className={`chatHeader${!isRoom && !isOfficial ? " chatHeader--direct" : ""}`} ref={chatHeaderRef}>
             <div className="chatHeaderLead">
               {onMobileBack ? (
                 <button
@@ -2802,8 +2827,13 @@ export default function Chat({
                   aria-label={t("back")}
                 >
                   <span className="mobileChatBackGlyph" aria-hidden>
-                    ←
+                    ‹
                   </span>
+                  {totalUnread > 0 ? (
+                    <span className="mobileChatBackBadge">
+                      {totalUnread > 999 ? Math.floor(totalUnread / 1000) + "K" : String(totalUnread)}
+                    </span>
+                  ) : null}
                 </button>
               ) : null}
               {isRoom ? (

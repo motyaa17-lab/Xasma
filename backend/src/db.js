@@ -104,14 +104,6 @@ async function initDb() {
   await query(`CREATE INDEX IF NOT EXISTS idx_messages_forward_from ON messages(forward_from_message_id)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_messages_deleted_for_all ON messages(deleted_for_all, deleted_at DESC)`);
 
-  await query(`
-    CREATE TABLE IF NOT EXISTS message_hidden (
-      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      message_id BIGINT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-      PRIMARY KEY (user_id, message_id)
-    )
-  `);
   await query(`CREATE INDEX IF NOT EXISTS idx_message_hidden_user ON message_hidden(user_id, created_at DESC)`);
 
   // Group chats: type, title, creator; direct chats keep ordered user1_id/user2_id.
@@ -183,6 +175,18 @@ async function initDb() {
     )
   `);
   await query(`CREATE INDEX IF NOT EXISTS idx_message_reports_created ON message_reports (created_at DESC)`);
+
+  // User blocks (1:1). blocker_id has blocked blocked_id.
+  await query(`
+    CREATE TABLE IF NOT EXISTS blocked_users (
+      blocker_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      blocked_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (blocker_id, blocked_id)
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_blocked_users_blocker ON blocked_users (blocker_id)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_blocked_users_blocked ON blocked_users (blocked_id)`);
 
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS aura_color TEXT`);
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS messages_sent_count BIGINT NOT NULL DEFAULT 0`);

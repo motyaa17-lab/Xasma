@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { getUserById } from "../api.js";
+import { getUserById, setUserBlocked } from "../api.js";
 import AvatarAura from "./AvatarAura.jsx";
 import ActivityBadge from "./ActivityBadge.jsx";
 import UserTagBadge from "./UserTagBadge.jsx";
@@ -47,7 +47,7 @@ export default function UserProfileScreen({
   onToggleMute,
   onChangeWallpaper,
   onClearHistory,
-  onBlock,
+  onBlocked,
   onDeleteChat,
 }) {
   const [user, setUser] = useState(null);
@@ -55,7 +55,25 @@ export default function UserProfileScreen({
   const [err, setErr] = useState("");
   const [phase, setPhase] = useState("in"); // in | out
   const [moreOpen, setMoreOpen] = useState(false);
+  const [blockBusy, setBlockBusy] = useState(false);
   const closeTimerRef = useRef(null);
+
+  const blockedByMe = Boolean(user?.blockedByMe);
+
+  async function handleToggleBlock() {
+    if (!userId || blockBusy) return;
+    const next = !blockedByMe;
+    setBlockBusy(true);
+    try {
+      await setUserBlocked(userId, next);
+      setUser((prev) => (prev ? { ...prev, blockedByMe: next } : prev));
+      onBlocked?.(next);
+    } catch (e) {
+      setErr(e?.message || t("errorGeneric"));
+    } finally {
+      setBlockBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (closeTimerRef.current) {
@@ -283,12 +301,13 @@ export default function UserProfileScreen({
             <button
               type="button"
               className="tgSheetItem tgSheetItem--danger"
+              disabled={blockBusy}
               onClick={() => {
                 setMoreOpen(false);
-                onBlock?.();
+                handleToggleBlock();
               }}
             >
-              {t("blockUser")}
+              {blockedByMe ? (t("unblockUser") ?? "Unblock user") : t("blockUser")}
             </button>
             <button
               type="button"
