@@ -167,6 +167,7 @@ const Sidebar = forwardRef(function Sidebar(
     mobileLayout = false,
     mobileStoriesExpanded = false,
     onMobileStoriesExpandedChange,
+    autoFocusSearch = false,
   },
   ref
 ) {
@@ -209,6 +210,9 @@ const Sidebar = forwardRef(function Sidebar(
   const [folderCreateName, setFolderCreateName] = useState("");
   const [chatActionId, setChatActionId] = useState(null);
   const [chatMoveFolderId, setChatMoveFolderId] = useState("");
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedChatIds, setSelectedChatIds] = useState(() => new Set());
+  const mobileSearchInputRef = useRef(null);
   const [storyViewerOpen, setStoryViewerOpen] = useState(false);
   const [storyViewerLabel, setStoryViewerLabel] = useState("");
   const [storyViewerIndex, setStoryViewerIndex] = useState(0); // user index in storyUsers
@@ -517,9 +521,59 @@ const Sidebar = forwardRef(function Sidebar(
       openCreateChannel: () => {
         if (onCreateChannel) setShowChannelModal(true);
       },
+      enterSelectMode: () => {
+        setSelectedChatIds(new Set());
+        setSelectMode(true);
+      },
+      focusSearch: () => {
+        const el = mobileSearchInputRef.current;
+        if (el) {
+          el.focus();
+          try {
+            el.select?.();
+          } catch {
+            /* noop */
+          }
+        }
+      },
     }),
     [onCreateGroup, onCreateChannel]
   );
+
+  const exitSelectMode = useCallback(() => {
+    setSelectMode(false);
+    setSelectedChatIds(new Set());
+  }, []);
+
+  useEffect(() => {
+    if (!mobileLayout || !autoFocusSearch) return undefined;
+    const id = setTimeout(() => mobileSearchInputRef.current?.focus(), 90);
+    return () => clearTimeout(id);
+  }, [mobileLayout, autoFocusSearch]);
+
+  const toggleChatSelected = useCallback((chatId) => {
+    setSelectedChatIds((prev) => {
+      const next = new Set(prev);
+      const id = Number(chatId);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  async function handleDeleteSelectedChats() {
+    if (typeof onChatDelete !== "function") return;
+    const ids = Array.from(selectedChatIds);
+    for (const id of ids) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await onChatDelete(Number(id));
+      } catch {
+        /* keep going */
+      }
+    }
+    exitSelectMode();
+  }
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -1085,6 +1139,7 @@ const Sidebar = forwardRef(function Sidebar(
               <IconSearch size={18} />
             </span>
             <input
+              ref={mobileSearchInputRef}
               type="search"
               className="tgSearchInput"
               value={query}
@@ -1176,9 +1231,15 @@ const Sidebar = forwardRef(function Sidebar(
             const unreadLabel = unreadN > 0 ? (unreadN > 99 ? "99+" : String(unreadN)) : null;
             const statusSubtitle =
               !isRoom && !isOfficial && other ? formatUserStatusLine(other, t, lang) : "";
-            const rowClass = `tgListRow tgChatRow${isOfficial ? " tgChatRow--official" : ""}${c.listPinned ? " tgChatRow--pinned" : ""}`;
+            const isSelected = selectMode && selectedChatIds.has(Number(c.id));
+            const rowClass = `tgListRow tgChatRow${isOfficial ? " tgChatRow--official" : ""}${c.listPinned ? " tgChatRow--pinned" : ""}${selectMode ? " tgChatRow--selectable" : ""}${isSelected ? " tgChatRow--selected" : ""}`;
             const rowBody = (
               <>
+                {selectMode ? (
+                  <span className={`tgRowSelectMark${isSelected ? " tgRowSelectMark--on" : ""}`} aria-hidden>
+                    {isSelected ? "✓" : ""}
+                  </span>
+                ) : null}
                 <span className="tgRowAvatar">
                   {isRoom && c.avatar ? (
                     <img src={c.avatar} alt="" />
@@ -1229,6 +1290,21 @@ const Sidebar = forwardRef(function Sidebar(
                 </span>
               </>
             );
+
+            if (selectMode) {
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={rowClass}
+                  style={{ '--row-i': Math.min(rowIdx, 15) }}
+                  aria-pressed={isSelected}
+                  onClick={() => toggleChatSelected(c.id)}
+                >
+                  {rowBody}
+                </button>
+              );
+            }
 
             if (onChatListPinToggle && onChatDelete) {
               return (
@@ -1311,6 +1387,26 @@ const Sidebar = forwardRef(function Sidebar(
             <div className="mobileChatListEmpty muted">{t("searchNoResults")}</div>
           ) : null}
         </MobileChatListScroll>
+        {selectMode ? (
+          <div className="tgSelectActionBar" role="toolbar" aria-label={t("select") ?? "Select"}>
+            <button type="button" className="ghostBtn tgSelectCancelBtn" onClick={exitSelectMode}>
+              {t("cancel") ?? "Cancel"}
+            </button>
+            <span className="tgSelectCount">
+              {selectedChatIds.size > 0
+                ? `${t("selected") ?? "Selected"}: ${selectedChatIds.size}`
+                : t("selectChatsHint") ?? "Select chats"}
+            </span>
+            <button
+              type="button"
+              className="dangerBtn tgSelectDeleteBtn"
+              disabled={selectedChatIds.size === 0}
+              onClick={handleDeleteSelectedChats}
+            >
+              {t("deleteSelected")}
+            </button>
+          </div>
+        ) : null}
         {groupModal}
         {channelModal}
         {deleteConfirmModal}

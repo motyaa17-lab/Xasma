@@ -28,6 +28,7 @@ import {
   patchChatPin,
   patchChatListPin,
   deleteChatMembership,
+  clearChatHistory,
   login,
   register,
   adminDeleteMessage,
@@ -188,6 +189,8 @@ export default function App() {
   const socketEndpoint = useMemo(() => getSocketEndpoint(), []);
   const isMobile = useIsMobile(900);
   const [mobileTab, setMobileTab] = useState("chats");
+  const [settingsPanelReq, setSettingsPanelReq] = useState({ panel: null, nonce: 0 });
+  const [composeMenuOpen, setComposeMenuOpen] = useState(false);
   const [mobileStoriesExpanded, setMobileStoriesExpanded] = useState(false);
   const [mobileTopNotice, setMobileTopNotice] = useState("");
   const [installDownloadOpen, setInstallDownloadOpen] = useState(false);
@@ -2123,6 +2126,25 @@ export default function App() {
     }
   }
 
+  async function handleClearChatHistory(chatId) {
+    const cid = Number(chatId);
+    await clearChatHistory(cid);
+    messagesCacheRef.current.set(cid, []);
+    if (Number(selectedChatId) === cid) setMessages([]);
+    setChats((prev) =>
+      prev.map((c) => (Number(c.id) === cid ? { ...c, lastMessage: null, unreadCount: 0 } : c))
+    );
+  }
+
+  function handleChangeWallpaper() {
+    if (isMobile) {
+      setMobileTab("settings");
+      setSettingsPanelReq((r) => ({ panel: "chatBackground", nonce: r.nonce + 1 }));
+    } else {
+      desktopUserMenuRef.current?.openPanel?.("chatBackground");
+    }
+  }
+
   function handleSend(payload) {
     const isObj = payload && typeof payload === "object" && !Array.isArray(payload);
     const text = isObj ? String(payload.text ?? "").trim() : String(payload ?? "").trim();
@@ -2639,6 +2661,9 @@ export default function App() {
     onChatListPinToggle: handleChatListPinToggle,
     onStartCall: beginOutgoingCall,
     callUiBlocked: call.phase !== "idle",
+    onClearHistory: handleClearChatHistory,
+    onDeleteChat: handleChatMembershipDelete,
+    onChangeWallpaper: handleChangeWallpaper,
   };
 
   const chatPropsDesktop = { ...chatPropsBase, onMobileBack: undefined };
@@ -2754,7 +2779,7 @@ export default function App() {
               <button
                 type="button"
                 className="tgTopTextBtn"
-                onClick={() => setMobileTopNotice(t("comingSoon"))}
+                onClick={() => mobileInboxSidebarRef.current?.enterSelectMode?.()}
               >
                 {t("editShort") || t("edit")}
               </button>
@@ -2798,7 +2823,7 @@ export default function App() {
                   type="button"
                   className="tgTopIconBtn"
                   aria-label={t("select") ?? "Select"}
-                  onClick={() => setMobileTopNotice(t("comingSoon"))}
+                  onClick={() => mobileInboxSidebarRef.current?.enterSelectMode?.()}
                 >
                   <span className="tgTopCheck" aria-hidden>
                     ✓
@@ -2808,7 +2833,7 @@ export default function App() {
                   type="button"
                   className="tgTopIconBtn"
                   aria-label={t("newMessage") ?? "New message"}
-                  onClick={() => mobileInboxSidebarRef.current?.openCreateGroup?.()}
+                  onClick={() => setComposeMenuOpen(true)}
                 >
                   <IconCompose size={20} />
                 </button>
@@ -2866,11 +2891,11 @@ export default function App() {
         ) : null}
 
         {mobileTab === "search" ? (
-          <div className="mobilePane mobilePane--placeholder">
+          <div className="mobilePane mobilePane--inbox mobilePane--search">
             <header className="mobileSubHeader">
               <h1 className="mobileSubHeaderTitle">{t("navSearch")}</h1>
             </header>
-            <div className="mobilePlaceholderBody muted">{t("comingSoon")}</div>
+            <Sidebar {...sidebarProps} mobileLayout autoFocusSearch />
           </div>
         ) : null}
 
@@ -2880,16 +2905,78 @@ export default function App() {
               {/* Left spacer keeps title centered (Telegram iOS-like). */}
               <span className="tgTopIconBtn tgTopIconBtn--spacer" aria-hidden />
               <div className="tgTopTitle">{t("navSettings")}</div>
-              <button type="button" className="tgTopTextBtn" onClick={() => {}}>
+              <button
+                type="button"
+                className="tgTopTextBtn"
+                onClick={() => setSettingsPanelReq((r) => ({ panel: "profile", nonce: r.nonce + 1 }))}
+              >
                 {t("editShort") || t("edit")}
               </button>
             </header>
             <div className="mobileSettingsScroll">
-              <UserMenu {...userMenuProps} variant="mobilePage" />
+              <UserMenu
+                {...userMenuProps}
+                variant="mobilePage"
+                requestPanel={settingsPanelReq.panel}
+                requestPanelNonce={settingsPanelReq.nonce}
+                onPanelConsumed={() => setSettingsPanelReq((r) => ({ panel: null, nonce: r.nonce }))}
+              />
             </div>
           </div>
         ) : null}
       </div>
+
+      {composeMenuOpen ? (
+        <div
+          className="tgComposeSheetBackdrop"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setComposeMenuOpen(false)}
+        >
+          <div className="tgComposeSheet" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="tgComposeSheetItem"
+              onClick={() => {
+                setComposeMenuOpen(false);
+                goMobileTab("contacts");
+              }}
+            >
+              <span className="tgComposeSheetIcon" aria-hidden><IconContacts size={20} /></span>
+              <span>{t("newMessage") ?? "New message"}</span>
+            </button>
+            <button
+              type="button"
+              className="tgComposeSheetItem"
+              onClick={() => {
+                setComposeMenuOpen(false);
+                mobileInboxSidebarRef.current?.openCreateGroup?.();
+              }}
+            >
+              <span className="tgComposeSheetIcon" aria-hidden>👥</span>
+              <span>{t("newGroup") ?? "New group"}</span>
+            </button>
+            <button
+              type="button"
+              className="tgComposeSheetItem"
+              onClick={() => {
+                setComposeMenuOpen(false);
+                mobileInboxSidebarRef.current?.openCreateChannel?.();
+              }}
+            >
+              <span className="tgComposeSheetIcon" aria-hidden>📢</span>
+              <span>{t("newChannel") ?? "New channel"}</span>
+            </button>
+            <button
+              type="button"
+              className="tgComposeSheetItem tgComposeSheetItem--cancel"
+              onClick={() => setComposeMenuOpen(false)}
+            >
+              {t("cancel") ?? "Cancel"}
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {mobileTab === "chats" && selectedChatId ? null : (
         <nav className="mobileBottomNav" aria-label={t("mobileNavLabel")}>

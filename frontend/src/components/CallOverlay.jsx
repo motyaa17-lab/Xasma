@@ -44,7 +44,7 @@ export default function CallOverlay({
 
   const title = useMemo(() => {
     if (!call) return "";
-    const dotsText = "…".repeat(dots);
+    const dotsText = ".".repeat(dots);
     if (call.phase === "calling") return `${t("callCalling")}${dotsText}`;
     if (call.phase === "ringing") return t("callIncoming");
     if (call.phase === "connecting") return `${t("callConnecting")}${dotsText}`;

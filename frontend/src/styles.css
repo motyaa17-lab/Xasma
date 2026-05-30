@@ -9552,17 +9552,13 @@ body.body--mobileConversationOpen {
 .tgChatRow::after {
   content: "";
   position: absolute;
-  left: 14px;
+  left: 70px;
   right: 0;
   bottom: 0;
   height: 1px;
   background: rgba(255, 255, 255, 0.06);
   transform: scaleY(0.5);
   transform-origin: bottom;
-}
-
-.tgChatRow::after {
-  left: 78px; /* aligns with iOS list: separator starts after avatar */
 }
 
 /* Pinned chats — gray/muted background like Telegram iOS */
@@ -12240,3 +12236,129 @@ html.cap-android .avatarPremium::after {
   }
 }
 
+
+/* ===== Chat-list multi-select mode (Telegram "Edit"/"Select") ===== */
+.tgChatRow--selectable {
+  padding-left: 6px;
+}
+.tgRowSelectMark {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  margin-right: 8px;
+  border-radius: 50%;
+  border: 2px solid var(--tg-divider, rgba(127, 127, 127, 0.45));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: transparent;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+.tgRowSelectMark--on {
+  background: #3390ec;
+  border-color: #3390ec;
+  transform: scale(1.05);
+}
+.tgChatRow--selected {
+  background: rgba(51, 144, 236, 0.12);
+}
+
+.tgSelectActionBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--tg-divider, rgba(127, 127, 127, 0.2));
+  background: var(--tg-bg, #fff);
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+}
+.tgSelectCount {
+  flex: 1 1 auto;
+  text-align: center;
+  font-size: 14px;
+  opacity: 0.8;
+}
+.tgSelectDeleteBtn,
+.dangerBtn {
+  background: #e53935;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.12s ease;
+}
+.dangerBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.dangerBtn:not(:disabled):active {
+  transform: scale(0.96);
+}
+
+/* ===== Compose action sheet (New message / group / channel) ===== */
+.tgComposeSheetBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: composeBackdropIn 0.2s ease;
+}
+@keyframes composeBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.tgComposeSheet {
+  width: min(520px, 100%);
+  background: var(--tg-bg, #fff);
+  border-radius: 16px 16px 0 0;
+  padding: 8px;
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.25);
+  animation: composeSheetIn 0.26s cubic-bezier(0.34, 1.12, 0.42, 1);
+}
+@keyframes composeSheetIn {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.tgComposeSheetItem {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  border: none;
+  background: transparent;
+  border-radius: 12px;
+  font-size: 16px;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+.tgComposeSheetItem:active {
+  background: rgba(127, 127, 127, 0.12);
+}
+.tgComposeSheetIcon {
+  width: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+.tgComposeSheetItem--cancel {
+  justify-content: center;
+  font-weight: 600;
+  color: #3390ec;
+  margin-top: 4px;
+}

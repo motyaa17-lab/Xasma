@@ -280,6 +280,21 @@ export async function deleteChatMembership(chatId) {
   });
 }
 
+/** Clear chat history for the current user only (Telegram "Clear history"). */
+export async function clearChatHistory(chatId) {
+  return apiFetch(`/api/chats/${chatId}/clear-history`, {
+    method: "POST",
+  });
+}
+
+/** Block / unblock a user (affects 1:1 messaging both ways). */
+export async function setUserBlocked(userId, block) {
+  return apiFetch(`/api/users/${Number(userId)}/block`, {
+    method: "POST",
+    body: { block: Boolean(block) },
+  });
+}
+
 export async function createGroup({ title, memberUserIds }) {
   const data = await apiFetch("/api/groups", {
     method: "POST",
